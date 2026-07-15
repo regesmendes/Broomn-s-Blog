@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String
+  avatarUrl      String?
+  role           Role      @default(USER)
+  googleId       String?   @unique
+  cognitoId      String?   @unique
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  comments       Comment[]
+  subscriptions  Newsletter[]
+
+  @@map("users")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+// ─── Posts ────────────────────────────────────────────────────────────────────
+
+model Post {
+  id          String      @id @default(cuid())
+  title       String
+  slug        String      @unique
+  excerpt     String?
+  content     String      // rich text / HTML
+  coverImage  String?
+  status      PostStatus  @default(DRAFT)
+  publishedAt DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  tags        TagsOnPosts[]
+  comments    Comment[]
+
+  @@map("posts")
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+}
+
+// ─── Tags ─────────────────────────────────────────────────────────────────────
+
+model Tag {
+  id    String        @id @default(cuid())
+  name  String        @unique
+  slug  String        @unique
+
+  posts TagsOnPosts[]
+
+  @@map("tags")
+}
+
+model TagsOnPosts {
+  postId String
+  tagId  String
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@map("tags_on_posts")
+}
+
+// ─── Comments ─────────────────────────────────────────────────────────────────
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  postId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+// ─── Newsletter ───────────────────────────────────────────────────────────────
+
+model Newsletter {
+  id          String             @id @default(cuid())
+  email       String             @unique
+  status      SubscriptionStatus @default(PENDING)
+  confirmedAt DateTime?
+  createdAt   DateTime           @default(now())
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("newsletter")
+}
+
+enum SubscriptionStatus {
+  PENDING
+  CONFIRMED
+  UNSUBSCRIBED
+}

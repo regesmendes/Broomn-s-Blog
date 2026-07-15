@@ -1,0 +1,266 @@
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+// Types
+
+export interface Tag {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface Post {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt?: string;
+  content: string;
+  coverImage?: string;
+  tags: Tag[];
+  status: 'DRAFT' | 'PUBLISHED';
+  publishedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  authorId: string;
+}
+
+export interface Comment {
+  id: string;
+  content: string;
+  authorName: string;
+  authorEmail: string;
+  postId: string;
+  post?: Post;
+  approved: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  picture?: string;
+  role: 'ADMIN' | 'USER';
+  createdAt: string;
+}
+
+export interface Subscriber {
+  id: string;
+  email: string;
+  confirmed: boolean;
+  createdAt: string;
+}
+
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  meta: PaginationMeta;
+}
+
+export interface AuthResponse {
+  accessToken: string;
+  refreshToken: string;
+  user: User;
+}
+
+// Error class
+
+export class ApiError extends Error {
+  status: number;
+  body: unknown;
+
+  constructor(message: string, status: number, body?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
+// API Client
+
+class ApiClient {
+  private baseUrl: string;
+
+  constructor(baseUrl: string) {
+    this.baseUrl = baseUrl;
+  }
+
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const url = `${this.baseUrl}${endpoint}`;
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+
+    const response = await fetch(url, { ...options, headers });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new ApiError(
+        body?.message || `Request failed with status ${response.status}`,
+        response.status,
+        body
+      );
+    }
+
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
+    return response.json();
+  }
+
+  private authHeaders(token?: string): HeadersInit {
+    if (!token) return {};
+    return { Authorization: `Bearer ${token}` };
+  }
+
+  // Posts
+
+  async getPosts(page = 1, limit = 10): Promise<PaginatedResponse<Post>> {
+    return this.request<PaginatedResponse<Post>>(`/posts?page=${page}&limit=${limit}`);
+  }
+
+  async getPost(slug: string): Promise<Post> {
+    return this.request<Post>(`/posts/${slug}`);
+  }
+
+  async getPostById(id: string): Promise<Post> {
+    return this.request<Post>(`/posts/id/${id}`);
+  }
+
+  async createPost(
+    data: {
+      title: string;
+      excerpt?: string;
+      content: string;
+      coverImage?: string;
+      tags?: string[];
+      status?: 'DRAFT' | 'PUBLISHED';
+      publishedAt?: string;
+    },
+    token: string
+  ): Promise<Post> {
+    return this.request<Post>('/posts', {
+      method: 'POST',
+      headers: this.authHeaders(token),
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updatePost(id: string, data: Partial<Post>, token: string): Promise<Post> {
+    return this.request<Post>(`/posts/${id}`, {
+      method: 'PATCH',
+      headers: this.authHeaders(token),
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deletePost(id: string, token: string): Promise<void> {
+    return this.request<void>(`/posts/${id}`, {
+      method: 'DELETE',
+      headers: this.authHeaders(token),
+    });
+  }
+
+  async publishPost(id: string, token: string): Promise<Post> {
+    return this.request<Post>(`/posts/${id}/publish`, {
+      method: 'PATCH',
+      headers: this.authHeaders(token),
+    });
+  }
+
+  // Comments
+
+  async getComments(postId: string): Promise<Comment[]> {
+    return this.request<Comment[]>(`/posts/${postId}/comments`);
+  }
+
+  async getAllComments(token: string): Promise<Comment[]> {
+    return this.request<Comment[]>('/comments', {
+      headers: this.authHeaders(token),
+    });
+  }
+
+  async createComment(
+    postId: string,
+    data: { content: string; authorName: string; authorEmail: string }
+  ): Promise<Comment> {
+    return this.request<Comment>(`/posts/${postId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async approveComment(id: string, token: string): Promise<Comment> {
+    return this.request<Comment>(`/comments/${id}/approve`, {
+      method: 'PATCH',
+      headers: this.authHeaders(token),
+    });
+  }
+
+  async deleteComment(id: string, token: string): Promise<void> {
+    return this.request<void>(`/comments/${id}`, {
+      method: 'DELETE',
+      headers: this.authHeaders(token),
+    });
+  }
+
+  // Auth
+
+  async loginWithGoogle(code: string): Promise<AuthResponse> {
+    return this.request<AuthResponse>('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+  }
+
+  async refreshToken(refreshToken: string): Promise<AuthResponse> {
+    return this.request<AuthResponse>('/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken }),
+    });
+  }
+
+  async getMe(token: string): Promise<User> {
+    return this.request<User>('/auth/me', {
+      headers: this.authHeaders(token),
+    });
+  }
+
+  // Newsletter
+
+  async subscribe(email: string): Promise<Subscriber> {
+    return this.request<Subscriber>('/newsletter/subscribe', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async getSubscribers(token: string): Promise<Subscriber[]> {
+    return this.request<Subscriber[]>('/newsletter/subscribers', {
+      headers: this.authHeaders(token),
+    });
+  }
+
+  async sendNewsletter(
+    data: { subject: string; content: string },
+    token: string
+  ): Promise<{ sent: number }> {
+    return this.request<{ sent: number }>('/newsletter/send', {
+      method: 'POST',
+      headers: this.authHeaders(token),
+      body: JSON.stringify(data),
+    });
+  }
+}
+
+const api = new ApiClient(API_URL);
+export default api;
