@@ -1,4 +1,4 @@
-# Fora do Programa
+# Broomn's Blog
 
 A personal blog built from scratch with Node.js, deployed on AWS serverless infrastructure.
 
@@ -261,4 +261,4 @@ This is a personal project. If you're reading this as a collaborator or future-m
 1. **API pattern**: routes → controllers → services → repositories. Add new features by following the existing post/comment/newsletter pattern.
 2. **Tests**: Run `npm test` in `api/` before committing. Add tests for new endpoints.
 3. **Frontend**: Run `npm run dev` in `frontend/`. TypeScript errors caught by `npx tsc --noEmit`.
-4. **No commits to main without tests passing.**
+4. **No commits to master without tests passing.**
