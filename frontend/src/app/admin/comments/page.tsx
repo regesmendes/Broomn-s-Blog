@@ -11,7 +11,7 @@ export default function AdminCommentsPage() {
     loadComments();
   }, []);
 
-  const getToken = () => localStorage.getItem('accessToken') || '';
+  const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('accessToken') || '' : '';
 
   const loadComments = async () => {
     try {

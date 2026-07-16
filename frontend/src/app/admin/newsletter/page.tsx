@@ -12,7 +12,7 @@ export default function AdminNewsletterPage() {
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
 
-  const getToken = () => localStorage.getItem('accessToken') || '';
+  const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('accessToken') || '' : '';
 
   useEffect(() => {
     loadSubscribers();

@@ -155,7 +155,7 @@ foradoprograma/
 
 ### Prerequisites
 
-- Node.js >= 20
+- Node.js >= 20 (tested on Node 25 — see note below)
 - Docker (for PostgreSQL)
 - npm
 
@@ -170,6 +170,7 @@ cd api
 cp .env.example .env
 npm install
 npm run db:migrate    # Type "init" when prompted for migration name
+npm run db:seed       # Creates admin user, test user, and a sample post
 npm run dev           # Starts on http://localhost:3001
 
 # 3. Set up the frontend (separate terminal)
@@ -177,6 +178,39 @@ cd frontend
 npm install
 npm run dev           # Starts on http://localhost:3000
 ```
+
+Open http://localhost:3000 — you should see the "Hello World" sample post.
+
+### Dev authentication
+
+Since Google OAuth (Cognito) requires AWS infrastructure, we provide a **dev-only login endpoint** for local development:
+
+```bash
+# Get an admin JWT token
+curl -X POST http://localhost:3001/auth/dev-login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@broomns-blog.local"}'
+
+# Get a regular user token
+curl -X POST http://localhost:3001/auth/dev-login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@broomns-blog.local"}'
+```
+
+Use the returned `accessToken` in the `Authorization: Bearer <token>` header to access admin endpoints.
+
+**This endpoint only exists when `NODE_ENV !== 'production'`.** It will never be available in production.
+
+### Seeded users
+
+| Email | Role | Purpose |
+|---|---|---|
+| `admin@broomns-blog.local` | ADMIN | Create/edit posts, moderate comments, send newsletters |
+| `user@broomns-blog.local` | USER | Test commenting as a regular user |
+
+### Node.js 25 note
+
+Node.js 25 introduced a built-in `localStorage` global that requires `--localstorage-file` to function. Next.js's dev overlay uses `localStorage` internally, which crashes on Node 25 without this flag. The frontend's `dev` script includes `NODE_OPTIONS='--localstorage-file=.next/.localStorage'` to handle this. If you're on Node 20–22, this is harmless.
 
 ### Running tests
 
