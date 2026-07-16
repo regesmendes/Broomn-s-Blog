@@ -25,6 +25,13 @@ export const commentController = {
     return reply.send(result)
   },
 
+  // ── GET /comments/admin (admin — all comments across all posts) ──────────────
+  async listAllGlobal(request: FastifyRequest, reply: FastifyReply) {
+    const query = listCommentsQuerySchema.parse(request.query)
+    const result = await commentService.listAllGlobal(query)
+    return reply.send(result)
+  },
+
   // ── POST /posts/:postId/comments (auth required) ─────────────────────────────
   async create(request: FastifyRequest, reply: FastifyReply) {
     const { postId } = commentPostParamSchema.parse(request.params)

@@ -39,6 +39,22 @@ export const commentService = {
     return { data: comments, meta }
   },
 
+  /** List all comments across all posts — admin global view. */
+  async listAllGlobal(query: ListCommentsQuery) {
+    const { page, limit, approved } = query
+    const approvedFilter = approved === 'true' ? true : approved === 'false' ? false : undefined
+    const { total, comments } = await commentRepository.findAll(page, limit, approvedFilter)
+
+    const meta: PaginationMeta = {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    }
+
+    return { data: comments, meta }
+  },
+
   /** Create a comment. */
   async create(postId: string, userId: string, content: string) {
     return commentRepository.create(postId, userId, content)

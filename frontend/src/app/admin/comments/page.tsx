@@ -1,106 +1,186 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import api, { Comment } from '@/lib/api';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import api, { AdminComment } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
+
+type Filter = 'pending' | 'approved' | 'all';
 
 export default function AdminCommentsPage() {
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [comments, setComments] = useState<AdminComment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<Filter>('pending');
+  const [total, setTotal] = useState(0);
+  const { getToken } = useAuth();
 
   useEffect(() => {
     loadComments();
-  }, []);
+  }, [filter]);
 
-  const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('accessToken') || '' : '';
-
-  const loadComments = async () => {
+  async function loadComments() {
+    setLoading(true);
     try {
-      const data = await api.getAllComments(getToken());
-      setComments(data);
+      const approved = filter === 'pending' ? 'false' : filter === 'approved' ? 'true' : undefined;
+      const token = getToken() || '';
+      const result = await api.getAdminComments(token, { approved });
+      setComments(result.data);
+      setTotal(result.meta.total);
     } catch {
-      console.error('Failed to load comments');
+      setComments([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleApprove = async (id: string) => {
-    try {
-      const updated = await api.approveComment(id, getToken());
-      setComments(comments.map((c) => (c.id === id ? updated : c)));
-    } catch {
-      console.error('Failed to approve comment');
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this comment?')) return;
-    try {
-      await api.deleteComment(id, getToken());
-      setComments(comments.filter((c) => c.id !== id));
-    } catch {
-      console.error('Failed to delete comment');
-    }
-  };
-
-  if (loading) {
-    return <p className="text-gray-500">Loading comments...</p>;
   }
+
+  async function handleApprove(id: string, approved: boolean) {
+    try {
+      const token = getToken() || '';
+      await api.approveComment(id, approved, token);
+      // Remove from list or update status
+      if (filter === 'pending' && approved) {
+        setComments(comments.filter((c) => c.id !== id));
+        setTotal(total - 1);
+      } else if (filter === 'approved' && !approved) {
+        setComments(comments.filter((c) => c.id !== id));
+        setTotal(total - 1);
+      } else {
+        setComments(comments.map((c) => (c.id === id ? { ...c, approved } : c)));
+      }
+    } catch {
+      console.error('Failed to update comment');
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('Delete this comment permanently?')) return;
+    try {
+      const token = getToken() || '';
+      await api.deleteComment(id, token);
+      setComments(comments.filter((c) => c.id !== id));
+      setTotal(total - 1);
+    } catch (err) {
+      console.error('Failed to delete comment', err);
+      alert('Failed to delete: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  }
+
+  const tabs: { key: Filter; label: string }[] = [
+    { key: 'pending', label: 'Pending' },
+    { key: 'approved', label: 'Approved' },
+    { key: 'all', label: 'All' },
+  ];
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold text-gray-900">Comment Moderation</h1>
+      <h1 className="mb-6 text-2xl font-bold text-gray-900 dark:text-white">Comment Moderation</h1>
 
-      {comments.length === 0 ? (
-        <p className="text-gray-500">No comments to moderate.</p>
-      ) : (
+      {/* Tabs */}
+      <div className="mb-6 flex gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-700">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setFilter(tab.key)}
+            className={`cursor-pointer rounded-md px-4 py-2 text-sm font-medium transition ${
+              filter === tab.key
+                ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Count */}
+      {!loading && (
+        <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+          {total} comment{total !== 1 ? 's' : ''} found
+        </p>
+      )}
+
+      {/* Loading */}
+      {loading && <p className="text-gray-500 dark:text-gray-400">Loading...</p>}
+
+      {/* Empty state */}
+      {!loading && comments.length === 0 && (
+        <p className="text-gray-500 dark:text-gray-400">
+          {filter === 'pending' ? 'No comments awaiting moderation.' : 'No comments found.'}
+        </p>
+      )}
+
+      {/* Comments list */}
+      {!loading && comments.length > 0 && (
         <div className="space-y-4">
           {comments.map((comment) => (
             <div
               key={comment.id}
-              className="rounded-lg border border-gray-200 bg-white p-4"
+              className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
             >
-              <div className="mb-2 flex items-center justify-between">
+              {/* Header */}
+              <div className="mb-2 flex items-start justify-between">
                 <div>
-                  <span className="font-medium text-gray-900">
-                    {comment.authorName}
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    {comment.user.name}
                   </span>
-                  <span className="ml-2 text-sm text-gray-500">
-                    {comment.authorEmail}
+                  <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
+                    {new Date(comment.createdAt).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
                   </span>
                 </div>
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                     comment.approved
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-yellow-100 text-yellow-700'
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                      : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
                   }`}
                 >
                   {comment.approved ? 'Approved' : 'Pending'}
                 </span>
               </div>
 
-              <p className="mb-3 text-gray-700">{comment.content}</p>
+              {/* Post context */}
+              <div className="mb-2">
+                <span className="text-xs text-gray-500 dark:text-gray-400">on </span>
+                <Link
+                  href={`/posts/${comment.post.slug}`}
+                  className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  {comment.post.title}
+                </Link>
+              </div>
 
+              {/* Content */}
+              <p className="mb-3 text-gray-700 dark:text-gray-300">{comment.content}</p>
+
+              {/* Actions */}
               <div className="flex items-center gap-4 text-sm">
-                <span className="text-gray-400">
-                  {new Date(comment.createdAt).toLocaleDateString('pt-BR')}
-                </span>
-
                 {!comment.approved && (
                   <button
-                    onClick={() => handleApprove(comment.id)}
-                    className="text-green-600 hover:text-green-800"
+                    onClick={() => handleApprove(comment.id, true)}
+                    className="cursor-pointer text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
                   >
-                    Approve
+                    ✓ Approve
                   </button>
                 )}
-
+                {comment.approved && (
+                  <button
+                    onClick={() => handleApprove(comment.id, false)}
+                    className="cursor-pointer text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-300"
+                  >
+                    ↩ Reject
+                  </button>
+                )}
                 <button
                   onClick={() => handleDelete(comment.id)}
-                  className="text-red-600 hover:text-red-800"
+                  className="cursor-pointer text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
                 >
-                  Delete
+                  ✕ Delete
                 </button>
               </div>
             </div>

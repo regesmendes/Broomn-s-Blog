@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import api, { ApiError } from '@/lib/api';
+import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import api, { ApiError, Post } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { RichTextEditor } from '@/components/RichTextEditor';
 
@@ -16,10 +16,14 @@ interface PostFormData {
   publishedAt: string;
 }
 
-export default function NewPostPage() {
+export default function EditPostPage() {
   const router = useRouter();
-  const { getToken } = useAuth();
-  const [loading, setLoading] = useState(false);
+  const params = useParams();
+  const postId = params.id as string;
+  const { getToken, isLoading: authLoading } = useAuth();
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<PostFormData>({
     title: '',
@@ -31,6 +35,34 @@ export default function NewPostPage() {
     publishedAt: '',
   });
 
+  useEffect(() => {
+    if (!authLoading) {
+      loadPost();
+    }
+  }, [postId, authLoading]);
+
+  const loadPost = async () => {
+    try {
+      const token = getToken() || '';
+      const post = await api.getPostById(postId, token);
+      setForm({
+        title: post.title,
+        excerpt: post.excerpt || '',
+        content: post.content,
+        coverImage: post.coverImage || '',
+        tags: post.tags.map((t) => t.name).join(', '),
+        status: post.status,
+        publishedAt: post.publishedAt
+          ? new Date(post.publishedAt).toISOString().slice(0, 16)
+          : '',
+      });
+    } catch (err) {
+      setError('Failed to load post.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
@@ -40,7 +72,7 @@ export default function NewPostPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSaving(true);
     setError(null);
 
     const token = getToken() || '';
@@ -50,7 +82,8 @@ export default function NewPostPage() {
       .filter(Boolean);
 
     try {
-      await api.createPost(
+      await api.updatePost(
+        postId,
         {
           title: form.title,
           content: form.content,
@@ -67,16 +100,20 @@ export default function NewPostPage() {
       if (err instanceof ApiError) {
         setError(err.message);
       } else {
-        setError('Failed to create post.');
+        setError('Failed to update post.');
       }
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
+  if (loading) {
+    return <p className="text-gray-500">Loading post...</p>;
+  }
+
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold text-gray-900 dark:text-white">New Post</h1>
+      <h1 className="mb-6 text-2xl font-bold text-gray-900 dark:text-white">Edit Post</h1>
 
       <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
         <div>
@@ -109,7 +146,7 @@ export default function NewPostPage() {
         </div>
 
         <div>
-          <label htmlFor="content" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Content *
           </label>
           <div className="mt-1">
@@ -184,13 +221,22 @@ export default function NewPostPage() {
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded-md bg-gray-900 px-6 py-2 text-white hover:bg-gray-700 disabled:opacity-50"
-        >
-          {loading ? 'Creating...' : 'Create Post'}
-        </button>
+        <div className="flex gap-3">
+          <button
+            type="submit"
+            disabled={saving}
+            className="rounded-md bg-gray-900 px-6 py-2 text-white hover:bg-gray-700 disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/admin/posts')}
+            className="rounded-md border border-gray-300 px-6 py-2 text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+        </div>
       </form>
     </div>
   );

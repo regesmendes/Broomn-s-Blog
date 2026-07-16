@@ -30,6 +30,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.register(cors, {
     origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
     credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   })
 
   app.register(rateLimit, {

@@ -3,8 +3,9 @@ import { z } from 'zod'
 // ─── Query schemas ─────────────────────────────────────────────────────────────
 
 export const listCommentsQuerySchema = z.object({
-  page:  z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  page:     z.coerce.number().int().min(1).default(1),
+  limit:    z.coerce.number().int().min(1).max(100).default(20),
+  approved: z.enum(['true', 'false']).optional(),
 })
 
 export const commentPostParamSchema = z.object({
