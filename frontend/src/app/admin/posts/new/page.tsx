@@ -40,7 +40,7 @@ export default function NewPostPage() {
     setLoading(true);
     setError(null);
 
-    const token = localStorage.getItem('accessToken') || '';
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') || '' : '';
     const tagsArray = form.tags
       .split(',')
       .map((t) => t.trim())

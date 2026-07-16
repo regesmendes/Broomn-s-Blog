@@ -9,6 +9,7 @@ import { postRoutes } from './routes/post.routes'
 import { authRoutes } from './routes/auth.routes'
 import { commentRoutes } from './routes/comment.routes'
 import { newsletterRoutes } from './routes/newsletter.routes'
+import { devAuthRoutes } from './routes/dev-auth.routes'
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -75,6 +76,11 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.register(postRoutes, { prefix: '/posts' })
   app.register(commentRoutes)
   app.register(newsletterRoutes, { prefix: '/newsletter' })
+
+  // Dev-only routes (never available in production)
+  if (process.env.NODE_ENV !== 'production') {
+    app.register(devAuthRoutes, { prefix: '/auth' })
+  }
 
   // ── Global error handler ───────────────────────────────────────────────────
   app.setErrorHandler((error, request, reply) => {

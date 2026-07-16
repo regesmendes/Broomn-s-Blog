@@ -25,7 +25,7 @@ export default function AdminPostsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this post?')) return;
-    const token = localStorage.getItem('accessToken') || '';
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') || '' : '';
     try {
       await api.deletePost(id, token);
       setPosts(posts.filter((p) => p.id !== id));

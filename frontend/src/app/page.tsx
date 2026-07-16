@@ -1,16 +1,29 @@
 import Link from 'next/link';
 import api from '@/lib/api';
+import { Post } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const { data: posts } = await api.getPosts();
+  let posts: Post[] = [];
+  let error = false;
+
+  try {
+    const result = await api.getPosts();
+    posts = result.data;
+  } catch {
+    error = true;
+  }
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-12">
       <h1 className="mb-8 text-3xl font-bold text-gray-900">Latest Posts</h1>
 
-      {posts.length === 0 && (
+      {error && (
+        <p className="text-gray-500">Unable to load posts. Please try again later.</p>
+      )}
+
+      {!error && posts.length === 0 && (
         <p className="text-gray-500">No posts yet. Check back soon!</p>
       )}
 
@@ -33,7 +46,7 @@ export default async function HomePage() {
             <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
               {post.publishedAt && (
                 <time dateTime={post.publishedAt}>
-                  {new Date(post.publishedAt).toLocaleDateString('pt-BR', {
+                  {new Date(post.publishedAt).toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric',
