@@ -26,13 +26,21 @@ export interface Post {
 export interface Comment {
   id: string;
   content: string;
-  authorName: string;
-  authorEmail: string;
-  postId: string;
-  post?: Post;
   approved: boolean;
   createdAt: string;
-  updatedAt: string;
+  user: {
+    id: string;
+    name: string;
+    avatarUrl: string | null;
+  };
+}
+
+export interface AdminComment extends Comment {
+  post: {
+    id: string;
+    title: string;
+    slug: string;
+  };
 }
 
 export interface User {
@@ -95,7 +103,7 @@ class ApiClient {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     const headers: HeadersInit = {
-      'Content-Type': 'application/json',
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
       ...options.headers,
     };
 
@@ -132,8 +140,10 @@ class ApiClient {
     return this.request<Post>(`/posts/${slug}`);
   }
 
-  async getPostById(id: string): Promise<Post> {
-    return this.request<Post>(`/posts/id/${id}`);
+  async getPostById(id: string, token: string): Promise<Post> {
+    return this.request<Post>(`/posts/admin/${id}`, {
+      headers: this.authHeaders(token),
+    });
   }
 
   async createPost(
@@ -155,9 +165,17 @@ class ApiClient {
     });
   }
 
-  async updatePost(id: string, data: Partial<Post>, token: string): Promise<Post> {
+  async updatePost(id: string, data: {
+    title?: string;
+    excerpt?: string;
+    content?: string;
+    coverImage?: string;
+    tags?: string[];
+    status?: 'DRAFT' | 'PUBLISHED';
+    publishedAt?: string;
+  }, token: string): Promise<Post> {
     return this.request<Post>(`/posts/${id}`, {
-      method: 'PATCH',
+      method: 'PUT',
       headers: this.authHeaders(token),
       body: JSON.stringify(data),
     });
@@ -179,30 +197,39 @@ class ApiClient {
 
   // Comments
 
-  async getComments(postId: string): Promise<Comment[]> {
-    return this.request<Comment[]>(`/posts/${postId}/comments`);
+  async getComments(postId: string): Promise<PaginatedResponse<Comment>> {
+    return this.request<PaginatedResponse<Comment>>(`/posts/${postId}/comments`);
   }
 
-  async getAllComments(token: string): Promise<Comment[]> {
-    return this.request<Comment[]>('/comments', {
+  async getPostComments(postId: string, token: string): Promise<PaginatedResponse<Comment>> {
+    return this.request<PaginatedResponse<Comment>>(`/posts/${postId}/comments/all`, {
       headers: this.authHeaders(token),
     });
   }
 
-  async createComment(
-    postId: string,
-    data: { content: string; authorName: string; authorEmail: string }
-  ): Promise<Comment> {
-    return this.request<Comment>(`/posts/${postId}/comments`, {
-      method: 'POST',
-      body: JSON.stringify(data),
+  async getAdminComments(token: string, params?: { page?: number; approved?: string }): Promise<PaginatedResponse<AdminComment>> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', String(params.page));
+    if (params?.approved) searchParams.set('approved', params.approved);
+    const query = searchParams.toString();
+    return this.request<PaginatedResponse<AdminComment>>(`/comments/admin${query ? `?${query}` : ''}`, {
+      headers: this.authHeaders(token),
     });
   }
 
-  async approveComment(id: string, token: string): Promise<Comment> {
+  async createComment(postId: string, content: string, token: string): Promise<Comment> {
+    return this.request<Comment>(`/posts/${postId}/comments`, {
+      method: 'POST',
+      headers: this.authHeaders(token),
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  async approveComment(id: string, approved: boolean, token: string): Promise<Comment> {
     return this.request<Comment>(`/comments/${id}/approve`, {
       method: 'PATCH',
       headers: this.authHeaders(token),
+      body: JSON.stringify({ approved }),
     });
   }
 

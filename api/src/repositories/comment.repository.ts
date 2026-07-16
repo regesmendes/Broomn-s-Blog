@@ -14,6 +14,27 @@ const commentSelect = {
   },
 } as const
 
+const adminCommentSelect = {
+  id:        true,
+  content:   true,
+  approved:  true,
+  createdAt: true,
+  user: {
+    select: {
+      id:        true,
+      name:      true,
+      avatarUrl: true,
+    },
+  },
+  post: {
+    select: {
+      id:    true,
+      title: true,
+      slug:  true,
+    },
+  },
+} as const
+
 export const commentRepository = {
   /** Get approved comments for a post (public). */
   async findApprovedByPost(postId: string, page: number, limit: number) {
@@ -79,5 +100,23 @@ export const commentRepository = {
   /** Delete a comment. */
   async delete(id: string) {
     return prisma.comment.delete({ where: { id } })
+  },
+
+  /** Get all comments across all posts (admin). Filterable by approval status. */
+  async findAll(page: number, limit: number, approved?: boolean) {
+    const where = approved !== undefined ? { approved } : {}
+
+    const [total, comments] = await prisma.$transaction([
+      prisma.comment.count({ where }),
+      prisma.comment.findMany({
+        where,
+        select:  adminCommentSelect,
+        orderBy: { createdAt: 'desc' },
+        skip:    (page - 1) * limit,
+        take:    limit,
+      }),
+    ])
+
+    return { total, comments }
   },
 }

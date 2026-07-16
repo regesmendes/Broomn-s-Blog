@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import api, { ApiError, Subscriber } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
 
 export default function AdminNewsletterPage() {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
@@ -12,7 +13,7 @@ export default function AdminNewsletterPage() {
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
 
-  const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('accessToken') || '' : '';
+  const { getToken } = useAuth();
 
   useEffect(() => {
     loadSubscribers();
@@ -20,7 +21,7 @@ export default function AdminNewsletterPage() {
 
   const loadSubscribers = async () => {
     try {
-      const data = await api.getSubscribers(getToken());
+      const data = await api.getSubscribers(getToken() || '');
       setSubscribers(data);
     } catch {
       console.error('Failed to load subscribers');
@@ -36,7 +37,7 @@ export default function AdminNewsletterPage() {
     setSendError(null);
 
     try {
-      const result = await api.sendNewsletter({ subject, content }, getToken());
+      const result = await api.sendNewsletter({ subject, content }, getToken() || '');
       setSendSuccess(`Newsletter sent to ${result.sent} subscribers.`);
       setSubject('');
       setContent('');
@@ -89,7 +90,7 @@ export default function AdminNewsletterPage() {
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
             />
           </div>
           <div>
@@ -102,7 +103,7 @@ export default function AdminNewsletterPage() {
               onChange={(e) => setContent(e.target.value)}
               required
               rows={6}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
             />
           </div>
 

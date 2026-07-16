@@ -17,6 +17,9 @@ export async function commentRoutes(app: FastifyInstance) {
 
   // ── Top-level comment actions ────────────────────────────────────────────────
 
+  // GET /comments/admin — list all comments across all posts (admin)
+  app.get('/comments/admin', { preHandler: [authenticate, authorize('admin')] }, commentController.listAllGlobal)
+
   // PATCH /comments/:id/approve — admin only
   app.patch('/comments/:id/approve', { preHandler: [authenticate, authorize('admin')] }, commentController.approve)
 

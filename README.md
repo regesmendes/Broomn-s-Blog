@@ -1,6 +1,8 @@
 # Broomn's Blog
 
-A personal blog built from scratch with Node.js, deployed on AWS serverless infrastructure.
+Chronicles from Broomn, the druid storyteller. A place for stories worth sharing around the fire.
+
+Built from scratch with Node.js, deployed on AWS serverless infrastructure.
 
 ## What is this?
 
