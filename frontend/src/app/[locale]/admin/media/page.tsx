@@ -20,6 +20,9 @@ export default function MediaLibraryPage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadMedia = useCallback(async () => {
@@ -27,14 +30,15 @@ export default function MediaLibraryPage() {
     if (!token) return;
     try {
       setLoading(true);
-      const items = await api.getMedia(token);
-      setMedia(items);
+      const result = await api.getMedia(token, { page, limit: 10, search: search || undefined });
+      setMedia(result.data);
+      setTotalPages(result.meta.totalPages);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load media');
     } finally {
       setLoading(false);
     }
-  }, [getToken]);
+  }, [getToken, page, search]);
 
   useEffect(() => {
     loadMedia();
@@ -140,12 +144,23 @@ export default function MediaLibraryPage() {
       <div className="flex gap-6">
         {/* Grid */}
         <div className="flex-1">
+          <div className="mb-4">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Search images by filename..."
+              className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+            />
+          </div>
+
           {loading ? (
             <p className="text-gray-500 dark:text-gray-400">Loading media...</p>
           ) : media.length === 0 ? (
-            <p className="text-gray-500 dark:text-gray-400">No media uploaded yet.</p>
+            <p className="text-gray-500 dark:text-gray-400">{search ? 'No images match your search.' : 'No media uploaded yet.'}</p>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            <>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               {media.map((item) => (
                 <button
                   key={item.id}
@@ -181,6 +196,28 @@ export default function MediaLibraryPage() {
                 </button>
               ))}
             </div>
+              {totalPages > 1 && (
+                <div className="mt-4 flex items-center justify-center gap-4">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                    className="cursor-pointer rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                  >
+                    ← Previous
+                  </button>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    {page} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                    className="cursor-pointer rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
 

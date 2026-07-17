@@ -344,8 +344,13 @@ class ApiClient {
     return response.json();
   }
 
-  async getMedia(token: string): Promise<MediaItem[]> {
-    return this.request<MediaItem[]>('/media', {
+  async getMedia(token: string, params?: { page?: number; limit?: number; search?: string }): Promise<PaginatedResponse<MediaItem>> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', String(params.page));
+    if (params?.limit) searchParams.set('limit', String(params.limit));
+    if (params?.search) searchParams.set('search', params.search);
+    const query = searchParams.toString();
+    return this.request<PaginatedResponse<MediaItem>>(`/media${query ? `?${query}` : ''}`, {
       headers: this.authHeaders(token),
     });
   }
