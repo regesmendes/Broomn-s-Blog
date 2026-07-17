@@ -28,6 +28,16 @@ The API and frontend are fully implemented and working locally. Infrastructure (
 - ✅ Cognito integration (ready — needs AWS infrastructure)
 - ✅ Newsletter with HMAC-based email confirmation/unsubscribe tokens
 - ✅ Frontend with all pages (public blog, admin panel, auth flow)
+- ✅ Auth context with token management and auto-refresh
+- ✅ Protected admin routes (redirects to login if unauthenticated)
+- ✅ Rich text editor (Tiptap) for creating/editing posts
+- ✅ Dark mode with toggle (persists preference)
+- ✅ Comment section on post detail page with moderation
+- ✅ SEO metadata (dynamic og:title, description, og:image per post)
+- ✅ Mulgore-inspired visual identity (landscape hero, druidic emblem, vine dividers)
+- ✅ Custom typography (Cinzel headings, Lora body — manuscript/scroll feel)
+- ✅ i18n: Portuguese (default) + English with language switcher
+- ✅ On-the-fly post translation via MyMemory API (preserves HTML structure)
 - ✅ TypeScript compiles clean across both projects
 
 ### Known Issues
@@ -270,24 +280,17 @@ These are the remaining pieces to complete the project, roughly in priority orde
 - [ ] SES integration for newsletter sending (currently stubbed)
 - [ ] SES integration for confirmation emails
 - [ ] S3 presigned URL endpoint for image uploads
-- [ ] Admin endpoint to list all comments across all posts
 - [ ] Pagination cursors for better performance at scale
 - [ ] Request rate limiting per user (not just per IP)
 
 ### Frontend enhancements
 - [ ] Complete the OAuth callback (Cognito token exchange)
-- [ ] Auth context/provider (store tokens, refresh automatically)
-- [ ] Protected route wrapper for admin pages
-- [ ] Post edit page (currently only create exists)
-- [ ] Rich text editor for post content (replace raw HTML textarea)
 - [ ] Image upload in post editor
-- [ ] Comment section on post detail page
-- [ ] SEO metadata per post (dynamic og:image, description)
-- [ ] Dark mode
+- [ ] Pagination on home page
 
 ### DevOps
 - [ ] GitHub Actions CI pipeline (lint, test, build)
-- [ ] Deployment pipeline (CDK deploy on merge to main)
+- [ ] Deployment pipeline (CDK deploy on merge to master)
 - [ ] Environment separation (dev/staging/prod)
 
 ## Contributing
@@ -298,3 +301,4 @@ This is a personal project. If you're reading this as a collaborator or future-m
 2. **Tests**: Run `npm test` in `api/` before committing. Add tests for new endpoints.
 3. **Frontend**: Run `npm run dev` in `frontend/`. TypeScript errors caught by `npx tsc --noEmit`.
 4. **No commits to master without tests passing.**
+5. **Always update this README** when adding features or changing architecture before raising a PR.
