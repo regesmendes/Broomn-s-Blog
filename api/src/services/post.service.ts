@@ -19,8 +19,8 @@ export interface PaginationMeta {
 
 export const postService = {
   async listPublished(query: ListPostsQuery) {
-    const { page, limit, tag } = query
-    const { total, posts } = await postRepository.findPublished({ page, limit, tag })
+    const { page, limit, tag, search } = query
+    const { total, posts } = await postRepository.findPublished({ page, limit, tag, search })
 
     const meta: PaginationMeta = {
       total,

@@ -18,7 +18,7 @@ export async function generateMetadata({
   try {
     const post = await api.getPost(slug);
     return {
-      title: `${post.title} | Broomn's Blog`,
+      title: `${post.title} | Blog do Broomn`,
       description: post.excerpt || post.content.replace(/<[^>]*>/g, '').slice(0, 160),
       openGraph: {
         title: post.title,
@@ -35,7 +35,7 @@ export async function generateMetadata({
       },
     };
   } catch {
-    return { title: "Post not found | Broomn's Blog" };
+    return { title: "Post not found | Blog do Broomn" };
   }
 }
 

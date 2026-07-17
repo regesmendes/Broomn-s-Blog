@@ -16,7 +16,13 @@
     "latestPosts": "Latest Posts",
     "noPosts": "No posts yet. Check back soon!",
     "loadError": "Unable to load posts. Please try again later.",
-    "translationUnavailable": "Translation unavailable right now."
+    "translationUnavailable": "Translation unavailable right now.",
+    "searchPlaceholder": "Search posts...",
+    "searchButton": "Search",
+    "clearFilters": "Clear",
+    "previousPage": "← Previous",
+    "nextPage": "Next →",
+    "pageOf": "Page {current} of {total}"
   },
   "newsletter": {
     "title": "Newsletter",

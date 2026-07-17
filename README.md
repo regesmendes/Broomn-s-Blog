@@ -124,9 +124,10 @@ foradoprograma/
 | Method | Path | Description |
 |---|---|---|
 | GET | `/health` | Health check |
-| GET | `/posts` | List published posts (paginated, filterable by tag) |
+| GET | `/posts` | List published posts (paginated, filterable by tag, text search) |
 | GET | `/posts/:slug` | Get a single published post |
 | GET | `/posts/:postId/comments` | List approved comments for a post |
+| GET | `/tags` | List all tags with post count |
 | POST | `/newsletter/subscribe` | Subscribe to newsletter |
 | GET | `/newsletter/confirm?token=` | Confirm subscription |
 | GET | `/newsletter/unsubscribe?token=` | Unsubscribe |
@@ -286,7 +287,6 @@ These are the remaining pieces to complete the project, roughly in priority orde
 ### Frontend enhancements
 - [ ] Complete the OAuth callback (Cognito token exchange)
 - [ ] Image upload in post editor
-- [ ] Pagination on home page
 
 ### DevOps
 - [ ] GitHub Actions CI pipeline (lint, test, build)
