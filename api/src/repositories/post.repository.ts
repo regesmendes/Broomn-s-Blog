@@ -4,9 +4,10 @@ import { CreatePostBody, UpdatePostBody } from '../schemas/post.schema'
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 export interface FindPublishedPostsOptions {
-  page:  number
-  limit: number
-  tag?:  string
+  page:    number
+  limit:   number
+  tag?:    string
+  search?: string
 }
 
 export interface UpsertTagsResult {
@@ -46,7 +47,7 @@ export const postRepository = {
    * Count and fetch published posts visible to the public.
    * A post is visible when status = PUBLISHED and publishedAt <= now.
    */
-  async findPublished({ page, limit, tag }: FindPublishedPostsOptions) {
+  async findPublished({ page, limit, tag, search }: FindPublishedPostsOptions) {
     const now = new Date()
 
     const where = {
@@ -56,6 +57,13 @@ export const postRepository = {
         tags: {
           some: { tag: { slug: tag } },
         },
+      }),
+      ...(search && {
+        OR: [
+          { title:   { contains: search, mode: 'insensitive' as const } },
+          { excerpt: { contains: search, mode: 'insensitive' as const } },
+          { content: { contains: search, mode: 'insensitive' as const } },
+        ],
       }),
     }
 

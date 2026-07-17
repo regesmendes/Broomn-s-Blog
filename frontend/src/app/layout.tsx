@@ -16,8 +16,8 @@ const lora = Lora({
 });
 
 export const metadata: Metadata = {
-  title: "Broomn's Blog",
-  description: 'Chronicles from Broomn, the druid storyteller. A place for stories worth sharing around the fire.',
+  title: "Blog do Broomn",
+  description: 'Crônicas de Broomn, o druida contador de histórias. Um lugar para histórias que merecem ser compartilhadas ao redor da fogueira.',
 };
 
 export default function RootLayout({

@@ -1,11 +1,11 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: "Newsletter | Broomn's Blog",
-  description: 'Subscribe to get notified when new posts are published. No spam, unsubscribe anytime.',
+  title: "Newsletter | Blog do Broomn",
+  description: 'Receba uma notificação quando novas histórias forem publicadas. Sem spam, cancele a qualquer momento.',
   openGraph: {
-    title: "Newsletter | Broomn's Blog",
-    description: 'Subscribe to get notified when new posts are published.',
+    title: "Newsletter | Blog do Broomn",
+    description: 'Receba uma notificação quando novas histórias forem publicadas.',
   },
 };
 

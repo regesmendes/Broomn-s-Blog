@@ -16,7 +16,7 @@ export default function AdminPostsPage() {
 
   const loadPosts = async () => {
     try {
-      const { data } = await api.getPosts(1, 100);
+      const { data } = await api.getPosts({ page: 1, limit: 100 });
       setPosts(data);
     } catch {
       console.error('Failed to load posts');

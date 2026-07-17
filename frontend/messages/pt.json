@@ -16,7 +16,13 @@
     "latestPosts": "Últimas Publicações",
     "noPosts": "Nenhuma publicação ainda. Volte em breve!",
     "loadError": "Não foi possível carregar as publicações. Tente novamente mais tarde.",
-    "translationUnavailable": "Não foi possível traduzir no momento."
+    "translationUnavailable": "Não foi possível traduzir no momento.",
+    "searchPlaceholder": "Buscar publicações...",
+    "searchButton": "Buscar",
+    "clearFilters": "Limpar",
+    "previousPage": "← Anterior",
+    "nextPage": "Próxima →",
+    "pageOf": "Página {current} de {total}"
   },
   "newsletter": {
     "title": "Newsletter",

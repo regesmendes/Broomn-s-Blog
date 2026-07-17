@@ -9,6 +9,7 @@ import { postRoutes } from './routes/post.routes'
 import { authRoutes } from './routes/auth.routes'
 import { commentRoutes } from './routes/comment.routes'
 import { newsletterRoutes } from './routes/newsletter.routes'
+import { tagRoutes } from './routes/tag.routes'
 import { devAuthRoutes } from './routes/dev-auth.routes'
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -76,6 +77,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   // ── Routes ─────────────────────────────────────────────────────────────────
   app.register(authRoutes, { prefix: '/auth' })
   app.register(postRoutes, { prefix: '/posts' })
+  app.register(tagRoutes, { prefix: '/tags' })
   app.register(commentRoutes)
   app.register(newsletterRoutes, { prefix: '/newsletter' })
 

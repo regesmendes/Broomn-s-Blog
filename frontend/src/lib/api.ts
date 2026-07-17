@@ -8,6 +8,13 @@ export interface Tag {
   slug: string;
 }
 
+export interface TagWithCount {
+  id: string;
+  name: string;
+  slug: string;
+  postCount: number;
+}
+
 export interface Post {
   id: string;
   title: string;
@@ -132,8 +139,18 @@ class ApiClient {
 
   // Posts
 
-  async getPosts(page = 1, limit = 10): Promise<PaginatedResponse<Post>> {
-    return this.request<PaginatedResponse<Post>>(`/posts?page=${page}&limit=${limit}`);
+  async getPosts(params?: { page?: number; limit?: number; tag?: string; search?: string }): Promise<PaginatedResponse<Post>> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', String(params.page));
+    if (params?.limit) searchParams.set('limit', String(params.limit));
+    if (params?.tag) searchParams.set('tag', params.tag);
+    if (params?.search) searchParams.set('search', params.search);
+    const query = searchParams.toString();
+    return this.request<PaginatedResponse<Post>>(`/posts${query ? `?${query}` : ''}`);
+  }
+
+  async getTags(): Promise<TagWithCount[]> {
+    return this.request<TagWithCount[]>('/tags');
   }
 
   async getPost(slug: string): Promise<Post> {
