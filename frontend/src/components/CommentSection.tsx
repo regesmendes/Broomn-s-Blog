@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import api, { Comment } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
@@ -15,6 +16,7 @@ export function CommentSection({ postId }: CommentSectionProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const { isAuthenticated, user, getToken } = useAuth();
+  const t = useTranslations('post');
 
   useEffect(() => {
     loadComments();
@@ -48,7 +50,7 @@ export function CommentSection({ postId }: CommentSectionProps) {
       if (newComment.approved) {
         setComments([newComment, ...comments]);
       } else {
-        setError('Your comment has been submitted and is awaiting moderation.');
+        setError(t('awaitingModeration'));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to post comment');
@@ -59,7 +61,7 @@ export function CommentSection({ postId }: CommentSectionProps) {
 
   return (
     <section className="mt-12 border-t border-gray-200 pt-8 dark:border-gray-700">
-      <h2 className="mb-6 text-2xl font-bold text-gray-900 dark:text-white">Comments</h2>
+      <h2 className="mb-6 text-2xl font-bold text-gray-900 dark:text-white">{t('comments')}</h2>
 
       {/* Comment form */}
       {isAuthenticated ? (
@@ -68,7 +70,7 @@ export function CommentSection({ postId }: CommentSectionProps) {
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="Write a comment..."
+              placeholder={t('writeComment')}
               rows={3}
               required
               className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
@@ -76,14 +78,14 @@ export function CommentSection({ postId }: CommentSectionProps) {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-500 dark:text-gray-400">
-              Commenting as {user?.name}
+              {t('commentingAs')} {user?.name}
             </span>
             <button
               type="submit"
               disabled={submitting || !content.trim()}
               className="cursor-pointer rounded-md bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-700 disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-300"
             >
-              {submitting ? 'Posting...' : 'Post Comment'}
+              {submitting ? t('posting') : t('postComment')}
             </button>
           </div>
           {error && (
@@ -94,15 +96,15 @@ export function CommentSection({ postId }: CommentSectionProps) {
         </form>
       ) : (
         <p className="mb-8 text-sm text-gray-500 dark:text-gray-400">
-          <a href="/auth/login" className="text-blue-600 hover:underline dark:text-blue-400">Sign in</a> to leave a comment.
+          <a href="/auth/login" className="text-emerald-600 hover:underline dark:text-emerald-400">{t('signInToComment')}</a>
         </p>
       )}
 
       {/* Comments list */}
       {loading ? (
-        <p className="text-gray-500 dark:text-gray-400">Loading comments...</p>
+        <p className="text-gray-500 dark:text-gray-400">...</p>
       ) : comments.length === 0 ? (
-        <p className="text-gray-500 dark:text-gray-400">No comments yet. Be the first to comment!</p>
+        <p className="text-gray-500 dark:text-gray-400">{t('noComments')}</p>
       ) : (
         <div className="space-y-6">
           {comments.map((comment) => (

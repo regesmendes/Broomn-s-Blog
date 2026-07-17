@@ -1,0 +1,56 @@
+{
+  "header": {
+    "blogName": "Broomn's Blog",
+    "home": "Home",
+    "newsletter": "Newsletter",
+    "admin": "Admin",
+    "signIn": "Sign in",
+    "logout": "Logout"
+  },
+  "hero": {
+    "title": "Broomn's Blog",
+    "subtitle": "Chronicles from a druid storyteller.",
+    "subtitle2": "A place for stories worth sharing around the fire."
+  },
+  "home": {
+    "latestPosts": "Latest Posts",
+    "noPosts": "No posts yet. Check back soon!",
+    "loadError": "Unable to load posts. Please try again later.",
+    "translationUnavailable": "Translation unavailable right now."
+  },
+  "newsletter": {
+    "title": "Newsletter",
+    "description": "Get notified when new stories are published. No spam, unsubscribe anytime.",
+    "placeholder": "your@email.com",
+    "subscribe": "Subscribe",
+    "subscribing": "Subscribing..."
+  },
+  "login": {
+    "title": "Sign In",
+    "description": "Sign in to comment on posts and access the admin area.",
+    "googleButton": "Continue with Google",
+    "cognitoNotConfigured": "Google OAuth not configured (Cognito env vars missing).",
+    "devLogin": "Development Login",
+    "loginAsAdmin": "Login as Admin",
+    "loginAsUser": "Login as User",
+    "signingIn": "Signing in..."
+  },
+  "post": {
+    "backToAll": "← Back to all posts",
+    "translateButton": "Translate to English",
+    "showOriginal": "Show original (Portuguese)",
+    "translating": "Translating...",
+    "translatedDisclaimer": "Automatically translated from Portuguese.",
+    "comments": "Comments",
+    "noComments": "No comments yet. Be the first to comment!",
+    "writeComment": "Write a comment...",
+    "postComment": "Post Comment",
+    "posting": "Posting...",
+    "commentingAs": "Commenting as",
+    "signInToComment": "Sign in to leave a comment.",
+    "awaitingModeration": "Your comment has been submitted and is awaiting moderation."
+  },
+  "footer": {
+    "rights": "All rights reserved."
+  }
+}

@@ -91,7 +91,7 @@ export default function EditPostPage() {
           coverImage: form.coverImage || undefined,
           tags: tagsArray.length > 0 ? tagsArray : undefined,
           status: form.status,
-          publishedAt: form.publishedAt || undefined,
+          publishedAt: form.publishedAt ? new Date(form.publishedAt).toISOString() : undefined,
         },
         token
       );
