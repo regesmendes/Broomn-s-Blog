@@ -41,7 +41,7 @@ function ToolbarButton({
 
 // ─── Toolbar ───────────────────────────────────────────────────────────────────
 
-function Toolbar({ editor }: { editor: Editor }) {
+function Toolbar({ editor, onImagePick }: { editor: Editor; onImagePick?: () => void }) {
   const addLink = () => {
     const url = prompt('Enter URL:');
     if (url) {
@@ -50,9 +50,13 @@ function Toolbar({ editor }: { editor: Editor }) {
   };
 
   const addImage = () => {
-    const url = prompt('Enter image URL:');
-    if (url) {
-      editor.chain().focus().setImage({ src: url }).run();
+    if (onImagePick) {
+      onImagePick();
+    } else {
+      const url = prompt('Enter image URL:');
+      if (url) {
+        editor.chain().focus().setImage({ src: url }).run();
+      }
     }
   };
 
@@ -192,9 +196,10 @@ interface RichTextEditorProps {
   content: string;
   onChange: (html: string) => void;
   placeholder?: string;
+  onImagePick?: () => void;
 }
 
-export function RichTextEditor({ content, onChange, placeholder }: RichTextEditorProps) {
+export function RichTextEditor({ content, onChange, placeholder, onImagePick }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -233,7 +238,7 @@ export function RichTextEditor({ content, onChange, placeholder }: RichTextEdito
 
   return (
     <div className="overflow-hidden rounded-lg border border-gray-300 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
-      <Toolbar editor={editor} />
+      <Toolbar editor={editor} onImagePick={onImagePick} />
       <EditorContent editor={editor} />
     </div>
   );

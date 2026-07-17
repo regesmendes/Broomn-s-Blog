@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import api, { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { RichTextEditor } from '@/components/RichTextEditor';
+import { ImagePickerModal } from '@/components/ImagePickerModal';
 
 interface PostFormData {
   title: string;
@@ -21,6 +22,7 @@ export default function NewPostPage() {
   const { getToken } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const [form, setForm] = useState<PostFormData>({
     title: '',
     excerpt: '',
@@ -117,6 +119,18 @@ export default function NewPostPage() {
               content={form.content}
               onChange={(html) => setForm((prev) => ({ ...prev, content: html }))}
               placeholder="Start writing your post..."
+              onImagePick={() => setImagePickerOpen(true)}
+            />
+            <ImagePickerModal
+              isOpen={imagePickerOpen}
+              onClose={() => setImagePickerOpen(false)}
+              onSelect={(url) => {
+                setForm((prev) => ({
+                  ...prev,
+                  content: prev.content + `<img src="${url}" alt="" />`,
+                }));
+                setImagePickerOpen(false);
+              }}
             />
           </div>
         </div>

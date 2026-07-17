@@ -5,11 +5,13 @@ import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
 import swagger from '@fastify/swagger'
 import swaggerUi from '@fastify/swagger-ui'
+import multipart from '@fastify/multipart'
 import { postRoutes } from './routes/post.routes'
 import { authRoutes } from './routes/auth.routes'
 import { commentRoutes } from './routes/comment.routes'
 import { newsletterRoutes } from './routes/newsletter.routes'
 import { tagRoutes } from './routes/tag.routes'
+import { mediaRoutes } from './routes/media.routes'
 import { devAuthRoutes } from './routes/dev-auth.routes'
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -38,6 +40,11 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.register(rateLimit, {
     max: 100,
     timeWindow: '1 minute',
+  })
+
+  // File uploads
+  app.register(multipart, {
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   })
 
   // Auth
@@ -78,6 +85,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.register(authRoutes, { prefix: '/auth' })
   app.register(postRoutes, { prefix: '/posts' })
   app.register(tagRoutes, { prefix: '/tags' })
+  app.register(mediaRoutes, { prefix: '/media' })
   app.register(commentRoutes)
   app.register(newsletterRoutes, { prefix: '/newsletter' })
 

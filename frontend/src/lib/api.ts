@@ -66,6 +66,21 @@ export interface Subscriber {
   createdAt: string;
 }
 
+export interface MediaItem {
+  id: string;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  url: string;
+  createdAt: string;
+  usageCount: number;
+}
+
+export interface MediaDetail extends MediaItem {
+  posts: { id: string; title: string; slug: string }[];
+}
+
 export interface PaginationMeta {
   total: number;
   page: number;
@@ -302,6 +317,57 @@ class ApiClient {
       method: 'POST',
       headers: this.authHeaders(token),
       body: JSON.stringify(data),
+    });
+  }
+
+  // Media
+
+  async uploadMedia(file: File, token: string): Promise<MediaItem> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${this.baseUrl}/media/upload`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new ApiError(
+        body?.message || `Request failed with status ${response.status}`,
+        response.status,
+        body
+      );
+    }
+
+    return response.json();
+  }
+
+  async getMedia(token: string): Promise<MediaItem[]> {
+    return this.request<MediaItem[]>('/media', {
+      headers: this.authHeaders(token),
+    });
+  }
+
+  async getMediaById(id: string, token: string): Promise<MediaDetail> {
+    return this.request<MediaDetail>(`/media/${id}`, {
+      headers: this.authHeaders(token),
+    });
+  }
+
+  async deleteMedia(id: string, token: string): Promise<void> {
+    return this.request<void>(`/media/${id}`, {
+      method: 'DELETE',
+      headers: this.authHeaders(token),
+    });
+  }
+
+  async replaceMedia(id: string, newUrl: string, token: string): Promise<{ message: string; postsUpdated: number }> {
+    return this.request<{ message: string; postsUpdated: number }>(`/media/${id}/replace`, {
+      method: 'PATCH',
+      headers: this.authHeaders(token),
+      body: JSON.stringify({ newUrl }),
     });
   }
 }

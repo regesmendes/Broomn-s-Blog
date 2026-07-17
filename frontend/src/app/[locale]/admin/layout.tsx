@@ -27,6 +27,12 @@ export default function AdminLayout({
               Comments
             </Link>
             <Link
+              href="/admin/media"
+              className="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Media
+            </Link>
+            <Link
               href="/admin/newsletter"
               className="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
             >
