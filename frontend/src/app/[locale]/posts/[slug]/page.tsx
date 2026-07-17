@@ -1,8 +1,10 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Metadata } from 'next';
+import { getTranslations } from 'next-intl/server';
 import api, { ApiError } from '@/lib/api';
 import { CommentSection } from '@/components/CommentSection';
+import { PostContent } from '@/components/PostContent';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,9 +42,9 @@ export async function generateMetadata({
 export default async function PostPage({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ slug: string; locale: string }>;
 }) {
-  const { slug } = await params;
+  const { slug, locale } = await params;
 
   let post;
   try {
@@ -73,7 +75,7 @@ export default async function PostPage({
         <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-gray-500 dark:text-gray-400">
           {post.publishedAt && (
             <time dateTime={post.publishedAt}>
-              {new Date(post.publishedAt).toLocaleDateString('en-US', {
+              {new Date(post.publishedAt).toLocaleDateString(locale === 'pt' ? 'pt-BR' : 'en-US', {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric',
@@ -102,10 +104,7 @@ export default async function PostPage({
         <img src="/images/divider.png" alt="" className="h-10 w-auto opacity-60 dark:opacity-40" />
       </div>
 
-      <div
-        className="prose"
-        dangerouslySetInnerHTML={{ __html: post.content }}
-      />
+      <PostContent content={post.content} />
 
       {/* Comments */}
       <CommentSection postId={post.id} />

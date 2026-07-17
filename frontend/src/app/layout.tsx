@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { Cinzel, Lora } from 'next/font/google';
-import { Header, Footer } from '@/components/layout';
 import { Providers } from '@/components/Providers';
 import './globals.css';
 
@@ -27,12 +26,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${cinzel.variable} ${lora.variable}`}>
+    <html className={`${cinzel.variable} ${lora.variable}`} suppressHydrationWarning>
       <body className="flex min-h-screen flex-col bg-gray-50 font-body dark:bg-gray-900">
         <Providers>
-          <Header />
-          <main className="flex-1">{children}</main>
-          <Footer />
+          {children}
         </Providers>
       </body>
     </html>

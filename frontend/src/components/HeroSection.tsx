@@ -1,4 +1,10 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
+
 export function HeroSection() {
+  const t = useTranslations('hero');
+
   return (
     <section className="relative h-[50vh] min-h-[400px] w-full overflow-hidden">
       {/* Background image */}
@@ -13,12 +19,12 @@ export function HeroSection() {
       {/* Content */}
       <div className="relative flex h-full flex-col items-center justify-center px-4 text-center">
         <h1 className="mb-4 text-4xl font-bold text-white drop-shadow-lg md:text-5xl lg:text-6xl">
-          Broomn&apos;s Blog
+          {t('title')}
         </h1>
         <p className="max-w-xl text-lg text-amber-100/90 drop-shadow-md md:text-xl">
-          Chronicles from a druid storyteller.
+          {t('subtitle')}
           <br />
-          A place for stories worth sharing around the fire.
+          {t('subtitle2')}
         </p>
       </div>
 
