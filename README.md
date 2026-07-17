@@ -155,6 +155,11 @@ foradoprograma/
 | PATCH | `/comments/:id/approve` | Approve/reject a comment |
 | GET | `/newsletter/subscribers` | List all subscribers |
 | POST | `/newsletter/send` | Send newsletter to confirmed subscribers |
+| POST | `/media/upload` | Upload an image (multipart, 5MB max) |
+| GET | `/media` | List all media with usage count |
+| GET | `/media/:id` | Get media details with posts using it |
+| DELETE | `/media/:id` | Delete a media file |
+| PATCH | `/media/:id/replace` | Replace image URL across all posts |
 
 ## Data Model
 

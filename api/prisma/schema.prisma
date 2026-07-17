@@ -47,6 +47,7 @@ model Post {
 
   tags        TagsOnPosts[]
   comments    Comment[]
+  media       MediaOnPosts[]
 
   @@map("posts")
 }
@@ -116,4 +117,31 @@ enum SubscriptionStatus {
   PENDING
   CONFIRMED
   UNSUBSCRIBED
+}
+
+// ─── Media ────────────────────────────────────────────────────────────────────
+
+model Media {
+  id           String   @id @default(cuid())
+  filename     String   @unique // stored filename (uuid.ext)
+  originalName String   // original upload name
+  mimeType     String
+  size         Int      // bytes
+  url          String   // public URL
+  createdAt    DateTime @default(now())
+
+  posts MediaOnPosts[]
+
+  @@map("media")
+}
+
+model MediaOnPosts {
+  mediaId String
+  postId  String
+
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  post  Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([mediaId, postId])
+  @@map("media_on_posts")
 }

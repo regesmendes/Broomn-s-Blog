@@ -34,6 +34,13 @@ vi.mock('../lib/prisma', () => ({
     tag: {
       upsert: vi.fn(),
     },
+    media: {
+      findMany: vi.fn(),
+    },
+    mediaOnPosts: {
+      deleteMany: vi.fn(),
+      create: vi.fn(),
+    },
     $transaction: vi.fn(),
   },
 }))

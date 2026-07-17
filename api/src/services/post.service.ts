@@ -1,4 +1,5 @@
 import { postRepository } from '../repositories/post.repository'
+import { prisma } from '../lib/prisma'
 import {
   CreatePostBody,
   UpdatePostBody,
@@ -48,7 +49,9 @@ export const postService = {
   async create(body: CreatePostBody) {
     const slug = body.slug ?? (await generateUniqueSlug(body.title))
 
-    return flattenTags(await postRepository.create({ ...body, slug }))
+    const post = flattenTags(await postRepository.create({ ...body, slug }))
+    await syncMediaUsage(post.id, body.content)
+    return post
   },
 
   async update(id: string, body: UpdatePostBody) {
@@ -60,7 +63,11 @@ export const postService = {
       body.slug = await generateUniqueSlug(body.title)
     }
 
-    return flattenTags(await postRepository.update(id, body))
+    const post = flattenTags(await postRepository.update(id, body))
+    if (body.content) {
+      await syncMediaUsage(id, body.content)
+    }
+    return post
   },
 
   async delete(id: string) {
@@ -122,4 +129,39 @@ function slugify(value: string): string {
     .replace(/[^a-z0-9\s-]/g, '')
     .trim()
     .replace(/\s+/g, '-')
+}
+
+/**
+ * Scan post HTML content for media URLs and sync the MediaOnPosts junction table.
+ * Automatically adds/removes relations based on what images are actually in the content.
+ */
+async function syncMediaUsage(postId: string, content: string) {
+  // Find all media URLs in the content
+  const urlRegex = /\/media\/files\/[a-zA-Z0-9-]+\.[a-z]+/g
+  const matches = content.match(urlRegex) || []
+
+  // Extract filenames from URLs
+  const filenames = matches.map((url) => url.split('/').pop()!).filter(Boolean)
+
+  if (filenames.length === 0) {
+    // No media in post — clear all relations
+    await prisma.mediaOnPosts.deleteMany({ where: { postId } })
+    return
+  }
+
+  // Find media records by filename
+  const mediaRecords = await prisma.media.findMany({
+    where: { filename: { in: filenames } },
+    select: { id: true },
+  })
+
+  const mediaIds = mediaRecords.map((m) => m.id)
+
+  // Replace all relations for this post
+  await prisma.$transaction([
+    prisma.mediaOnPosts.deleteMany({ where: { postId } }),
+    ...mediaIds.map((mediaId) =>
+      prisma.mediaOnPosts.create({ data: { mediaId, postId } })
+    ),
+  ])
 }
