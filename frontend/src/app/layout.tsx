@@ -1,10 +1,20 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Cinzel, Lora } from 'next/font/google';
 import { Header, Footer } from '@/components/layout';
 import { Providers } from '@/components/Providers';
 import './globals.css';
 
-const inter = Inter({ subsets: ['latin'] });
+const cinzel = Cinzel({
+  subsets: ['latin'],
+  variable: '--font-cinzel',
+  display: 'swap',
+});
+
+const lora = Lora({
+  subsets: ['latin'],
+  variable: '--font-lora',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: "Broomn's Blog",
@@ -17,8 +27,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={`${inter.className} flex min-h-screen flex-col bg-gray-50 dark:bg-gray-900`}>
+    <html lang="en" className={`${cinzel.variable} ${lora.variable}`}>
+      <body className="flex min-h-screen flex-col bg-gray-50 font-body dark:bg-gray-900">
         <Providers>
           <Header />
           <main className="flex-1">{children}</main>

@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { Metadata } from 'next';
 import api from '@/lib/api';
 import { Post } from '@/lib/api';
+import { HeroSection } from '@/components/HeroSection';
+import { Divider } from '@/components/Divider';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,8 +29,11 @@ export default async function HomePage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-12">
-      <h1 className="mb-8 text-3xl font-bold text-gray-900 dark:text-white">Latest Posts</h1>
+    <>
+      <HeroSection />
+      <Divider />
+      <div className="mx-auto max-w-5xl px-4 py-12">
+        <h2 className="mb-8 text-2xl font-bold text-gray-900 dark:text-white">Latest Posts</h2>
 
       {error && (
         <p className="text-gray-500 dark:text-gray-400">Unable to load posts. Please try again later.</p>
@@ -45,7 +50,7 @@ export default async function HomePage() {
             className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
           >
             <Link href={`/posts/${post.slug}`}>
-              <h2 className="mb-2 text-xl font-semibold text-gray-900 hover:text-blue-600 dark:text-white dark:hover:text-blue-400">
+              <h2 className="mb-2 text-xl font-semibold text-gray-900 hover:text-emerald-600 dark:text-white dark:hover:text-emerald-400">
                 {post.title}
               </h2>
             </Link>
@@ -70,7 +75,7 @@ export default async function HomePage() {
                   {post.tags.map((tag) => (
                     <span
                       key={tag.id}
-                      className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                      className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
                     >
                       {tag.name}
                     </span>
@@ -81,6 +86,7 @@ export default async function HomePage() {
           </article>
         ))}
       </div>
-    </div>
+      </div>
+    </>
   );
 }

@@ -61,14 +61,16 @@ export default async function PostPage({
         <img
           src={post.coverImage}
           alt={post.title}
-          className="mb-8 w-full rounded-lg object-cover"
+          className="mb-8 w-full rounded-lg object-cover shadow-md"
         />
       )}
 
-      <header className="mb-8">
-        <h1 className="mb-4 text-3xl font-bold text-gray-900 dark:text-white">{post.title}</h1>
+      <header className="mb-10 text-center">
+        <h1 className="mb-4 text-4xl font-bold text-emerald-900 dark:text-emerald-100 md:text-5xl">
+          {post.title}
+        </h1>
 
-        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+        <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-gray-500 dark:text-gray-400">
           {post.publishedAt && (
             <time dateTime={post.publishedAt}>
               {new Date(post.publishedAt).toLocaleDateString('en-US', {
@@ -84,7 +86,7 @@ export default async function PostPage({
               {post.tags.map((tag) => (
                 <span
                   key={tag.id}
-                  className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                  className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
                 >
                   {tag.name}
                 </span>
@@ -94,6 +96,12 @@ export default async function PostPage({
         </div>
       </header>
 
+      {/* Decorative divider before content */}
+      <div className="mb-8 flex justify-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/divider.png" alt="" className="h-10 w-auto opacity-60 dark:opacity-40" />
+      </div>
+
       <div
         className="prose"
         dangerouslySetInnerHTML={{ __html: post.content }}
@@ -102,8 +110,8 @@ export default async function PostPage({
       {/* Comments */}
       <CommentSection postId={post.id} />
 
-      <div className="mt-8 border-t border-gray-200 pt-8 dark:border-gray-700">
-        <Link href="/" className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+      <div className="mt-8 border-t border-emerald-200/50 pt-8 dark:border-emerald-900/50">
+        <Link href="/" className="text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-300">
           &larr; Back to all posts
         </Link>
       </div>

@@ -10,22 +10,26 @@ export default function Header() {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
 
   return (
-    <header className="border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-        <Link href="/" className="text-xl font-bold text-gray-900 dark:text-white">
-          Broomn&apos;s Blog
+    <header className="border-b border-emerald-200/50 bg-white/95 backdrop-blur-sm dark:border-emerald-900/50 dark:bg-gray-800/95">
+      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
+        <Link href="/" className="flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/logo.png" alt="" className="h-9 w-auto" />
+          <span className="text-xl font-bold text-emerald-900 dark:text-emerald-100">
+            Broomn&apos;s Blog
+          </span>
         </Link>
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-6 md:flex">
-          <Link href="/" className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">
+          <Link href="/" className="text-emerald-800 hover:text-emerald-600 dark:text-emerald-200 dark:hover:text-emerald-400">
             Home
           </Link>
-          <Link href="/newsletter" className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">
+          <Link href="/newsletter" className="text-emerald-800 hover:text-emerald-600 dark:text-emerald-200 dark:hover:text-emerald-400">
             Newsletter
           </Link>
           {isAdmin && (
-            <Link href="/admin/posts" className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">
+            <Link href="/admin/posts" className="text-emerald-800 hover:text-emerald-600 dark:text-emerald-200 dark:hover:text-emerald-400">
               Admin
             </Link>
           )}
@@ -45,7 +49,7 @@ export default function Header() {
               <ThemeToggle />
               <Link
                 href="/auth/login"
-                className="rounded-md bg-gray-900 px-4 py-2 text-sm text-white hover:bg-gray-700 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-300"
+                className="rounded-md bg-emerald-700 px-4 py-2 text-sm text-white hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500"
               >
                 Sign in
               </Link>
