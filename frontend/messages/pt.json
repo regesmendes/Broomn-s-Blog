@@ -1,0 +1,56 @@
+{
+  "header": {
+    "blogName": "Blog do Broomn",
+    "home": "Início",
+    "newsletter": "Newsletter",
+    "admin": "Admin",
+    "signIn": "Entrar",
+    "logout": "Sair"
+  },
+  "hero": {
+    "title": "Blog do Broomn",
+    "subtitle": "Crônicas de um druida contador de histórias.",
+    "subtitle2": "Um lugar para histórias que merecem ser compartilhadas ao redor da fogueira."
+  },
+  "home": {
+    "latestPosts": "Últimas Publicações",
+    "noPosts": "Nenhuma publicação ainda. Volte em breve!",
+    "loadError": "Não foi possível carregar as publicações. Tente novamente mais tarde.",
+    "translationUnavailable": "Não foi possível traduzir no momento."
+  },
+  "newsletter": {
+    "title": "Newsletter",
+    "description": "Receba uma notificação quando novas histórias forem publicadas. Sem spam, cancele a qualquer momento.",
+    "placeholder": "seu@email.com",
+    "subscribe": "Assinar",
+    "subscribing": "Assinando..."
+  },
+  "login": {
+    "title": "Entrar",
+    "description": "Entre para comentar nas publicações e acessar a área de administração.",
+    "googleButton": "Continuar com Google",
+    "cognitoNotConfigured": "OAuth do Google não configurado (variáveis do Cognito ausentes).",
+    "devLogin": "Login de Desenvolvimento",
+    "loginAsAdmin": "Entrar como Admin",
+    "loginAsUser": "Entrar como Usuário",
+    "signingIn": "Entrando..."
+  },
+  "post": {
+    "backToAll": "← Voltar para todas as publicações",
+    "translateButton": "Traduzir para Inglês",
+    "showOriginal": "Mostrar original",
+    "translating": "Traduzindo...",
+    "translatedDisclaimer": "Traduzido automaticamente. O texto original está em português.",
+    "comments": "Comentários",
+    "noComments": "Nenhum comentário ainda. Seja o primeiro a comentar!",
+    "writeComment": "Escreva um comentário...",
+    "postComment": "Publicar Comentário",
+    "posting": "Publicando...",
+    "commentingAs": "Comentando como",
+    "signInToComment": "Entre para deixar um comentário.",
+    "awaitingModeration": "Seu comentário foi enviado e está aguardando moderação."
+  },
+  "footer": {
+    "rights": "Todos os direitos reservados."
+  }
+}
