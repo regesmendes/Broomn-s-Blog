@@ -3,6 +3,18 @@
 /* Enable class-based dark mode (toggled via .dark on <html>) */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ─── Font families ─────────────────────────────────────────────────────────── */
+
+@theme {
+  --font-heading: var(--font-cinzel), serif;
+  --font-body: var(--font-lora), serif;
+}
+
+/* Apply heading font to all headings */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+}
+
 /* ─── Prose (light) ─────────────────────────────────────────────────────────── */
 
 .prose {
