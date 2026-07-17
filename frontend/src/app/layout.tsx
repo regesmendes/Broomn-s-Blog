@@ -18,6 +18,9 @@ const lora = Lora({
 export const metadata: Metadata = {
   title: "Blog do Broomn",
   description: 'Crônicas de Broomn, o druida contador de histórias. Um lugar para histórias que merecem ser compartilhadas ao redor da fogueira.',
+  icons: {
+    icon: '/favicon.png',
+  },
 };
 
 export default function RootLayout({

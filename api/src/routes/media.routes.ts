@@ -66,12 +66,31 @@ export async function mediaRoutes(app: FastifyInstance) {
 
   // ── GET /media ─────────────────────────────────────────────────────────────
   app.get('/', { preHandler: [authenticate, authorize('admin')] }, async (request, reply) => {
-    const media = await prisma.media.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        _count: { select: { posts: true } },
-      },
-    })
+    const { page = '1', limit = '10', search = '' } = request.query as {
+      page?: string
+      limit?: string
+      search?: string
+    }
+
+    const pageNum = Math.max(1, parseInt(page))
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit)))
+
+    const where = search
+      ? { originalName: { contains: search, mode: 'insensitive' as const } }
+      : {}
+
+    const [total, media] = await prisma.$transaction([
+      prisma.media.count({ where }),
+      prisma.media.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (pageNum - 1) * limitNum,
+        take: limitNum,
+        include: {
+          _count: { select: { posts: true } },
+        },
+      }),
+    ])
 
     const result = media.map((m) => ({
       ...m,
@@ -79,7 +98,15 @@ export async function mediaRoutes(app: FastifyInstance) {
       _count: undefined,
     }))
 
-    return reply.send(result)
+    return reply.send({
+      data: result,
+      meta: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    })
   })
 
   // ── GET /media/:id ─────────────────────────────────────────────────────────
