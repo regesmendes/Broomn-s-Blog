@@ -62,7 +62,8 @@ export interface User {
 export interface Subscriber {
   id: string;
   email: string;
-  confirmed: boolean;
+  status: 'PENDING' | 'CONFIRMED' | 'UNSUBSCRIBED';
+  confirmedAt: string | null;
   createdAt: string;
 }
 
@@ -311,8 +312,8 @@ class ApiClient {
     return this.request(`/newsletter/unsubscribe?token=${encodeURIComponent(token)}`);
   }
 
-  async getSubscribers(token: string): Promise<Subscriber[]> {
-    return this.request<Subscriber[]>('/newsletter/subscribers', {
+  async getSubscribers(token: string): Promise<PaginatedResponse<Subscriber>> {
+    return this.request<PaginatedResponse<Subscriber>>('/newsletter/subscribers', {
       headers: this.authHeaders(token),
     });
   }

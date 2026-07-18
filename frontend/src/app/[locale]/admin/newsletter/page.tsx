@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 
 export default function AdminNewsletterPage() {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
@@ -21,8 +22,9 @@ export default function AdminNewsletterPage() {
 
   const loadSubscribers = async () => {
     try {
-      const data = await api.getSubscribers(getToken() || '');
-      setSubscribers(data);
+      const result = await api.getSubscribers(getToken() || '');
+      setSubscribers(result.data);
+      setTotal(result.meta.total);
     } catch {
       console.error('Failed to load subscribers');
     } finally {
@@ -52,7 +54,8 @@ export default function AdminNewsletterPage() {
     }
   };
 
-  const confirmedCount = subscribers.filter((s) => s.confirmed).length;
+  const confirmedCount = subscribers.filter((s) => s.status === 'CONFIRMED').length;
+  const pendingCount = subscribers.filter((s) => s.status === 'PENDING').length;
 
   return (
     <div>
@@ -61,7 +64,7 @@ export default function AdminNewsletterPage() {
       {/* Stats */}
       <div className="mb-8 grid grid-cols-3 gap-4">
         <div className="rounded-lg border border-gray-200 bg-white p-4 text-center">
-          <p className="text-2xl font-bold text-gray-900">{subscribers.length}</p>
+          <p className="text-2xl font-bold text-gray-900">{total}</p>
           <p className="text-sm text-gray-500">Total Subscribers</p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4 text-center">
@@ -69,9 +72,7 @@ export default function AdminNewsletterPage() {
           <p className="text-sm text-gray-500">Confirmed</p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4 text-center">
-          <p className="text-2xl font-bold text-yellow-600">
-            {subscribers.length - confirmedCount}
-          </p>
+          <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
           <p className="text-sm text-gray-500">Pending</p>
         </div>
       </div>
@@ -143,12 +144,18 @@ export default function AdminNewsletterPage() {
                   <td className="px-4 py-3">
                     <span
                       className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-                        sub.confirmed
+                        sub.status === 'CONFIRMED'
                           ? 'bg-green-100 text-green-700'
-                          : 'bg-yellow-100 text-yellow-700'
+                          : sub.status === 'UNSUBSCRIBED'
+                            ? 'bg-gray-100 text-gray-700'
+                            : 'bg-yellow-100 text-yellow-700'
                       }`}
                     >
-                      {sub.confirmed ? 'Confirmed' : 'Pending'}
+                      {sub.status === 'CONFIRMED'
+                        ? 'Confirmed'
+                        : sub.status === 'UNSUBSCRIBED'
+                          ? 'Unsubscribed'
+                          : 'Pending'}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-500">
