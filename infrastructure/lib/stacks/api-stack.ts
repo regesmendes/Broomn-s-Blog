@@ -11,6 +11,7 @@ import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as rds from 'aws-cdk-lib/aws-rds';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 
 export interface ApiStackProps extends StackProps {
   /** VPC for Lambda to access Aurora */
@@ -55,6 +56,21 @@ export class ApiStack extends Stack {
     const dbUsername = dbSecret.secretValueFromJson('username').unsafeUnwrap();
     const dbPassword = dbSecret.secretValueFromJson('password').unsafeUnwrap();
 
+    // JWT signing secret for app-issued access/refresh tokens (also used for
+    // the newsletter confirm/unsubscribe HMAC tokens). This was previously
+    // unset entirely, which meant Fastify fell back to the literal string
+    // 'change-me-in-production' baked into the source — anyone reading the
+    // repo could forge a valid admin token. Generated once at deploy time;
+    // rotating it (redeploy) invalidates all existing sessions.
+    const jwtSecret = new secretsmanager.Secret(this, 'JwtSecret', {
+      secretName: 'broomns-blog/jwt-secret',
+      generateSecretString: {
+        passwordLength: 64,
+        excludePunctuation: true,
+      },
+    });
+    const jwtSecretValue = jwtSecret.secretValue.unsafeUnwrap();
+
     // Repo root: node_modules are hoisted here (npm workspaces), so esbuild
     // bundling and the lockfile resolution both need to start from there.
     const repoRoot = path.join(__dirname, '..', '..', '..');
@@ -94,11 +110,13 @@ export class ApiStack extends Stack {
       environment: {
         NODE_ENV: 'production',
         DATABASE_URL: `postgresql://${dbUsername}:${dbPassword}@${props.dbInstance.dbInstanceEndpointAddress}:${props.dbInstance.dbInstanceEndpointPort}/broomnsblog`,
+        JWT_SECRET: jwtSecretValue,
         COGNITO_USER_POOL_ID: props.userPoolId,
         COGNITO_CLIENT_ID: props.userPoolClientId,
         COGNITO_DOMAIN: props.cognitoDomain,
         S3_BUCKET_NAME: props.mediaBucketName,
         AWS_REGION_NAME: 'us-east-1',
+        API_URL: `https://api.${props.domainName}`,
         FRONTEND_URL: 'https://blogdobroomn.com',
         SES_FROM_EMAIL: 'noreply@blogdobroomn.com',
       },

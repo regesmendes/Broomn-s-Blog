@@ -221,8 +221,8 @@ describe('Newsletter API', () => {
       const token = generateAdminToken(app)
 
       mockPrisma.newsletter.findMany.mockResolvedValue([
-        { email: 'a@example.com' },
-        { email: 'b@example.com' },
+        { id: 'sub-a', email: 'a@example.com' },
+        { id: 'sub-b', email: 'b@example.com' },
       ])
 
       const res = await app.inject({

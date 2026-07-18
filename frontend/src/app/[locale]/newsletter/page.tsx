@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import api, { ApiError } from '@/lib/api';
 
 export default function NewsletterPage() {
+  const t = useTranslations('newsletter');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -22,7 +24,7 @@ export default function NewsletterPage() {
       if (err instanceof ApiError) {
         setError(err.message);
       } else {
-        setError('Something went wrong. Please try again.');
+        setError(t('genericError'));
       }
     } finally {
       setLoading(false);
@@ -31,22 +33,18 @@ export default function NewsletterPage() {
 
   return (
     <div className="mx-auto max-w-xl px-4 py-12">
-      <h1 className="mb-4 text-3xl font-bold text-gray-900">Newsletter</h1>
-      <p className="mb-8 text-gray-600">
-        Subscribe to get new posts delivered directly to your inbox.
-      </p>
+      <h1 className="mb-4 text-3xl font-bold text-gray-900">{t('title')}</h1>
+      <p className="mb-8 text-gray-600">{t('description')}</p>
 
       {success ? (
         <div className="rounded-lg border border-green-200 bg-green-50 p-6 text-center">
-          <p className="text-green-800">
-            🎉 You&apos;re subscribed! Check your email for confirmation.
-          </p>
+          <p className="text-green-800">{t('success')}</p>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              Email address
+              {t('emailLabel')}
             </label>
             <input
               id="email"
@@ -54,7 +52,7 @@ export default function NewsletterPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              placeholder="you@example.com"
+              placeholder={t('placeholder')}
               className="mt-1 block w-full rounded-md border border-gray-300 px-4 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
@@ -66,7 +64,7 @@ export default function NewsletterPage() {
             disabled={loading}
             className="w-full rounded-md bg-gray-900 px-4 py-2 text-white hover:bg-gray-700 disabled:opacity-50"
           >
-            {loading ? 'Subscribing...' : 'Subscribe'}
+            {loading ? t('subscribing') : t('subscribe')}
           </button>
         </form>
       )}

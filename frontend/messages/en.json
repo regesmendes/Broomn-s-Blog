@@ -27,9 +27,12 @@
   "newsletter": {
     "title": "Newsletter",
     "description": "Get notified when new stories are published. No spam, unsubscribe anytime.",
+    "emailLabel": "Email address",
     "placeholder": "your@email.com",
     "subscribe": "Subscribe",
-    "subscribing": "Subscribing..."
+    "subscribing": "Subscribing...",
+    "success": "🎉 You're subscribed! Check your email for confirmation.",
+    "genericError": "Something went wrong. Please try again."
   },
   "login": {
     "title": "Sign In",

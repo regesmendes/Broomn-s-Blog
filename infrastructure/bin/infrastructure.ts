@@ -49,6 +49,7 @@ const storageStack = new StorageStack(app, 'BromnBlog-Storage', {
 const sesStack = new SesStack(app, 'BromnBlog-Ses', {
   env,
   domainName,
+  hostedZoneId,
   description: "Broomn's Blog - SES email configuration",
 });
 

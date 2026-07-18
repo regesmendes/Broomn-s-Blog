@@ -27,9 +27,12 @@
   "newsletter": {
     "title": "Newsletter",
     "description": "Receba uma notificação quando novas histórias forem publicadas. Sem spam, cancele a qualquer momento.",
+    "emailLabel": "Endereço de e-mail",
     "placeholder": "seu@email.com",
     "subscribe": "Assinar",
-    "subscribing": "Assinando..."
+    "subscribing": "Assinando...",
+    "success": "🎉 Assinatura confirmada! Verifique seu e-mail para confirmar.",
+    "genericError": "Algo deu errado. Tente novamente."
   },
   "login": {
     "title": "Entrar",
