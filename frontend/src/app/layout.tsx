@@ -31,6 +31,13 @@ export default function RootLayout({
   return (
     <html className={`${cinzel.variable} ${lora.variable}`} suppressHydrationWarning>
       <body className="flex min-h-screen flex-col bg-gray-50 font-body dark:bg-gray-900">
+        {/* Apply saved theme before first paint to avoid flash of wrong theme */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark')}}catch(e){}",
+          }}
+        />
         <Providers>
           {children}
         </Providers>

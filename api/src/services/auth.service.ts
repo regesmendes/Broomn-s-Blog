@@ -26,7 +26,7 @@ function getJwksClient(): jwksRsa.JwksClient {
   if (jwksClient) return jwksClient
 
   const region   = process.env.AWS_REGION!
-  const poolId   = process.env.AWS_COGNITO_USER_POOL_ID!
+  const poolId   = process.env.COGNITO_USER_POOL_ID!
 
   jwksClient = jwksRsa({
     jwksUri: `https://cognito-idp.${region}.amazonaws.com/${poolId}/.well-known/jwks.json`,
@@ -108,8 +108,8 @@ export const authService = {
 
 async function verifyCognitoToken(idToken: string): Promise<CognitoIdTokenClaims> {
   const region   = process.env.AWS_REGION
-  const poolId   = process.env.AWS_COGNITO_USER_POOL_ID
-  const clientId = process.env.AWS_COGNITO_CLIENT_ID
+  const poolId   = process.env.COGNITO_USER_POOL_ID
+  const clientId = process.env.COGNITO_CLIENT_ID
 
   if (!region || !poolId || !clientId) {
     throw new Error('Cognito environment variables are not configured')

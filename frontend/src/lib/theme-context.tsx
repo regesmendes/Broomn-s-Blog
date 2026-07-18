@@ -42,9 +42,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  // Prevent flash of wrong theme
-  if (!mounted) return null;
-
+  // NOTE: never conditionally return null here — this provider wraps the whole
+  // app in the root layout, and returning null during SSR suppresses the
+  // server-rendered output of every client page. Flash-of-wrong-theme is
+  // prevented by the inline pre-paint script in app/layout.tsx instead.
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
       {children}
