@@ -1,5 +1,10 @@
 import { vi, beforeEach } from 'vitest'
 
+// Mock SES globally for all tests — no real email sending in the test suite
+vi.mock('../lib/ses', () => ({
+  sendEmail: vi.fn(),
+}))
+
 // Mock Prisma globally for all tests
 vi.mock('../lib/prisma', () => ({
   prisma: {

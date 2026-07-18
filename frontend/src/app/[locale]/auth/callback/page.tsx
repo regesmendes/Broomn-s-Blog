@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useAuth } from '@/lib/auth-context';
 
 const COGNITO_DOMAIN = process.env.NEXT_PUBLIC_COGNITO_DOMAIN;
@@ -10,6 +11,7 @@ const COGNITO_REDIRECT_URI = process.env.NEXT_PUBLIC_COGNITO_REDIRECT_URI;
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 function CallbackContent() {
+  const t = useTranslations('callback');
   const searchParams = useSearchParams();
   const router = useRouter();
   const { login } = useAuth();
@@ -25,7 +27,7 @@ function CallbackContent() {
     }
 
     if (!code) {
-      setError('No authorization code received.');
+      setError(t('noAuthCode'));
       return;
     }
 
@@ -76,20 +78,20 @@ function CallbackContent() {
       login(accessToken, refreshToken, user);
       router.push('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed');
+      setError(err instanceof Error ? err.message : t('authFailedGeneric'));
     }
   }
 
   if (error) {
     return (
       <div className="text-center">
-        <h1 className="mb-4 text-2xl font-bold text-red-600 dark:text-red-400">Authentication Failed</h1>
+        <h1 className="mb-4 text-2xl font-bold text-red-600 dark:text-red-400">{t('authFailed')}</h1>
         <p className="mb-6 text-gray-600 dark:text-gray-400">{error}</p>
         <a
           href="/auth/login"
           className="text-emerald-600 hover:underline dark:text-emerald-400"
         >
-          Try again
+          {t('tryAgain')}
         </a>
       </div>
     );
@@ -97,8 +99,8 @@ function CallbackContent() {
 
   return (
     <div className="text-center">
-      <h1 className="mb-4 text-2xl font-bold text-gray-900 dark:text-white">Signing you in...</h1>
-      <p className="text-gray-600 dark:text-gray-400">Please wait while we complete authentication.</p>
+      <h1 className="mb-4 text-2xl font-bold text-gray-900 dark:text-white">{t('signingYouIn')}</h1>
+      <p className="text-gray-600 dark:text-gray-400">{t('pleaseWait')}</p>
       <div className="mt-6 flex justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-emerald-200 border-t-emerald-600" />
       </div>
@@ -107,13 +109,15 @@ function CallbackContent() {
 }
 
 export default function AuthCallbackPage() {
+  const t = useTranslations('callback');
+
   return (
     <div className="mx-auto flex max-w-md flex-col items-center px-4 py-20">
       <Suspense
         fallback={
           <div className="text-center">
-            <h1 className="mb-4 text-2xl font-bold text-gray-900 dark:text-white">Loading...</h1>
-            <p className="text-gray-600 dark:text-gray-400">Processing authentication...</p>
+            <h1 className="mb-4 text-2xl font-bold text-gray-900 dark:text-white">{t('loading')}</h1>
+            <p className="text-gray-600 dark:text-gray-400">{t('processingAuth')}</p>
           </div>
         }
       >

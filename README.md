@@ -15,9 +15,9 @@ A full-stack blog application with:
 
 ## Current Status
 
-**Phase: Local Development Complete**
+**Phase: Live in production** — https://blogdobroomn.com
 
-The API and frontend are fully implemented and working locally. Infrastructure (AWS deployment) has not been started yet.
+The API and frontend are deployed and working end-to-end on AWS: real Google OAuth login, real newsletter emails, the full admin panel. See [Deployment (AWS CDK)](#deployment-aws-cdk) for infrastructure details and known operational gotchas.
 
 ### What's working
 
@@ -25,9 +25,9 @@ The API and frontend are fully implemented and working locally. Infrastructure (
 - ✅ 49 passing tests covering all API modules
 - ✅ Role-based access control (public, authenticated user, admin)
 - ✅ JWT authentication with access/refresh token flow
-- ✅ Cognito integration (ready — needs AWS infrastructure)
-- ✅ Newsletter with HMAC-based email confirmation/unsubscribe tokens
-- ✅ Frontend with all pages (public blog, admin panel, auth flow)
+- ✅ Cognito integration with real Google OAuth login, live in production
+- ✅ Newsletter with HMAC-based email confirmation/unsubscribe tokens — real SES sending, graceful confirm/unsubscribe pages (not bare API JSON)
+- ✅ Frontend with all pages (public blog, admin panel, auth flow) — server-rendered via OpenNext/Lambda, not just static
 - ✅ Auth context with token management and auto-refresh
 - ✅ Protected admin routes (redirects to login if unauthenticated)
 - ✅ Rich text editor (Tiptap) for creating/editing posts
@@ -36,7 +36,7 @@ The API and frontend are fully implemented and working locally. Infrastructure (
 - ✅ SEO metadata (dynamic og:title, description, og:image per post)
 - ✅ Mulgore-inspired visual identity (landscape hero, druidic emblem, vine dividers)
 - ✅ Custom typography (Cinzel headings, Lora body — manuscript/scroll feel)
-- ✅ i18n: Portuguese (default) + English with language switcher
+- ✅ i18n: Portuguese (default) + English with language switcher — all pages, including auth/login and newsletter flows
 - ✅ On-the-fly post translation via MyMemory API (preserves HTML structure)
 - ✅ TypeScript compiles clean across both projects
 
@@ -51,7 +51,7 @@ The API and frontend are fully implemented and working locally. Infrastructure (
 | **API** | Node.js + Fastify | 5.10 |
 | **Language** | TypeScript | 5.8 |
 | **ORM** | Prisma | 6.10 |
-| **Database** | PostgreSQL (Docker locally, Aurora Serverless v2 on AWS) | 16 |
+| **Database** | PostgreSQL (Docker locally, RDS t4g.micro on AWS) | 16 |
 | **Frontend** | Next.js (App Router) | 15.3.9 |
 | **UI** | React | 19 |
 | **CSS** | Tailwind CSS | 4 |
@@ -75,14 +75,16 @@ foradoprograma/
 ├── api/                    # Node.js REST API
 │   ├── src/
 │   │   ├── app.ts         # Fastify instance + plugin registration
-│   │   ├── server.ts      # Entry point (listens on :3001)
+│   │   ├── server.ts      # Entry point for local dev (listens on :3001)
+│   │   ├── lambda.ts      # Lambda entry point (wraps the Fastify app via @fastify/aws-lambda)
+│   │   ├── migrate.ts     # On-demand Lambda: prisma migrate deploy + one-off admin SQL (see below)
 │   │   ├── routes/        # Route definitions
 │   │   ├── controllers/   # Request/response handling
 │   │   ├── services/      # Business logic
 │   │   ├── repositories/  # Database queries
 │   │   ├── schemas/       # Zod validation schemas
 │   │   ├── middlewares/   # authenticate, authorize
-│   │   ├── lib/           # Shared utilities (Prisma client)
+│   │   ├── lib/           # Shared utilities (Prisma client, SES client)
 │   │   ├── types/         # TypeScript type definitions
 │   │   └── __tests__/     # Vitest test files
 │   ├── prisma/
@@ -95,22 +97,25 @@ foradoprograma/
 ├── frontend/               # Next.js application
 │   ├── src/
 │   │   ├── app/           # App Router pages
-│   │   │   ├── page.tsx           # Home (post list)
-│   │   │   ├── posts/[slug]/      # Post detail
-│   │   │   ├── newsletter/       # Subscribe form
-│   │   │   ├── auth/login/       # Google OAuth login
-│   │   │   ├── auth/callback/    # OAuth redirect handler
-│   │   │   ├── admin/posts/      # Post management
-│   │   │   ├── admin/comments/   # Comment moderation
-│   │   │   └── admin/newsletter/ # Newsletter send + subscribers
+│   │   │   ├── page.tsx                   # Home (post list)
+│   │   │   ├── posts/[slug]/              # Post detail
+│   │   │   ├── newsletter/                # Subscribe form
+│   │   │   ├── newsletter/confirm/        # Confirm-subscription landing page
+│   │   │   ├── newsletter/unsubscribe/    # Unsubscribe landing page
+│   │   │   ├── auth/login/                # Google OAuth login
+│   │   │   ├── auth/callback/             # OAuth redirect handler
+│   │   │   ├── admin/posts/               # Post management
+│   │   │   ├── admin/comments/            # Comment moderation
+│   │   │   └── admin/newsletter/          # Newsletter send + subscribers
 │   │   ├── components/layout/    # Header, Footer
 │   │   ├── lib/api.ts            # Typed API client
 │   │   └── pages/                # Legacy router files (framework bug workaround)
 │   ├── next.config.ts
+│   ├── open-next.config.ts       # Disables the ISR queue/tag cache (nothing uses ISR — see Deployment)
 │   ├── tailwind.config.ts (not needed — Tailwind v4 auto-detects)
 │   └── package.json
 │
-├── infrastructure/         # AWS CDK (not yet implemented)
+├── infrastructure/         # AWS CDK — deployed, see Deployment (AWS CDK) below
 ├── docs/                   # Architecture docs (not yet populated)
 ├── docker-compose.yml      # Local PostgreSQL
 ├── package.json            # Root workspace (API only)
@@ -219,6 +224,8 @@ Use the returned `accessToken` in the `Authorization: Bearer <token>` header to 
 
 **This endpoint only exists when `NODE_ENV !== 'production'`.** It will never be available in production.
 
+**Caution**: newsletter emails are sent for real whenever `api/.env` has working AWS credentials configured, even in local dev — there's no dev/test stub for SES. Testing `/newsletter/subscribe` locally with real credentials sends a real email.
+
 ### Seeded users
 
 | Email | Role | Purpose |
@@ -269,6 +276,14 @@ Comments are created with `approved = false` by default. They only appear public
 
 Next.js has known issues with React version resolution when placed in an npm workspace alongside other packages. The frontend manages its own `node_modules` independently to avoid duplicate React instances causing `useContext` errors during build.
 
+### Never conditionally `return null` from a top-level Provider
+
+`ThemeProvider` (`frontend/src/lib/theme-context.tsx`) used to `return null` while waiting for a `mounted` flag to avoid a flash of the wrong theme. Since it wraps the *entire app* in the root layout, this silently suppressed the server-rendered output of **every page** — the whole admin panel and auth flow rendered as blank/not-found in production for a while before this was caught, and it was hard to trace because pages using `next-intl` translations still looked fine (next-intl inlines all message JSON into the RSC payload regardless of whether the page's own HTML rendered, which masked the bug on translated pages). Any provider that wraps the root layout must always render its `children` — do the actual flash-prevention with a synchronous pre-hydration `<script>` in `app/layout.tsx` instead (reads `localStorage`/`prefers-color-scheme`, applies `.dark` before first paint).
+
+### Migration Lambda doubles as an admin console
+
+`api/src/migrate.ts` defaults to `prisma migrate deploy`, but also accepts `{ args, stdin }` in its invoke payload to run arbitrary one-off `prisma` CLI commands (e.g. `db execute --stdin` for a raw SQL statement) against the production database — it's the only Lambda with a network path into the private-subnet RDS instance, so it's the way to do any one-off admin task (like promoting the first user to `ADMIN`) without a bastion host. See [Deployment](#deployment-aws-cdk) for the invoke command.
+
 ## Deployment (AWS CDK)
 
 The infrastructure is defined in the `infrastructure/` directory using AWS CDK (TypeScript).
@@ -296,7 +311,7 @@ npx cdk deploy --all \
 | Stack | Resources |
 |---|---|
 | BromnBlog-Cognito | User Pool, Google IdP, App Client, Hosted UI |
-| BromnBlog-Database | VPC, Aurora Serverless v2 (PostgreSQL 16), Security Groups |
+| BromnBlog-Database | VPC (3-tier: public/private-with-egress/isolated), RDS PostgreSQL 16 (t4g.micro), Security Groups |
 | BromnBlog-Storage | S3 bucket (media uploads, public read) |
 | BromnBlog-Api | Lambda, API Gateway HTTP API, custom domain |
 | BromnBlog-Frontend | S3 + CloudFront + ACM cert + Route53 |
@@ -310,50 +325,78 @@ npx cdk deploy --all \
 
 ### Current Deployment Status (as of July 2026)
 
-**Deployed and working:**
-- ✅ BromnBlog-Cognito (User Pool ID: `us-east-1_ApHF59Xas`, Client ID: `535qq83rh90srom3ij4ospn78e`)
-- ✅ BromnBlog-Database (RDS PostgreSQL t4g.micro in private subnet)
-- ✅ BromnBlog-Storage (S3 bucket: `broomns-blog-frontend-099710233970`)
-- ✅ BromnBlog-Api (Lambda + API Gateway, domain: `api.blogdobroomn.com`)
-- ✅ BromnBlog-Frontend (S3 + CloudFront distribution: `EKN0G1CK1QQC`)
-- ✅ BromnBlog-Ses (using existing SES identity)
-- ✅ Static assets uploaded to S3
-- ✅ Google OAuth configured (redirect URI added to Google Cloud Console)
+**Everything is deployed and working in production**, including the pieces that used to block launch (SSR, DB migrations, Cognito callback URL — all resolved):
 
-**NOT YET COMPLETE — blocking production launch:**
+- ✅ BromnBlog-Cognito (User Pool ID: `us-east-1_ApHF59Xas`, Client ID: `535qq83rh90srom3ij4ospn78e`) — real Google OAuth login working end-to-end
+- ✅ BromnBlog-Database (RDS PostgreSQL t4g.micro in private subnet) — migrations applied via the on-demand migration Lambda (see below)
+- ✅ BromnBlog-Storage (S3 bucket: `broomns-blog-media-099710233970`) — **not actually used by the app yet**: media uploads still go to local disk / Lambda `/tmp`, not this bucket. Real gap, see What's Next.
+- ✅ BromnBlog-Api (Lambda + API Gateway, domain: `api.blogdobroomn.com`) — Fastify app wrapped via `@fastify/aws-lambda`, bundled with esbuild (`NodejsFunction`), running in a `PRIVATE_WITH_EGRESS` subnet (not `PRIVATE_ISOLATED` — it needs real internet egress for SES and Cognito's JWKS endpoint, neither of which has a VPC Gateway Endpoint)
+- ✅ BromnBlog-Frontend (S3 + CloudFront distribution: `EKN0G1CK1QQC`) — full SSR via OpenNext + a Lambda Function URL behind CloudFront OAC, not just static files
+- ✅ BromnBlog-Ses — `blogdobroomn.com` domain verified (DKIM via Route53, automatic). **Account is still in SES sandbox** — production access requested, pending AWS review; until approved, sending only works to individually pre-verified recipient addresses
+- ✅ Google OAuth configured and confirmed working (redirect URI registered in Google Cloud Console, real login tested)
 
-1. **Frontend SSR Lambda**: The Next.js app uses Server Components and cannot be served purely from S3. OpenNext (`open-next` package) has been installed and successfully builds the app into Lambda-compatible bundles (output at `frontend/.open-next/`). However, the CDK Frontend stack currently only creates an S3+CloudFront setup for static files. It needs:
-   - A new Lambda function using the server bundle from `.open-next/server-functions/default/`
-   - A Lambda Function URL (or API Gateway) for the SSR handler
-   - CloudFront behavior routing: `/_next/static/*` → S3 origin, everything else → Lambda origin
-   - The image optimization function (`.open-next/image-optimization-function/`) optionally deployed as another Lambda behind CloudFront `/\_next/image*`
+### ⚠️ Two footguns that already caused real incidents — read before touching `cdk deploy`
 
-2. **Database migration**: The RDS instance is in a private VPC subnet with no public access. Prisma migrations need to be run against it. Options:
-   - Add a migration step to the API Lambda (run on first cold start or via a custom event)
-   - Create a one-time "migration Lambda" that runs in the same VPC
-   - Use a bastion host / EC2 instance to tunnel and run `npx prisma migrate deploy`
-   - Temporarily enable public access on RDS (not recommended for production)
-
-3. **Cognito callback URL update**: The Cognito stack was initially deployed with `broomn.foradoprograma.com` callback URLs. It was later updated to `blogdobroomn.com` in the code, but you need to re-deploy the Cognito stack with the new domain:
+1. **Never pass placeholder Google OAuth credentials on any deploy that includes `BromnBlog-Api`, or anything else, unless you pass `--exclusively`.** `bin/infrastructure.ts` falls back to literal `PLACEHOLDER_GOOGLE_CLIENT_ID`/`PLACEHOLDER_GOOGLE_CLIENT_SECRET` strings if `--context googleClientId`/`googleClientSecret` aren't passed — harmless on its own, **except** `ApiStack.addDependency(cognitoStack)` means CDK will also evaluate (and, if the template differs, silently overwrite) `BromnBlog-Cognito` as a dependency. This happened for real: Cognito's Google Identity Provider got its real Client ID/Secret replaced with the literal placeholder strings, breaking login with `Error 401: invalid_client` from Google, until someone with the real credentials redeployed Cognito directly. **If you need to deploy `BromnBlog-Api`/`BromnBlog-Frontend` without the real Google credentials in hand, always add `--exclusively`** so CDK never touches Cognito:
    ```bash
-   npx cdk deploy BromnBlog-Cognito --context googleClientId=... --context googleClientSecret=... --context hostedZoneId=Z03952433C47AYNUTV3QU
+   npx cdk deploy BromnBlog-Api BromnBlog-Frontend --exclusively \
+     --context googleClientId=PLACEHOLDER_GOOGLE_CLIENT_ID \
+     --context googleClientSecret=PLACEHOLDER_GOOGLE_CLIENT_SECRET \
+     --context hostedZoneId=Z03952433C47AYNUTV3QU
    ```
 
-### OpenNext Build
+2. **CloudFormation only diffs the S3 key *name* for Lambda code assets, not the object's actual content.** If a `cdk deploy` gets interrupted (e.g. killed) mid-upload, it can leave a truncated zip sitting at that content-hash key in the CDK bootstrap assets bucket (`cdk-hnb659fds-assets-<account>-<region>`). A later deploy that recomputes the *same* hash (nothing in the source changed) will see the object already exists and skip re-uploading — silently deploying the corrupted zip, with CloudFormation reporting success. This happened for real and took the whole site down (502s) until it was traced by comparing local build file counts against the deployed package. If you ever kill a `cdk deploy` mid-flight, or see a Lambda erroring with `Cannot find module` for something that's clearly bundled, don't just retry — verify the deployed artifact matches what's on disk (`aws lambda get-function --function-name <fn> --query Code.Location` and diff it), delete the corrupted object from the assets bucket, and redeploy. If CloudFormation still reports "no changes," force it with `aws lambda update-function-code` directly.
 
-The frontend is built for Lambda deployment using OpenNext:
+### Frontend deploy procedure (SSR via OpenNext)
+
+Unlike the API stack, redeploying frontend *code* changes needs three steps in order — a plain `cdk deploy` alone does nothing, since the CDK stack just packages whatever is already on disk in `frontend/.open-next/`:
 
 ```bash
+# 1. Build (env vars are inlined at build time — NEXT_PUBLIC_* won't work if set only at runtime)
 cd frontend
-NEXT_PUBLIC_API_URL=https://api.blogdobroomn.com NODE_OPTIONS='--localstorage-file=.next/.localStorage' npx open-next build
+rm -rf .next .open-next   # WSL2/DrvFs file-watching is unreliable — stale webpack cache has silently
+                           # kept old NEXT_PUBLIC_* values baked in before; always start clean
+NEXT_PUBLIC_API_URL=https://api.blogdobroomn.com \
+NEXT_PUBLIC_COGNITO_DOMAIN=https://broomns-blog.auth.us-east-1.amazoncognito.com \
+NEXT_PUBLIC_COGNITO_CLIENT_ID=535qq83rh90srom3ij4ospn78e \
+NEXT_PUBLIC_COGNITO_REDIRECT_URI=https://blogdobroomn.com/pt/auth/callback \
+NODE_OPTIONS='--localstorage-file=.next/.localStorage' npx open-next build
+
+# 2. Sync static assets to S3 under the _assets/ prefix (CloudFront's S3 origin path)
+aws s3 sync .open-next/assets s3://broomns-blog-frontend-099710233970/_assets --delete
+
+# 3. Deploy the CDK stack (packages the SSR Lambda from .open-next/server-functions/default/)
+cd ../infrastructure
+npx cdk deploy BromnBlog-Frontend --exclusively \
+  --context googleClientId=PLACEHOLDER_GOOGLE_CLIENT_ID \
+  --context googleClientSecret=PLACEHOLDER_GOOGLE_CLIENT_SECRET \
+  --context hostedZoneId=Z03952433C47AYNUTV3QU
+
+# 4. Invalidate CloudFront so viewers see the new content immediately
+aws cloudfront create-invalidation --distribution-id EKN0G1CK1QQC --paths "/*"
 ```
 
 This produces `.open-next/` with:
-- `assets/` — static files (already uploaded to S3)
-- `server-functions/default/` — the SSR Lambda handler
-- `image-optimization-function/` — image optimization Lambda
-- `revalidation-function/` — ISR revalidation handler
-- `warmer-function/` — keeps Lambda warm
+- `assets/` — static files, synced to S3 above
+- `server-functions/default/` — the SSR Lambda handler (fully self-contained, `node_modules` included — no esbuild/CDK bundling needed, unlike the API Lambda)
+- `image-optimization-function/`, `revalidation-function/`, `warmer-function/` — built but **not deployed**: no `next/image` usage in the app (image optimizer skipped) and no ISR/SSG anywhere (every route is `force-dynamic`, revalidation/warmer skipped) — see `frontend/open-next.config.ts`
+
+### Running database migrations / one-off admin SQL
+
+The RDS instance has no public access — the only way in is the `broomns-blog-migrate` Lambda, which runs inside the same VPC:
+
+```bash
+# Apply pending Prisma migrations (default behavior)
+aws lambda invoke --function-name broomns-blog-migrate --region us-east-1 /dev/stdout
+
+# Run an arbitrary one-off SQL statement (e.g. promoting a user to admin)
+aws lambda invoke --function-name broomns-blog-migrate --region us-east-1 \
+  --cli-binary-format raw-in-base64-out \
+  --payload '{"args":["db","execute","--stdin"],"stdin":"UPDATE users SET role = '"'"'ADMIN'"'"' WHERE email = '"'"'you@example.com'"'"';"}' \
+  /dev/stdout
+```
+
+Note: `prisma db execute` runs the statement but doesn't print `SELECT` results — it's designed for DDL/DML, not querying. If the local `@prisma/engines` package is missing the `rhel-openssl-3.0.x` schema engine binary needed to rebuild this Lambda, fetch it with `PRISMA_CLI_BINARY_TARGETS=native,rhel-openssl-3.0.x npm rebuild @prisma/engines` before redeploying `BromnBlog-Api`.
 
 ### Key AWS Resources
 
@@ -369,6 +412,9 @@ This produces `.open-next/` with:
 | S3 Frontend Bucket | `broomns-blog-frontend-099710233970` |
 | API Lambda | `broomns-blog-api` |
 | API Gateway | `58m9fzd8lj` |
+| Migration/admin-SQL Lambda | `broomns-blog-migrate` |
+| Frontend SSR Lambda | `broomns-blog-frontend-server` |
+| CDK Bootstrap Assets Bucket | `cdk-hnb659fds-assets-099710233970-us-east-1` |
 
 ### Node.js 25 Compatibility Note
 
@@ -382,15 +428,17 @@ The project runs on Node.js 25 which has a built-in `localStorage` global requir
 These are the remaining pieces to complete the project:
 
 ### API enhancements
-- [ ] SES integration for newsletter sending (currently stubbed)
-- [ ] SES integration for confirmation emails
+- [ ] **Media storage → S3**: `api/src/routes/media.routes.ts` still writes uploads to local disk (`/tmp` on Lambda, which doesn't persist across cold starts or instances) despite the `BromnBlog-Storage` S3 bucket + IAM permissions already being provisioned and unused. Real gap — uploaded images can silently 404 in production.
+- [ ] SES production access — requested, pending AWS manual review; sending currently only works to individually pre-verified recipient addresses
 - [ ] Pagination cursors for better performance at scale
 - [ ] Per-user rate limiting
+- [ ] Confirm/unsubscribe email links currently point at the frontend pages which work fine, but consider whether newsletter sends should stay fully manual (`/admin/newsletter`) or auto-trigger on publish — discussed and deliberately deferred, not a bug
 
 ### DevOps
-- [ ] GitHub Actions CI pipeline (lint, test, build)
+- [ ] GitHub Actions CI pipeline (lint, test, build) — planned to eventually replace the manual `cdk deploy` workflow (see the footguns documented under Deployment above) with deploy-on-merge to a deploy branch
 - [ ] Deployment pipeline (CDK deploy on merge to master)
 - [ ] Environment separation (dev/staging/prod)
+- [ ] `api/` has no ESLint config despite a `lint` script in `package.json` — currently a no-op
 
 ## Contributing
 

@@ -60,12 +60,11 @@ export const newsletterRepository = {
     return { total, subscribers }
   },
 
-  /** Get all confirmed subscriber emails (for sending). */
-  async getConfirmedEmails(): Promise<string[]> {
-    const subs = await prisma.newsletter.findMany({
+  /** Get all confirmed subscribers (id + email, for sending with per-recipient unsubscribe links). */
+  async getConfirmedSubscribers(): Promise<{ id: string; email: string }[]> {
+    return prisma.newsletter.findMany({
       where:  { status: 'CONFIRMED' },
-      select: { email: true },
+      select: { id: true, email: true },
     })
-    return subs.map((s) => s.email)
   },
 }

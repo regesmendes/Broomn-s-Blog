@@ -27,9 +27,17 @@
   "newsletter": {
     "title": "Newsletter",
     "description": "Receba uma notificação quando novas histórias forem publicadas. Sem spam, cancele a qualquer momento.",
+    "emailLabel": "Endereço de e-mail",
     "placeholder": "seu@email.com",
     "subscribe": "Assinar",
-    "subscribing": "Assinando..."
+    "subscribing": "Assinando...",
+    "success": "🎉 Assinatura confirmada! Verifique seu e-mail para confirmar.",
+    "genericError": "Algo deu errado. Tente novamente.",
+    "confirmSuccess": "🎉 Assinatura confirmada com sucesso! Você vai receber um aviso quando novas histórias forem publicadas.",
+    "confirmError": "Não foi possível confirmar a assinatura. O link pode ter expirado ou já ter sido usado.",
+    "unsubscribeSuccess": "Você foi removido da nossa lista. Sentiremos sua falta!",
+    "unsubscribeError": "Não foi possível cancelar a assinatura. O link pode ter expirado ou já ter sido usado.",
+    "backHome": "← Voltar para o início"
   },
   "login": {
     "title": "Entrar",
@@ -39,7 +47,18 @@
     "devLogin": "Login de Desenvolvimento",
     "loginAsAdmin": "Entrar como Admin",
     "loginAsUser": "Entrar como Usuário",
-    "signingIn": "Entrando..."
+    "signingIn": "Entrando...",
+    "loginFailed": "Falha ao entrar"
+  },
+  "callback": {
+    "signingYouIn": "Entrando...",
+    "pleaseWait": "Aguarde enquanto concluímos a autenticação.",
+    "authFailed": "Falha na autenticação",
+    "tryAgain": "Tentar novamente",
+    "loading": "Carregando...",
+    "processingAuth": "Processando autenticação...",
+    "noAuthCode": "Nenhum código de autorização recebido.",
+    "authFailedGeneric": "Falha na autenticação"
   },
   "post": {
     "backToAll": "← Voltar para todas as publicações",

@@ -27,9 +27,17 @@
   "newsletter": {
     "title": "Newsletter",
     "description": "Get notified when new stories are published. No spam, unsubscribe anytime.",
+    "emailLabel": "Email address",
     "placeholder": "your@email.com",
     "subscribe": "Subscribe",
-    "subscribing": "Subscribing..."
+    "subscribing": "Subscribing...",
+    "success": "🎉 You're subscribed! Check your email for confirmation.",
+    "genericError": "Something went wrong. Please try again.",
+    "confirmSuccess": "🎉 Subscription confirmed! You'll be notified when new stories are published.",
+    "confirmError": "Couldn't confirm the subscription. The link may have expired or already been used.",
+    "unsubscribeSuccess": "You've been removed from our list. We'll miss you!",
+    "unsubscribeError": "Couldn't unsubscribe. The link may have expired or already been used.",
+    "backHome": "← Back to home"
   },
   "login": {
     "title": "Sign In",
@@ -39,7 +47,18 @@
     "devLogin": "Development Login",
     "loginAsAdmin": "Login as Admin",
     "loginAsUser": "Login as User",
-    "signingIn": "Signing in..."
+    "signingIn": "Signing in...",
+    "loginFailed": "Login failed"
+  },
+  "callback": {
+    "signingYouIn": "Signing you in...",
+    "pleaseWait": "Please wait while we complete authentication.",
+    "authFailed": "Authentication Failed",
+    "tryAgain": "Try again",
+    "loading": "Loading...",
+    "processingAuth": "Processing authentication...",
+    "noAuthCode": "No authorization code received.",
+    "authFailedGeneric": "Authentication failed"
   },
   "post": {
     "backToAll": "← Back to all posts",

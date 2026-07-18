@@ -2,6 +2,7 @@ import { createHmac } from 'crypto'
 import { newsletterRepository } from '../repositories/newsletter.repository'
 import { ListSubscribersQuery } from '../schemas/newsletter.schema'
 import { SubscriptionStatus } from '@prisma/client'
+import { sendEmail } from '../lib/ses'
 
 // ─── Token helpers ─────────────────────────────────────────────────────────────
 // We generate HMAC tokens so we can verify them without storing anything.
@@ -28,19 +29,64 @@ function verifyToken(token: string): string | null {
   }
 }
 
+function getFrontendUrl(): string {
+  return process.env.FRONTEND_URL ?? 'http://localhost:3000'
+}
+
+// ─── Email templates (PT-first, matches the blog's default language) ───────────
+
+function confirmationEmail(confirmUrl: string) {
+  return {
+    subject: 'Confirme sua assinatura — Blog do Broomn',
+    html: `
+      <div style="font-family: Georgia, serif; max-width: 480px; margin: 0 auto; color: #1f2937;">
+        <h1 style="font-size: 22px;">Blog do Broomn</h1>
+        <p>Olá! Recebemos um pedido de assinatura da newsletter com este e-mail.</p>
+        <p>Clique no link abaixo para confirmar:</p>
+        <p><a href="${confirmUrl}" style="color: #1d4ed8;">Confirmar assinatura</a></p>
+        <p style="color: #6b7280; font-size: 13px;">Se você não pediu essa assinatura, pode ignorar este e-mail.</p>
+      </div>
+    `,
+    text: `Blog do Broomn\n\nRecebemos um pedido de assinatura da newsletter com este e-mail.\n\nConfirme em: ${confirmUrl}\n\nSe você não pediu essa assinatura, pode ignorar este e-mail.`,
+  }
+}
+
+function newsletterEmail(subject: string, content: string, unsubscribeUrl: string) {
+  return {
+    subject,
+    html: `
+      <div style="font-family: Georgia, serif; max-width: 480px; margin: 0 auto; color: #1f2937;">
+        ${content}
+        <hr style="margin: 32px 0; border: none; border-top: 1px solid #e5e7eb;" />
+        <p style="color: #6b7280; font-size: 13px;">
+          Você está recebendo este e-mail porque assina a newsletter do Blog do Broomn.
+          <a href="${unsubscribeUrl}" style="color: #1d4ed8;">Cancelar assinatura</a>
+        </p>
+      </div>
+    `,
+    text: `${content}\n\n---\nCancelar assinatura: ${unsubscribeUrl}`,
+  }
+}
+
 // ─── Service ───────────────────────────────────────────────────────────────────
 
 export const newsletterService = {
   /**
-   * Subscribe an email. Returns the subscriber record and a confirmation token.
-   * In production, you'd send a confirmation email with a link containing the token.
+   * Subscribe an email. Sends a confirmation email via SES with a link
+   * containing an HMAC token (verifiable without a DB lookup).
    */
   async subscribe(email: string, userId?: string) {
     const subscriber = await newsletterRepository.subscribe(email, userId)
     const confirmToken = generateToken(subscriber.id)
+    const confirmUrl = `${getFrontendUrl()}/pt/newsletter/confirm?token=${confirmToken}`
 
-    // TODO: send confirmation email via SES with link:
-    // `${FRONTEND_URL}/newsletter/confirm?token=${confirmToken}`
+    try {
+      await sendEmail({ to: subscriber.email, ...confirmationEmail(confirmUrl) })
+    } catch (err) {
+      // Don't fail the subscription if the email provider hiccups — the row is
+      // already created and an admin can be alerted separately if this matters.
+      console.error('Failed to send newsletter confirmation email:', err)
+    }
 
     return { subscriber, confirmToken }
   },
@@ -89,21 +135,30 @@ export const newsletterService = {
     }
   },
 
-  /**
-   * Send a newsletter to all confirmed subscribers.
-   * For now returns the list of recipients — SES integration comes with infra.
-   */
+  /** Send a newsletter to all confirmed subscribers, each with their own unsubscribe link. */
   async send(subject: string, content: string) {
-    const emails = await newsletterRepository.getConfirmedEmails()
+    const subscribers = await newsletterRepository.getConfirmedSubscribers()
 
-    if (emails.length === 0) {
+    if (subscribers.length === 0) {
       return { sent: 0, recipients: [] }
     }
 
-    // TODO: integrate with AWS SES
-    // For each email, send via SES with an unsubscribe link in the footer.
-    // The unsubscribe link should contain generateToken(subscriberId).
+    let sent = 0
+    for (const subscriber of subscribers) {
+      const unsubscribeToken = generateToken(subscriber.id)
+      const unsubscribeUrl = `${getFrontendUrl()}/pt/newsletter/unsubscribe?token=${unsubscribeToken}`
 
-    return { sent: emails.length, recipients: emails }
+      try {
+        await sendEmail({
+          to: subscriber.email,
+          ...newsletterEmail(subject, content, unsubscribeUrl),
+        })
+        sent++
+      } catch (err) {
+        console.error(`Failed to send newsletter to ${subscriber.email}:`, err)
+      }
+    }
+
+    return { sent, recipients: subscribers.map((s) => s.email) }
   },
 }
