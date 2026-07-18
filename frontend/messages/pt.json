@@ -32,7 +32,12 @@
     "subscribe": "Assinar",
     "subscribing": "Assinando...",
     "success": "🎉 Assinatura confirmada! Verifique seu e-mail para confirmar.",
-    "genericError": "Algo deu errado. Tente novamente."
+    "genericError": "Algo deu errado. Tente novamente.",
+    "confirmSuccess": "🎉 Assinatura confirmada com sucesso! Você vai receber um aviso quando novas histórias forem publicadas.",
+    "confirmError": "Não foi possível confirmar a assinatura. O link pode ter expirado ou já ter sido usado.",
+    "unsubscribeSuccess": "Você foi removido da nossa lista. Sentiremos sua falta!",
+    "unsubscribeError": "Não foi possível cancelar a assinatura. O link pode ter expirado ou já ter sido usado.",
+    "backHome": "← Voltar para o início"
   },
   "login": {
     "title": "Entrar",

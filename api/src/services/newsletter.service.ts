@@ -29,8 +29,8 @@ function verifyToken(token: string): string | null {
   }
 }
 
-function getApiUrl(): string {
-  return process.env.API_URL ?? `http://localhost:${process.env.PORT ?? 3001}`
+function getFrontendUrl(): string {
+  return process.env.FRONTEND_URL ?? 'http://localhost:3000'
 }
 
 // ─── Email templates (PT-first, matches the blog's default language) ───────────
@@ -78,7 +78,7 @@ export const newsletterService = {
   async subscribe(email: string, userId?: string) {
     const subscriber = await newsletterRepository.subscribe(email, userId)
     const confirmToken = generateToken(subscriber.id)
-    const confirmUrl = `${getApiUrl()}/newsletter/confirm?token=${confirmToken}`
+    const confirmUrl = `${getFrontendUrl()}/pt/newsletter/confirm?token=${confirmToken}`
 
     try {
       await sendEmail({ to: subscriber.email, ...confirmationEmail(confirmUrl) })
@@ -146,7 +146,7 @@ export const newsletterService = {
     let sent = 0
     for (const subscriber of subscribers) {
       const unsubscribeToken = generateToken(subscriber.id)
-      const unsubscribeUrl = `${getApiUrl()}/newsletter/unsubscribe?token=${unsubscribeToken}`
+      const unsubscribeUrl = `${getFrontendUrl()}/pt/newsletter/unsubscribe?token=${unsubscribeToken}`
 
       try {
         await sendEmail({

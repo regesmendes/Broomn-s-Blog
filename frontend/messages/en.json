@@ -32,7 +32,12 @@
     "subscribe": "Subscribe",
     "subscribing": "Subscribing...",
     "success": "🎉 You're subscribed! Check your email for confirmation.",
-    "genericError": "Something went wrong. Please try again."
+    "genericError": "Something went wrong. Please try again.",
+    "confirmSuccess": "🎉 Subscription confirmed! You'll be notified when new stories are published.",
+    "confirmError": "Couldn't confirm the subscription. The link may have expired or already been used.",
+    "unsubscribeSuccess": "You've been removed from our list. We'll miss you!",
+    "unsubscribeError": "Couldn't unsubscribe. The link may have expired or already been used.",
+    "backHome": "← Back to home"
   },
   "login": {
     "title": "Sign In",

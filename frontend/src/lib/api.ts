@@ -303,6 +303,14 @@ class ApiClient {
     });
   }
 
+  async confirmSubscription(token: string): Promise<{ message: string; subscriber: { email: string } }> {
+    return this.request(`/newsletter/confirm?token=${encodeURIComponent(token)}`);
+  }
+
+  async unsubscribeFromNewsletter(token: string): Promise<{ message: string; subscriber: { email: string } }> {
+    return this.request(`/newsletter/unsubscribe?token=${encodeURIComponent(token)}`);
+  }
+
   async getSubscribers(token: string): Promise<Subscriber[]> {
     return this.request<Subscriber[]>('/newsletter/subscribers', {
       headers: this.authHeaders(token),
