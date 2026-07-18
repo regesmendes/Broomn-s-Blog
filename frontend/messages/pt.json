@@ -47,7 +47,18 @@
     "devLogin": "Login de Desenvolvimento",
     "loginAsAdmin": "Entrar como Admin",
     "loginAsUser": "Entrar como Usuário",
-    "signingIn": "Entrando..."
+    "signingIn": "Entrando...",
+    "loginFailed": "Falha ao entrar"
+  },
+  "callback": {
+    "signingYouIn": "Entrando...",
+    "pleaseWait": "Aguarde enquanto concluímos a autenticação.",
+    "authFailed": "Falha na autenticação",
+    "tryAgain": "Tentar novamente",
+    "loading": "Carregando...",
+    "processingAuth": "Processando autenticação...",
+    "noAuthCode": "Nenhum código de autorização recebido.",
+    "authFailedGeneric": "Falha na autenticação"
   },
   "post": {
     "backToAll": "← Voltar para todas as publicações",

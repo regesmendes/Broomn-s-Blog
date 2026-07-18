@@ -47,7 +47,18 @@
     "devLogin": "Development Login",
     "loginAsAdmin": "Login as Admin",
     "loginAsUser": "Login as User",
-    "signingIn": "Signing in..."
+    "signingIn": "Signing in...",
+    "loginFailed": "Login failed"
+  },
+  "callback": {
+    "signingYouIn": "Signing you in...",
+    "pleaseWait": "Please wait while we complete authentication.",
+    "authFailed": "Authentication Failed",
+    "tryAgain": "Try again",
+    "loading": "Loading...",
+    "processingAuth": "Processing authentication...",
+    "noAuthCode": "No authorization code received.",
+    "authFailedGeneric": "Authentication failed"
   },
   "post": {
     "backToAll": "← Back to all posts",
