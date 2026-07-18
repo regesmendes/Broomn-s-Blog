@@ -126,6 +126,5 @@ export async function buildApp(): Promise<FastifyInstance> {
     })
   })
 
-  await app.ready()
   return app
 }

@@ -269,29 +269,123 @@ Comments are created with `approved = false` by default. They only appear public
 
 Next.js has known issues with React version resolution when placed in an npm workspace alongside other packages. The frontend manages its own `node_modules` independently to avoid duplicate React instances causing `useContext` errors during build.
 
+## Deployment (AWS CDK)
+
+The infrastructure is defined in the `infrastructure/` directory using AWS CDK (TypeScript).
+
+### Prerequisites
+
+- AWS CLI configured with credentials
+- CDK bootstrapped: `npx cdk bootstrap`
+- Google OAuth credentials (Client ID + Secret from Google Cloud Console)
+- Route53 hosted zone for `blogdobroomn.com`
+
+### Deploy
+
+```bash
+cd infrastructure
+npm install
+npx cdk deploy --all \
+  --context googleClientId=YOUR_GOOGLE_CLIENT_ID \
+  --context googleClientSecret=YOUR_GOOGLE_CLIENT_SECRET \
+  --context hostedZoneId=YOUR_ROUTE53_HOSTED_ZONE_ID
+```
+
+### Architecture
+
+| Stack | Resources |
+|---|---|
+| BromnBlog-Cognito | User Pool, Google IdP, App Client, Hosted UI |
+| BromnBlog-Database | VPC, Aurora Serverless v2 (PostgreSQL 16), Security Groups |
+| BromnBlog-Storage | S3 bucket (media uploads, public read) |
+| BromnBlog-Api | Lambda, API Gateway HTTP API, custom domain |
+| BromnBlog-Frontend | S3 + CloudFront + ACM cert + Route53 |
+| BromnBlog-Ses | SES domain identity for email |
+
+### URLs after deployment
+
+- Blog: `https://blogdobroomn.com`
+- API: `https://api.blogdobroomn.com`
+- Cognito Hosted UI: `https://broomns-blog.auth.us-east-1.amazoncognito.com`
+
+### Current Deployment Status (as of July 2026)
+
+**Deployed and working:**
+- ✅ BromnBlog-Cognito (User Pool ID: `us-east-1_ApHF59Xas`, Client ID: `535qq83rh90srom3ij4ospn78e`)
+- ✅ BromnBlog-Database (RDS PostgreSQL t4g.micro in private subnet)
+- ✅ BromnBlog-Storage (S3 bucket: `broomns-blog-frontend-099710233970`)
+- ✅ BromnBlog-Api (Lambda + API Gateway, domain: `api.blogdobroomn.com`)
+- ✅ BromnBlog-Frontend (S3 + CloudFront distribution: `EKN0G1CK1QQC`)
+- ✅ BromnBlog-Ses (using existing SES identity)
+- ✅ Static assets uploaded to S3
+- ✅ Google OAuth configured (redirect URI added to Google Cloud Console)
+
+**NOT YET COMPLETE — blocking production launch:**
+
+1. **Frontend SSR Lambda**: The Next.js app uses Server Components and cannot be served purely from S3. OpenNext (`open-next` package) has been installed and successfully builds the app into Lambda-compatible bundles (output at `frontend/.open-next/`). However, the CDK Frontend stack currently only creates an S3+CloudFront setup for static files. It needs:
+   - A new Lambda function using the server bundle from `.open-next/server-functions/default/`
+   - A Lambda Function URL (or API Gateway) for the SSR handler
+   - CloudFront behavior routing: `/_next/static/*` → S3 origin, everything else → Lambda origin
+   - The image optimization function (`.open-next/image-optimization-function/`) optionally deployed as another Lambda behind CloudFront `/\_next/image*`
+
+2. **Database migration**: The RDS instance is in a private VPC subnet with no public access. Prisma migrations need to be run against it. Options:
+   - Add a migration step to the API Lambda (run on first cold start or via a custom event)
+   - Create a one-time "migration Lambda" that runs in the same VPC
+   - Use a bastion host / EC2 instance to tunnel and run `npx prisma migrate deploy`
+   - Temporarily enable public access on RDS (not recommended for production)
+
+3. **Cognito callback URL update**: The Cognito stack was initially deployed with `broomn.foradoprograma.com` callback URLs. It was later updated to `blogdobroomn.com` in the code, but you need to re-deploy the Cognito stack with the new domain:
+   ```bash
+   npx cdk deploy BromnBlog-Cognito --context googleClientId=... --context googleClientSecret=... --context hostedZoneId=Z03952433C47AYNUTV3QU
+   ```
+
+### OpenNext Build
+
+The frontend is built for Lambda deployment using OpenNext:
+
+```bash
+cd frontend
+NEXT_PUBLIC_API_URL=https://api.blogdobroomn.com NODE_OPTIONS='--localstorage-file=.next/.localStorage' npx open-next build
+```
+
+This produces `.open-next/` with:
+- `assets/` — static files (already uploaded to S3)
+- `server-functions/default/` — the SSR Lambda handler
+- `image-optimization-function/` — image optimization Lambda
+- `revalidation-function/` — ISR revalidation handler
+- `warmer-function/` — keeps Lambda warm
+
+### Key AWS Resources
+
+| Resource | Identifier |
+|---|---|
+| AWS Account | `099710233970` |
+| Region | `us-east-1` |
+| Route53 Hosted Zone (blogdobroomn.com) | `Z03952433C47AYNUTV3QU` |
+| Cognito User Pool | `us-east-1_ApHF59Xas` |
+| Cognito App Client | `535qq83rh90srom3ij4ospn78e` |
+| Cognito Domain | `broomns-blog.auth.us-east-1.amazoncognito.com` |
+| CloudFront Distribution | `EKN0G1CK1QQC` |
+| S3 Frontend Bucket | `broomns-blog-frontend-099710233970` |
+| API Lambda | `broomns-blog-api` |
+| API Gateway | `58m9fzd8lj` |
+
+### Node.js 25 Compatibility Note
+
+The project runs on Node.js 25 which has a built-in `localStorage` global requiring `--localstorage-file` flag. This affects:
+- Frontend dev server: handled via `NODE_OPTIONS` in package.json `dev` script
+- OpenNext build: must pass `NODE_OPTIONS='--localstorage-file=.next/.localStorage'` when running `npx open-next build`
+- Lambda runtime: uses Node.js 20 (no issue there)
+
 ## What's Next (Planned)
 
-These are the remaining pieces to complete the project, roughly in priority order:
-
-### Infrastructure (AWS CDK)
-- [ ] Aurora Serverless v2 (PostgreSQL) cluster
-- [ ] Cognito User Pool with Google Identity Provider
-- [ ] Lambda functions for the API (behind API Gateway)
-- [ ] S3 bucket for media uploads
-- [ ] CloudFront distribution for the frontend
-- [ ] SES configuration for newsletter emails
-- [ ] Secrets Manager for environment variables
+These are the remaining pieces to complete the project:
 
 ### API enhancements
 - [ ] SES integration for newsletter sending (currently stubbed)
 - [ ] SES integration for confirmation emails
-- [ ] S3 presigned URL endpoint for image uploads
 - [ ] Pagination cursors for better performance at scale
-- [ ] Request rate limiting per user (not just per IP)
-
-### Frontend enhancements
-- [ ] Complete the OAuth callback (Cognito token exchange)
-- [ ] Image upload in post editor
+- [ ] Per-user rate limiting
 
 ### DevOps
 - [ ] GitHub Actions CI pipeline (lint, test, build)
