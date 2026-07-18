@@ -7,7 +7,13 @@ import { prisma } from '../lib/prisma'
 import { authenticate } from '../middlewares/authenticate'
 import { authorize } from '../middlewares/authorize'
 
-const UPLOADS_DIR = join(process.cwd(), 'uploads')
+// Lambda's deployment package (process.cwd()) is read-only — only /tmp is
+// writable, and even that doesn't persist across cold starts or instances.
+// This unblocks the crash-on-boot; it does not make uploads durable on Lambda
+// (see README/follow-up notes — media storage needs to move to S3).
+const UPLOADS_DIR = process.env.LAMBDA_TASK_ROOT
+  ? join('/tmp', 'uploads')
+  : join(process.cwd(), 'uploads')
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 

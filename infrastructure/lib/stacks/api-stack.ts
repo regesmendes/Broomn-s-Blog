@@ -1,6 +1,8 @@
 import { Stack, StackProps, CfnOutput, Duration } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
+import * as path from 'path';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import * as apigatewayv2Integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
@@ -47,12 +49,25 @@ export class ApiStack extends Stack {
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
 
-    // Lambda function running the Fastify API
-    const apiFunction = new lambda.Function(this, 'ApiFn', {
+    // Resolve the real DB credentials at deploy time via a CloudFormation
+    // dynamic reference — never bake the password into the CDK app itself.
+    const dbSecret = props.dbInstance.secret!;
+    const dbUsername = dbSecret.secretValueFromJson('username').unsafeUnwrap();
+    const dbPassword = dbSecret.secretValueFromJson('password').unsafeUnwrap();
+
+    // Repo root: node_modules are hoisted here (npm workspaces), so esbuild
+    // bundling and the lockfile resolution both need to start from there.
+    const repoRoot = path.join(__dirname, '..', '..', '..');
+
+    // Lambda function running the Fastify API, adapted via @fastify/aws-lambda.
+    // Bundled with esbuild (NodejsFunction) since a plain dist/ asset doesn't
+    // include node_modules — the Lambda zip must carry fastify, prisma, etc.
+    const apiFunction = new NodejsFunction(this, 'ApiFn', {
       functionName: 'broomns-blog-api',
       runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'index.handler',
-      code: lambda.Code.fromAsset('../api/dist'), // Built API artifact
+      entry: path.join(repoRoot, 'api', 'src', 'lambda.ts'),
+      handler: 'handler',
+      depsLockFilePath: path.join(repoRoot, 'package-lock.json'),
       memorySize: 512,
       timeout: Duration.seconds(30),
       vpc: props.vpc,
@@ -60,9 +75,25 @@ export class ApiStack extends Stack {
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
       },
       securityGroups: [props.lambdaSecurityGroup],
+      bundling: {
+        // esbuild can't statically bundle Prisma's generated client (it's
+        // dynamically loaded + ships a native query engine binary). Install
+        // it as a real dependency in the bundle and copy the generated
+        // client — including the rhel-openssl-3.0.x engine for Lambda's
+        // Amazon Linux 2023 runtime — in alongside it.
+        nodeModules: ['@prisma/client'],
+        commandHooks: {
+          beforeBundling: () => [],
+          beforeInstall: () => [],
+          afterBundling: (inputDir: string, outputDir: string) => [
+            `rm -rf ${outputDir}/node_modules/.prisma`,
+            `cp -r ${inputDir}/node_modules/.prisma ${outputDir}/node_modules/.prisma`,
+          ],
+        },
+      },
       environment: {
         NODE_ENV: 'production',
-        DATABASE_URL: `postgresql://broomns_admin:PLACEHOLDER@${props.dbInstance.dbInstanceEndpointAddress}:${props.dbInstance.dbInstanceEndpointPort}/broomnsblog`,
+        DATABASE_URL: `postgresql://${dbUsername}:${dbPassword}@${props.dbInstance.dbInstanceEndpointAddress}:${props.dbInstance.dbInstanceEndpointPort}/broomnsblog`,
         COGNITO_USER_POOL_ID: props.userPoolId,
         COGNITO_CLIENT_ID: props.userPoolClientId,
         COGNITO_DOMAIN: props.cognitoDomain,
@@ -71,6 +102,53 @@ export class ApiStack extends Stack {
         FRONTEND_URL: 'https://blogdobroomn.com',
         SES_FROM_EMAIL: 'noreply@blogdobroomn.com',
       },
+    });
+
+    // On-demand migration Lambda: runs `prisma migrate deploy` from inside the
+    // VPC (the DB is only reachable from lambdaSecurityGroup). Not wired to any
+    // trigger — invoke manually after deploying new migrations:
+    //   aws lambda invoke --function-name broomns-blog-migrate --region us-east-1 /dev/stdout
+    // NOTE: bundling requires node_modules/@prisma/engines/schema-engine-rhel-openssl-3.0.x
+    // locally. If missing, fetch it with:
+    //   PRISMA_CLI_BINARY_TARGETS=native,rhel-openssl-3.0.x npm rebuild @prisma/engines
+    const migrateFunction = new NodejsFunction(this, 'MigrateFn', {
+      functionName: 'broomns-blog-migrate',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      entry: path.join(repoRoot, 'api', 'src', 'migrate.ts'),
+      handler: 'handler',
+      depsLockFilePath: path.join(repoRoot, 'package-lock.json'),
+      memorySize: 512,
+      timeout: Duration.minutes(5),
+      vpc: props.vpc,
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+      },
+      securityGroups: [props.lambdaSecurityGroup],
+      bundling: {
+        // Ship the real prisma CLI package (the handler shells out to it);
+        // esbuild only bundles the thin handler wrapper.
+        nodeModules: ['prisma'],
+        commandHooks: {
+          beforeBundling: () => [],
+          beforeInstall: () => [],
+          afterBundling: (inputDir: string, outputDir: string) => [
+            // Schema/migration engine built for Lambda's Amazon Linux runtime
+            `cp ${inputDir}/node_modules/@prisma/engines/schema-engine-rhel-openssl-3.0.x ${outputDir}/`,
+            // The schema + migrations the CLI will apply
+            `cp -r ${inputDir}/api/prisma ${outputDir}/prisma`,
+            // Trim engines the CLI won't use (handler points at the copy above)
+            `rm -f ${outputDir}/node_modules/@prisma/engines/schema-engine-* ${outputDir}/node_modules/@prisma/engines/libquery_engine-*`,
+          ],
+        },
+      },
+      environment: {
+        DATABASE_URL: `postgresql://${dbUsername}:${dbPassword}@${props.dbInstance.dbInstanceEndpointAddress}:${props.dbInstance.dbInstanceEndpointPort}/broomnsblog`,
+      },
+    });
+
+    new CfnOutput(this, 'MigrateFunctionName', {
+      value: migrateFunction.functionName,
+      description: 'Invoke this Lambda to run prisma migrate deploy against the live DB',
     });
 
     // IAM: Allow Lambda to upload/delete objects in the media bucket
@@ -93,7 +171,7 @@ export class ApiStack extends Stack {
     apiFunction.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['secretsmanager:GetSecretValue'],
-        resources: [`arn:aws:secretsmanager:${this.region}:${this.account}:secret:broomns-blog/db-credentials*`],
+        resources: [dbSecret.secretArn],
       }),
     );
 
