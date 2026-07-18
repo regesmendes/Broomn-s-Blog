@@ -87,8 +87,16 @@ export class ApiStack extends Stack {
       memorySize: 512,
       timeout: Duration.seconds(30),
       vpc: props.vpc,
+      // PRIVATE_WITH_EGRESS (routes through the VPC's existing NAT Gateway),
+      // not PRIVATE_ISOLATED — this Lambda needs real internet egress to
+      // reach SES (newsletter sending) and Cognito's JWKS endpoint (Google
+      // OAuth token verification), neither of which is a VPC Gateway
+      // Endpoint. PRIVATE_ISOLATED has zero route to 0.0.0.0/0, which meant
+      // both of those calls would hang until the Lambda's own timeout killed
+      // them. RDS is still reachable either way — that's same-VPC routing,
+      // not internet egress.
       vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
       },
       securityGroups: [props.lambdaSecurityGroup],
       bundling: {
