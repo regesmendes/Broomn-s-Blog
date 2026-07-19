@@ -333,7 +333,7 @@ npx cdk deploy --all \
 - ✅ BromnBlog-Storage (S3 bucket: `broomns-blog-media-099710233970`) — media uploads/deletes now go directly to this bucket via `api/src/lib/s3.ts` (`S3_BUCKET_NAME` env var, already wired to the Lambda; IAM already granted `s3:PutObject`/`s3:DeleteObject`)
 - ✅ BromnBlog-Api (Lambda + API Gateway, domain: `api.blogdobroomn.com`) — Fastify app wrapped via `@fastify/aws-lambda`, bundled with esbuild (`NodejsFunction`), running in a `PRIVATE_WITH_EGRESS` subnet (not `PRIVATE_ISOLATED` — it needs real internet egress for SES and Cognito's JWKS endpoint, neither of which has a VPC Gateway Endpoint)
 - ✅ BromnBlog-Frontend (S3 + CloudFront distribution: `EKN0G1CK1QQC`) — full SSR via OpenNext + a Lambda Function URL behind CloudFront OAC, not just static files
-- ✅ BromnBlog-Ses — `blogdobroomn.com` domain verified (DKIM via Route53, automatic). **Account is still in SES sandbox** — production access requested, pending AWS review; until approved, sending only works to individually pre-verified recipient addresses
+- ✅ BromnBlog-Ses — `blogdobroomn.com` domain verified (DKIM via Route53, automatic, `DkimAttributes.Status: SUCCESS`). **Production access granted** (confirmed via `aws sesv2 get-account`: `ProductionAccessEnabled: true`, review case `178438314600754` status `GRANTED`) — sending works to any recipient, not just pre-verified addresses. Quota: 50,000 emails/24h, 14/sec.
 - ✅ Google OAuth configured and confirmed working (redirect URI registered in Google Cloud Console, real login tested)
 
 ### ⚠️ Two footguns that already caused real incidents — read before touching `cdk deploy`
@@ -430,7 +430,6 @@ These are the remaining pieces to complete the project:
 
 ### API enhancements
 - [x] **Media storage → S3**: `api/src/routes/media.routes.ts` now uploads/deletes directly against the `BromnBlog-Storage` bucket via `api/src/lib/s3.ts`, instead of local disk / Lambda `/tmp`. No dev-mode fallback — local dev hits the real bucket too if AWS credentials are configured (same pattern as SES).
-- [ ] SES production access — requested, pending AWS manual review; sending currently only works to individually pre-verified recipient addresses
 - [ ] Pagination cursors for better performance at scale
 - [ ] Per-user rate limiting
 - [ ] Confirm/unsubscribe email links currently point at the frontend pages which work fine, but consider whether newsletter sends should stay fully manual (`/admin/newsletter`) or auto-trigger on publish — discussed and deliberately deferred, not a bug
