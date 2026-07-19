@@ -19,9 +19,20 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
+      # Match the npm version lockfiles are generated with locally — an
+      # older npm bundled with a given Node version can disagree with a
+      # newer one about whether a lockfile is "in sync", causing spurious
+      # `npm ci` EUSAGE failures on a lockfile that's actually fine.
+      - run: npm install -g npm@11
+
       - run: npm ci
 
       - run: npm run lint --workspace=api
+
+      # @prisma/client's generated types (e.g. enums like SubscriptionStatus)
+      # aren't produced by `npm ci` alone — they depend on the current
+      # schema.prisma and must be generated explicitly.
+      - run: npx prisma generate --schema=api/prisma/schema.prisma
 
       # api's build script is `tsc --project tsconfig.json` — this is also
       # the typecheck step, there's no separate one.
@@ -44,6 +55,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      - run: npm install -g npm@11
       - run: npm ci
       - run: npm run lint
       - run: npx tsc --noEmit
@@ -73,6 +85,7 @@ jobs:
           cache: npm
           cache-dependency-path: infrastructure/package-lock.json
 
+      - run: npm install -g npm@11
       - run: npm ci
       - run: npm run build
       - run: npm test
