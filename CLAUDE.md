@@ -44,3 +44,4 @@ next-intl, locales `pt` (default) and `en`, routed via a `[locale]` segment. Mes
 - Commits: conventional-style prefixes (`feat:`, `fix:`, `docs:`, `chore:`).
 - Branches: `feat/<topic>`, merged into `master` via PR.
 - Update README.md when adding features or changing architecture, before raising a PR.
+- `prod` is a protected, deploy-triggering branch — merging into it (from `master`, via PR) redeploys the entire live stack. Never push to it directly (branch protection blocks this anyway). See README's "CI/CD pipeline" under Architecture Decisions.

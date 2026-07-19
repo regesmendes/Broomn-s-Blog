@@ -288,6 +288,22 @@ The global rate limiter (`@fastify/rate-limit`, 100 req/min default) keys by aut
 
 **Known limitation, accepted for now**: `@fastify/rate-limit`'s default store is an in-memory `Map`, scoped to a single Lambda execution environment. Since API Gateway can spin up multiple concurrent Lambda instances, each with its own independent counter, this is a soft/best-effort limit rather than a mathematically exact global one under concurrent load. A true distributed limit would need a shared store (e.g. `@fastify/rate-limit`'s Redis option, via ElastiCache or Upstash) — real infra/cost disproportionate to this app's actual traffic. Revisit if usage ever grows enough for this gap to matter.
 
+### CI/CD pipeline
+
+**Branch flow**: feature branches → PR into `master` (everyday development, ungated) → PR from `master` into `prod` (a deliberate promotion step — merging into `prod` is what triggers a production deploy). `prod` has real GitHub branch protection: a PR is required (no direct pushes, no force-pushes, no deletions), and the CI workflow's three checks (`API`, `Frontend`, `Infrastructure`) must all pass against an up-to-date branch before the merge button is even enabled — this applies to repo admins too (`enforce_admins: true`). This repo was made **public** specifically to unlock branch protection: GitHub disables both classic branch protection rules and the newer Rulesets on private repos unless the account has GitHub Pro. The repo's git history was checked for secrets before flipping visibility — none found (no `.env` files, no AWS keys, no private keys were ever committed).
+
+**CI** (`.github/workflows/ci.yml`) runs on every PR/push touching `master` or `prod`: lint + build (which is also the typecheck, via `tsc`) + test for `api`, and lint + typecheck + test + build for `frontend`, and build + test for `infrastructure`. Nothing here touches AWS.
+
+**Deploy** (`.github/workflows/deploy.yml`) runs on push to `prod` (i.e. after a merge) and replays the manual procedure documented above in order — build frontend via OpenNext, sync static assets to S3, `cdk deploy --all`, invalidate CloudFront, invoke the migrate Lambda — as one automated job. Real Google OAuth credentials are always passed to `cdk deploy` (from GitHub Secrets), so it can never hit the placeholder-credential fallback that once overwrote Cognito's real Google IdP secret (see the footguns above) — every deploy is a full-stack deploy, safely.
+
+**AWS auth**: GitHub Actions authenticates via OIDC (GitHub's `token.actions.githubusercontent.com` provider, already registered in this AWS account for another project) assuming a dedicated IAM role, `broomns-blog-github-deploy`. Its trust policy restricts assumption to `repo:regesmendes/Broomn-s-Blog:ref:refs/heads/prod` only — no other branch, PR, or repo can assume it. No long-lived AWS access keys are stored anywhere. Its permissions are least-privilege, not broad admin:
+- `sts:AssumeRole`/`sts:TagSession` on the existing CDK bootstrap roles (`cdk-hnb659fds-*`) — the same mechanism the CDK CLI already uses for the human deploy user; the actual CloudFormation/resource permissions live on those pre-existing bootstrap roles, scoped by CDK itself.
+- `s3:PutObject`/`DeleteObject`/`ListBucket` on the frontend bucket only.
+- `cloudfront:CreateInvalidation`/`GetInvalidation` on the one distribution only.
+- `lambda:InvokeFunction` on the one migrate Lambda only.
+
+**GitHub repo configuration** (for reproducing this setup, or auditing what's in place): Secrets — `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (pulled from the live Cognito Google IdP config, not re-typed by hand). Variables (non-secret) — `AWS_DEPLOY_ROLE_ARN`, `AWS_REGION`, `HOSTED_ZONE_ID`, `CLOUDFRONT_DISTRIBUTION_ID`, `FRONTEND_BUCKET`, `MIGRATE_FUNCTION_NAME`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_COGNITO_DOMAIN`, `NEXT_PUBLIC_COGNITO_CLIENT_ID`, `NEXT_PUBLIC_COGNITO_REDIRECT_URI`.
+
 ### Frontend outside npm workspace
 
 Next.js has known issues with React version resolution when placed in an npm workspace alongside other packages. The frontend manages its own `node_modules` independently to avoid duplicate React instances causing `useContext` errors during build.
@@ -444,9 +460,8 @@ The project runs on Node.js 25 which has a built-in `localStorage` global requir
 These are the remaining pieces to complete the project:
 
 ### DevOps
-- [ ] GitHub Actions CI pipeline (lint, test, build) — planned to eventually replace the manual `cdk deploy` workflow (see the footguns documented under Deployment above) with deploy-on-merge to a deploy branch
-- [ ] Deployment pipeline (CDK deploy on merge to master)
-- [ ] Environment separation (dev/staging/prod)
+- [x] GitHub Actions CI pipeline (lint, test, build) — see "CI/CD pipeline" under Architecture Decisions
+- [x] Deployment pipeline (CDK deploy on merge to prod) — see "CI/CD pipeline" under Architecture Decisions
 - [x] `api/` now has a real ESLint config (flat config, typescript-eslint) — `npm run lint` works
 
 ## Contributing
