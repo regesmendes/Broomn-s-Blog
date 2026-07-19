@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/navigation';
-import api, { ApiError, Post } from '@/lib/api';
+import api, { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { ImagePickerModal } from '@/components/ImagePickerModal';
@@ -59,7 +59,7 @@ export default function EditPostPage() {
           ? new Date(post.publishedAt).toISOString().slice(0, 16)
           : '',
       });
-    } catch (err) {
+    } catch {
       setError('Failed to load post.');
     } finally {
       setLoading(false);
