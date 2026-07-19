@@ -282,6 +282,12 @@ Instead of storing confirmation tokens in the database, we generate HMAC tokens:
 
 Comments are created with `approved = false` by default. They only appear publicly after an admin approves them. Comment owners can delete their own comments; admins can delete any comment.
 
+### Per-user rate limiting
+
+The global rate limiter (`@fastify/rate-limit`, 100 req/min default) keys by authenticated user instead of IP when possible: its `keyGenerator` (in `api/src/app.ts`) attempts `request.jwtVerify()` and keys by `user:<sub>` on success, falling back to IP for anonymous requests. It verifies the token rather than just decoding it — trusting an unverified `sub` claim would let anyone dodge the limit by sending a fresh made-up token per request. A few high-abuse-risk routes are tightened further via per-route `config.rateLimit` (which inherits this same keyGenerator): `/newsletter/subscribe` (5/10min, public and a real SES-cost target), comment creation (10/min per user), and media upload (20/min per user).
+
+**Known limitation, accepted for now**: `@fastify/rate-limit`'s default store is an in-memory `Map`, scoped to a single Lambda execution environment. Since API Gateway can spin up multiple concurrent Lambda instances, each with its own independent counter, this is a soft/best-effort limit rather than a mathematically exact global one under concurrent load. A true distributed limit would need a shared store (e.g. `@fastify/rate-limit`'s Redis option, via ElastiCache or Upstash) — real infra/cost disproportionate to this app's actual traffic. Revisit if usage ever grows enough for this gap to matter.
+
 ### Frontend outside npm workspace
 
 Next.js has known issues with React version resolution when placed in an npm workspace alongside other packages. The frontend manages its own `node_modules` independently to avoid duplicate React instances causing `useContext` errors during build.
@@ -440,7 +446,7 @@ These are the remaining pieces to complete the project:
 ### API enhancements
 - [x] **Media storage → S3**: `api/src/routes/media.routes.ts` now uploads/deletes directly against the `BromnBlog-Storage` bucket via `api/src/lib/s3.ts`, instead of local disk / Lambda `/tmp`. No dev-mode fallback — local dev hits the real bucket too if AWS credentials are configured (same pattern as SES).
 - [x] Pagination cursors for better performance at scale — see "Cursor-based pagination" under Architecture Decisions
-- [ ] Per-user rate limiting
+- [x] Per-user rate limiting — see "Per-user rate limiting" under Architecture Decisions
 - [ ] Confirm/unsubscribe email links currently point at the frontend pages which work fine, but consider whether newsletter sends should stay fully manual (`/admin/newsletter`) or auto-trigger on publish — discussed and deliberately deferred, not a bug
 
 ### DevOps

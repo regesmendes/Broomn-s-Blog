@@ -12,8 +12,14 @@ export async function commentRoutes(app: FastifyInstance) {
   // GET /posts/:postId/comments/all — admin, includes unapproved
   app.get('/posts/:postId/comments/all', { preHandler: [authenticate, authorize('admin')] }, commentController.listAll)
 
-  // POST /posts/:postId/comments — auth required (any logged-in user)
-  app.post('/posts/:postId/comments', { preHandler: authenticate }, commentController.create)
+  // POST /posts/:postId/comments — auth required (any logged-in user).
+  // Tightened beyond the global default, keyed per-user, to stop a single
+  // account from flooding a post with comments.
+  app.post(
+    '/posts/:postId/comments',
+    { preHandler: authenticate, config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    commentController.create
+  )
 
   // ── Top-level comment actions ────────────────────────────────────────────────
 

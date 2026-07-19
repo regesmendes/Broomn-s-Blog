@@ -18,7 +18,12 @@ const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'
 
 export async function mediaRoutes(app: FastifyInstance) {
   // ── POST /media/upload ─────────────────────────────────────────────────────
-  app.post('/upload', { preHandler: [authenticate, authorize('admin')] }, async (request, reply) => {
+  // Tightened beyond the global default, keyed per-user, to bound storage
+  // costs while still allowing legitimate multi-file drag-drop uploads.
+  app.post('/upload', {
+    preHandler: [authenticate, authorize('admin')],
+    config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+  }, async (request, reply) => {
     const data = await request.file()
 
     if (!data) {

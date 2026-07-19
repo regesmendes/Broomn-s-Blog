@@ -33,6 +33,7 @@ Both `api` and `frontend` have real ESLint configs. `frontend`'s `next.config.ts
 - No CI pipeline exists yet — correctness is enforced by convention only (tests must pass locally before merging to `master`).
 - Media uploads go directly to S3 (`api/src/lib/s3.ts`, `S3_BUCKET_NAME` env var) — no dev-mode fallback, local dev hits the real bucket too if AWS credentials are configured (same pattern as SES).
 - All list endpoints use cursor pagination (`api/src/lib/pagination.ts`'s `paginateWithCursor`), not `page`/`skip` — new list endpoints should follow the same pattern (`cursor`/`limit` query params, `orderBy: [{field: 'desc'}, {id: 'desc'}]` for a stable tiebreaker). See README's "Cursor-based pagination" under Architecture Decisions.
+- Rate limiting keys by authenticated user (verified JWT `sub`), falling back to IP — see README's "Per-user rate limiting". The in-memory store is per-Lambda-instance, not a true distributed limit; a known, accepted tradeoff.
 
 ## i18n
 
