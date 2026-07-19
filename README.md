@@ -473,7 +473,7 @@ Note: `prisma db execute` runs the statement but doesn't print `SELECT` results 
 The project runs on Node.js 25 which has a built-in `localStorage` global requiring `--localstorage-file` flag. This affects:
 - Frontend dev server: handled via `NODE_OPTIONS` in package.json `dev` script
 - OpenNext build: must pass `NODE_OPTIONS='--localstorage-file=.next/.localStorage'` when running `npx open-next build`
-- Lambda runtime: uses Node.js 20 (no issue there)
+- Lambda runtime: uses Node.js 24 (no issue there — the `localStorage` global was introduced in Node 25, one major version later)
 
 ## Contributing
 

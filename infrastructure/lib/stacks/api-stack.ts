@@ -80,7 +80,7 @@ export class ApiStack extends Stack {
     // include node_modules — the Lambda zip must carry fastify, prisma, etc.
     const apiFunction = new NodejsFunction(this, 'ApiFn', {
       functionName: 'broomns-blog-api',
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       entry: path.join(repoRoot, 'api', 'src', 'lambda.ts'),
       handler: 'handler',
       depsLockFilePath: path.join(repoRoot, 'package-lock.json'),
@@ -138,7 +138,7 @@ export class ApiStack extends Stack {
     // locally. If missing, fetch it with: node api/scripts/fetch-migrate-engine.js
     const migrateFunction = new NodejsFunction(this, 'MigrateFn', {
       functionName: 'broomns-blog-migrate',
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       entry: path.join(repoRoot, 'api', 'src', 'migrate.ts'),
       handler: 'handler',
       depsLockFilePath: path.join(repoRoot, 'package-lock.json'),
