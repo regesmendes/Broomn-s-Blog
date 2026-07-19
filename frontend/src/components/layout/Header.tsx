@@ -31,6 +31,9 @@ export default function Header() {
           <Link href="/newsletter" className="text-emerald-800 hover:text-emerald-600 dark:text-emerald-200 dark:hover:text-emerald-400">
             {t('newsletter')}
           </Link>
+          <Link href="/about" className="text-emerald-800 hover:text-emerald-600 dark:text-emerald-200 dark:hover:text-emerald-400">
+            {t('about')}
+          </Link>
           {isAdmin && (
             <Link href="/admin/posts" className="text-emerald-800 hover:text-emerald-600 dark:text-emerald-200 dark:hover:text-emerald-400">
               {t('admin')}
@@ -85,6 +88,7 @@ export default function Header() {
           <div className="flex flex-col gap-4">
             <Link href="/" className="text-emerald-800 dark:text-emerald-200" onClick={() => setMenuOpen(false)}>{t('home')}</Link>
             <Link href="/newsletter" className="text-emerald-800 dark:text-emerald-200" onClick={() => setMenuOpen(false)}>{t('newsletter')}</Link>
+            <Link href="/about" className="text-emerald-800 dark:text-emerald-200" onClick={() => setMenuOpen(false)}>{t('about')}</Link>
             {isAdmin && (
               <Link href="/admin/posts" className="text-emerald-800 dark:text-emerald-200" onClick={() => setMenuOpen(false)}>{t('admin')}</Link>
             )}

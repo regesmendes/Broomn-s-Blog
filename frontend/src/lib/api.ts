@@ -80,6 +80,13 @@ export interface MediaItem {
 
 export interface MediaDetail extends MediaItem {
   posts: { id: string; title: string; slug: string }[];
+  usedInAboutPage: boolean;
+}
+
+export interface AboutPage {
+  id: string;
+  content: string;
+  updatedAt: string;
 }
 
 export interface CursorPaginationMeta {
@@ -392,6 +399,20 @@ class ApiClient {
       method: 'PATCH',
       headers: this.authHeaders(token),
       body: JSON.stringify({ newUrl }),
+    });
+  }
+
+  // About page
+
+  async getAbout(): Promise<AboutPage> {
+    return this.request<AboutPage>('/about');
+  }
+
+  async updateAbout(content: string, token: string): Promise<AboutPage> {
+    return this.request<AboutPage>('/about', {
+      method: 'PUT',
+      headers: this.authHeaders(token),
+      body: JSON.stringify({ content }),
     });
   }
 }
