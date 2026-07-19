@@ -12,6 +12,7 @@ import { commentRoutes } from './routes/comment.routes'
 import { newsletterRoutes } from './routes/newsletter.routes'
 import { tagRoutes } from './routes/tag.routes'
 import { mediaRoutes } from './routes/media.routes'
+import { aboutRoutes } from './routes/about.routes'
 import { devAuthRoutes } from './routes/dev-auth.routes'
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -37,19 +38,33 @@ export async function buildApp(): Promise<FastifyInstance> {
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
 
+  // Auth (registered before rate limiting so its `jwtVerify` decorator is
+  // available to the rate limit keyGenerator below)
+  app.register(jwt, {
+    secret: process.env.JWT_SECRET ?? 'change-me-in-production',
+  })
+
   app.register(rateLimit, {
     max: 100,
     timeWindow: '1 minute',
+    // Key by authenticated user when possible, so users don't share a quota
+    // just for being behind the same IP (offices, NAT, etc) — falls back to
+    // IP for anonymous requests. Verifies the token (not just decodes it):
+    // trusting an unverified `sub` claim would let anyone dodge the limit by
+    // sending a fresh made-up token on every request.
+    keyGenerator: async (request) => {
+      try {
+        await request.jwtVerify()
+        return `user:${request.user.sub}`
+      } catch {
+        return request.ip
+      }
+    },
   })
 
   // File uploads
   app.register(multipart, {
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-  })
-
-  // Auth
-  app.register(jwt, {
-    secret: process.env.JWT_SECRET ?? 'change-me-in-production',
   })
 
   // API docs (only in non-production)
@@ -88,6 +103,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.register(mediaRoutes, { prefix: '/media' })
   app.register(commentRoutes)
   app.register(newsletterRoutes, { prefix: '/newsletter' })
+  app.register(aboutRoutes, { prefix: '/about' })
 
   // Dev-only routes (never available in production)
   if (process.env.NODE_ENV !== 'production') {

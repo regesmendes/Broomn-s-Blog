@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
+import { Link } from '@/i18n/navigation';
 import api, { Comment } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
@@ -96,7 +97,7 @@ export function CommentSection({ postId }: CommentSectionProps) {
         </form>
       ) : (
         <p className="mb-8 text-sm text-gray-500 dark:text-gray-400">
-          <a href="/auth/login" className="text-emerald-600 hover:underline dark:text-emerald-400">{t('signInToComment')}</a>
+          <Link href="/auth/login" className="text-emerald-600 hover:underline dark:text-emerald-400">{t('signInToComment')}</Link>
         </p>
       )}
 

@@ -80,18 +80,35 @@ export interface MediaItem {
 
 export interface MediaDetail extends MediaItem {
   posts: { id: string; title: string; slug: string }[];
+  usedInAboutPage: boolean;
 }
 
-export interface PaginationMeta {
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+export interface AboutPage {
+  id: string;
+  content: string;
+  updatedAt: string;
 }
 
-export interface PaginatedResponse<T> {
+export interface CursorPaginationMeta {
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+export interface CursorPaginatedResponse<T> {
   data: T[];
-  meta: PaginationMeta;
+  meta: CursorPaginationMeta;
+}
+
+/** Global admin comment listing also returns a total count (cheap indexed
+ * count, not tied to how deep the cursor pagination goes) for the dashboard. */
+export interface AdminCommentsResponse extends CursorPaginatedResponse<AdminComment> {
+  meta: CursorPaginationMeta & { total: number };
+}
+
+/** Subscriber list also returns aggregate counts by status for the dashboard
+ * stat cards — a separate concern from the paginated rows themselves. */
+export interface SubscribersResponse extends CursorPaginatedResponse<Subscriber> {
+  counts: { total: number; confirmed: number; pending: number; unsubscribed: number };
 }
 
 export interface AuthResponse {
@@ -155,14 +172,14 @@ class ApiClient {
 
   // Posts
 
-  async getPosts(params?: { page?: number; limit?: number; tag?: string; search?: string }): Promise<PaginatedResponse<Post>> {
+  async getPosts(params?: { cursor?: string; limit?: number; tag?: string; search?: string }): Promise<CursorPaginatedResponse<Post>> {
     const searchParams = new URLSearchParams();
-    if (params?.page) searchParams.set('page', String(params.page));
+    if (params?.cursor) searchParams.set('cursor', params.cursor);
     if (params?.limit) searchParams.set('limit', String(params.limit));
     if (params?.tag) searchParams.set('tag', params.tag);
     if (params?.search) searchParams.set('search', params.search);
     const query = searchParams.toString();
-    return this.request<PaginatedResponse<Post>>(`/posts${query ? `?${query}` : ''}`);
+    return this.request<CursorPaginatedResponse<Post>>(`/posts${query ? `?${query}` : ''}`);
   }
 
   async getTags(): Promise<TagWithCount[]> {
@@ -230,22 +247,22 @@ class ApiClient {
 
   // Comments
 
-  async getComments(postId: string): Promise<PaginatedResponse<Comment>> {
-    return this.request<PaginatedResponse<Comment>>(`/posts/${postId}/comments`);
+  async getComments(postId: string): Promise<CursorPaginatedResponse<Comment>> {
+    return this.request<CursorPaginatedResponse<Comment>>(`/posts/${postId}/comments`);
   }
 
-  async getPostComments(postId: string, token: string): Promise<PaginatedResponse<Comment>> {
-    return this.request<PaginatedResponse<Comment>>(`/posts/${postId}/comments/all`, {
+  async getPostComments(postId: string, token: string): Promise<CursorPaginatedResponse<Comment>> {
+    return this.request<CursorPaginatedResponse<Comment>>(`/posts/${postId}/comments/all`, {
       headers: this.authHeaders(token),
     });
   }
 
-  async getAdminComments(token: string, params?: { page?: number; approved?: string }): Promise<PaginatedResponse<AdminComment>> {
+  async getAdminComments(token: string, params?: { cursor?: string; approved?: string }): Promise<AdminCommentsResponse> {
     const searchParams = new URLSearchParams();
-    if (params?.page) searchParams.set('page', String(params.page));
+    if (params?.cursor) searchParams.set('cursor', params.cursor);
     if (params?.approved) searchParams.set('approved', params.approved);
     const query = searchParams.toString();
-    return this.request<PaginatedResponse<AdminComment>>(`/comments/admin${query ? `?${query}` : ''}`, {
+    return this.request<AdminCommentsResponse>(`/comments/admin${query ? `?${query}` : ''}`, {
       headers: this.authHeaders(token),
     });
   }
@@ -312,8 +329,8 @@ class ApiClient {
     return this.request(`/newsletter/unsubscribe?token=${encodeURIComponent(token)}`);
   }
 
-  async getSubscribers(token: string): Promise<PaginatedResponse<Subscriber>> {
-    return this.request<PaginatedResponse<Subscriber>>('/newsletter/subscribers', {
+  async getSubscribers(token: string): Promise<SubscribersResponse> {
+    return this.request<SubscribersResponse>('/newsletter/subscribers', {
       headers: this.authHeaders(token),
     });
   }
@@ -353,13 +370,13 @@ class ApiClient {
     return response.json();
   }
 
-  async getMedia(token: string, params?: { page?: number; limit?: number; search?: string }): Promise<PaginatedResponse<MediaItem>> {
+  async getMedia(token: string, params?: { cursor?: string; limit?: number; search?: string }): Promise<CursorPaginatedResponse<MediaItem>> {
     const searchParams = new URLSearchParams();
-    if (params?.page) searchParams.set('page', String(params.page));
+    if (params?.cursor) searchParams.set('cursor', params.cursor);
     if (params?.limit) searchParams.set('limit', String(params.limit));
     if (params?.search) searchParams.set('search', params.search);
     const query = searchParams.toString();
-    return this.request<PaginatedResponse<MediaItem>>(`/media${query ? `?${query}` : ''}`, {
+    return this.request<CursorPaginatedResponse<MediaItem>>(`/media${query ? `?${query}` : ''}`, {
       headers: this.authHeaders(token),
     });
   }
@@ -382,6 +399,20 @@ class ApiClient {
       method: 'PATCH',
       headers: this.authHeaders(token),
       body: JSON.stringify({ newUrl }),
+    });
+  }
+
+  // About page
+
+  async getAbout(): Promise<AboutPage> {
+    return this.request<AboutPage>('/about');
+  }
+
+  async updateAbout(content: string, token: string): Promise<AboutPage> {
+    return this.request<AboutPage>('/about', {
+      method: 'PUT',
+      headers: this.authHeaders(token),
+      body: JSON.stringify({ content }),
     });
   }
 }

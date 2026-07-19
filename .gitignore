@@ -39,3 +39,6 @@ coverage/
 *.tgz
 .cache/
 uploads/
+
+# Claude Code personal settings
+CLAUDE.local.md

@@ -132,7 +132,8 @@ model Media {
   url          String   // public URL
   createdAt    DateTime @default(now())
 
-  posts MediaOnPosts[]
+  posts      MediaOnPosts[]
+  aboutPages MediaOnAboutPage[]
 
   @@map("media")
 }
@@ -146,4 +147,29 @@ model MediaOnPosts {
 
   @@id([mediaId, postId])
   @@map("media_on_posts")
+}
+
+// ─── About page ───────────────────────────────────────────────────────────────
+// Singleton — exactly one row, seeded by migration. Enforced at the
+// application layer (about.repository.ts always reads/updates that one row).
+
+model AboutPage {
+  id        String   @id @default(cuid())
+  content   String   // rich text / HTML
+  updatedAt DateTime @updatedAt
+
+  media MediaOnAboutPage[]
+
+  @@map("about_page")
+}
+
+model MediaOnAboutPage {
+  mediaId     String
+  aboutPageId String
+
+  media     Media     @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  aboutPage AboutPage @relation(fields: [aboutPageId], references: [id], onDelete: Cascade)
+
+  @@id([mediaId, aboutPageId])
+  @@map("media_on_about_page")
 }

@@ -1,10 +1,11 @@
 import { prisma } from '../lib/prisma'
 import { CreatePostBody, UpdatePostBody } from '../schemas/post.schema'
+import { paginateWithCursor } from '../lib/pagination'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 export interface FindPublishedPostsOptions {
-  page:    number
+  cursor?: string
   limit:   number
   tag?:    string
   search?: string
@@ -47,7 +48,7 @@ export const postRepository = {
    * Count and fetch published posts visible to the public.
    * A post is visible when status = PUBLISHED and publishedAt <= now.
    */
-  async findPublished({ page, limit, tag, search }: FindPublishedPostsOptions) {
+  async findPublished({ cursor, limit, tag, search }: FindPublishedPostsOptions) {
     const now = new Date()
 
     const where = {
@@ -67,18 +68,18 @@ export const postRepository = {
       }),
     }
 
-    const [total, posts] = await prisma.$transaction([
-      prisma.post.count({ where }),
-      prisma.post.findMany({
-        where,
-        select:  postSummarySelect,
-        orderBy: { publishedAt: 'desc' },
-        skip:    (page - 1) * limit,
-        take:    limit,
-      }),
-    ])
-
-    return { total, posts }
+    return paginateWithCursor(
+      (args) =>
+        prisma.post.findMany({
+          where,
+          select:  postSummarySelect,
+          // publishedAt alone isn't unique — id breaks ties so cursor
+          // pagination never skips or repeats a row across pages.
+          orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
+          ...args,
+        }),
+      { cursor, limit }
+    )
   },
 
   /** Find a single published post by slug. */

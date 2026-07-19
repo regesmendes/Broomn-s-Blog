@@ -1,58 +1,26 @@
 import { commentRepository } from '../repositories/comment.repository'
 import { ListCommentsQuery } from '../schemas/comment.schema'
 
-export interface PaginationMeta {
-  total:      number
-  page:       number
-  limit:      number
-  totalPages: number
-}
-
 export const commentService = {
   /** List approved comments for a post (public). */
   async listApproved(postId: string, query: ListCommentsQuery) {
-    const { page, limit } = query
-    const { total, comments } = await commentRepository.findApprovedByPost(postId, page, limit)
-
-    const meta: PaginationMeta = {
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    }
-
-    return { data: comments, meta }
+    const { cursor, limit } = query
+    return commentRepository.findApprovedByPost(postId, cursor, limit)
   },
 
   /** List ALL comments for a post — admin moderation. */
   async listAll(postId: string, query: ListCommentsQuery) {
-    const { page, limit } = query
-    const { total, comments } = await commentRepository.findAllByPost(postId, page, limit)
-
-    const meta: PaginationMeta = {
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    }
-
-    return { data: comments, meta }
+    const { cursor, limit } = query
+    return commentRepository.findAllByPost(postId, cursor, limit)
   },
 
   /** List all comments across all posts — admin global view. */
   async listAllGlobal(query: ListCommentsQuery) {
-    const { page, limit, approved } = query
+    const { cursor, limit, approved } = query
     const approvedFilter = approved === 'true' ? true : approved === 'false' ? false : undefined
-    const { total, comments } = await commentRepository.findAll(page, limit, approvedFilter)
+    const { data, meta, total } = await commentRepository.findAll(cursor, limit, approvedFilter)
 
-    const meta: PaginationMeta = {
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    }
-
-    return { data: comments, meta }
+    return { data, meta: { ...meta, total } }
   },
 
   /** Create a comment. */

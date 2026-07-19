@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { cursorQuerySchema } from './pagination.schema'
 
 export const subscribeSchema = z.object({
   email: z.string().email(),
@@ -17,9 +18,7 @@ export const sendNewsletterSchema = z.object({
   content: z.string().min(1), // HTML body
 })
 
-export const listSubscribersQuerySchema = z.object({
-  page:   z.coerce.number().int().min(1).default(1),
-  limit:  z.coerce.number().int().min(1).max(100).default(50),
+export const listSubscribersQuerySchema = cursorQuerySchema(50).extend({
   status: z.enum(['PENDING', 'CONFIRMED', 'UNSUBSCRIBED']).optional(),
 })
 

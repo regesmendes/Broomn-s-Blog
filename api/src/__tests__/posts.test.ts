@@ -38,7 +38,7 @@ describe('Posts API', () => {
         },
       ]
 
-      mockPrisma.$transaction.mockResolvedValue([1, mockPosts])
+      mockPrisma.post.findMany.mockResolvedValue(mockPosts)
 
       const res = await app.inject({
         method: 'GET',
@@ -50,12 +50,12 @@ describe('Posts API', () => {
       expect(body.data).toHaveLength(1)
       expect(body.data[0].title).toBe('Test Post')
       expect(body.data[0].tags[0].name).toBe('Node')
-      expect(body.meta.total).toBe(1)
-      expect(body.meta.page).toBe(1)
+      expect(body.meta.hasMore).toBe(false)
+      expect(body.meta.nextCursor).toBe(null)
     })
 
     it('returns empty list when no posts', async () => {
-      mockPrisma.$transaction.mockResolvedValue([0, []])
+      mockPrisma.post.findMany.mockResolvedValue([])
 
       const res = await app.inject({
         method: 'GET',
@@ -65,18 +65,20 @@ describe('Posts API', () => {
       expect(res.statusCode).toBe(200)
       const body = res.json()
       expect(body.data).toHaveLength(0)
-      expect(body.meta.total).toBe(0)
+      expect(body.meta.hasMore).toBe(false)
     })
 
-    it('respects page and limit query params', async () => {
-      mockPrisma.$transaction.mockResolvedValue([0, []])
+    it('respects cursor and limit query params', async () => {
+      mockPrisma.post.findMany.mockResolvedValue([])
 
       await app.inject({
         method: 'GET',
-        url: '/posts?page=2&limit=5',
+        url: '/posts?cursor=post-1&limit=5',
       })
 
-      expect(mockPrisma.$transaction).toHaveBeenCalled()
+      expect(mockPrisma.post.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ cursor: { id: 'post-1' }, skip: 1, take: 6 })
+      )
     })
   })
 

@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 export default function AdminLayout({
@@ -37,6 +37,12 @@ export default function AdminLayout({
               className="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
             >
               Newsletter
+            </Link>
+            <Link
+              href="/admin/about"
+              className="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              About Page
             </Link>
           </nav>
         </aside>

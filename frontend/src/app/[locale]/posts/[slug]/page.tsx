@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
 import { Metadata } from 'next';
-import { getTranslations } from 'next-intl/server';
 import api, { ApiError } from '@/lib/api';
 import { CommentSection } from '@/components/CommentSection';
 import { PostContent } from '@/components/PostContent';

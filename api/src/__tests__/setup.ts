@@ -5,6 +5,12 @@ vi.mock('../lib/ses', () => ({
   sendEmail: vi.fn(),
 }))
 
+// Mock S3 globally for all tests — no real uploads/deletes in the test suite
+vi.mock('../lib/s3', () => ({
+  uploadObject: vi.fn(),
+  deleteObject: vi.fn(),
+}))
+
 // Mock Prisma globally for all tests
 vi.mock('../lib/prisma', () => ({
   prisma: {
@@ -33,6 +39,7 @@ vi.mock('../lib/prisma', () => ({
       findUnique: vi.fn(),
       findMany: vi.fn(),
       count: vi.fn(),
+      groupBy: vi.fn(),
       upsert: vi.fn(),
       update: vi.fn(),
     },
@@ -40,9 +47,21 @@ vi.mock('../lib/prisma', () => ({
       upsert: vi.fn(),
     },
     media: {
+      create: vi.fn(),
+      count: vi.fn(),
       findMany: vi.fn(),
+      findUnique: vi.fn(),
+      delete: vi.fn(),
     },
     mediaOnPosts: {
+      deleteMany: vi.fn(),
+      create: vi.fn(),
+    },
+    aboutPage: {
+      findFirst: vi.fn(),
+      update: vi.fn(),
+    },
+    mediaOnAboutPage: {
       deleteMany: vi.fn(),
       create: vi.fn(),
     },

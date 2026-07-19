@@ -1,7 +1,8 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/lib/auth-context';
 
@@ -87,12 +88,12 @@ function CallbackContent() {
       <div className="text-center">
         <h1 className="mb-4 text-2xl font-bold text-red-600 dark:text-red-400">{t('authFailed')}</h1>
         <p className="mb-6 text-gray-600 dark:text-gray-400">{error}</p>
-        <a
+        <Link
           href="/auth/login"
           className="text-emerald-600 hover:underline dark:text-emerald-400"
         >
           {t('tryAgain')}
-        </a>
+        </Link>
       </div>
     );
   }

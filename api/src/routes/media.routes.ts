@@ -1,30 +1,29 @@
 import { FastifyInstance } from 'fastify'
 import { randomUUID } from 'crypto'
-import { writeFile, unlink, mkdir } from 'fs/promises'
-import { existsSync } from 'fs'
-import { join, extname } from 'path'
+import { extname } from 'path'
+import { z } from 'zod'
 import { prisma } from '../lib/prisma'
+import { uploadObject, deleteObject } from '../lib/s3'
+import { paginateWithCursor } from '../lib/pagination'
+import { cursorQuerySchema } from '../schemas/pagination.schema'
 import { authenticate } from '../middlewares/authenticate'
 import { authorize } from '../middlewares/authorize'
 
-// Lambda's deployment package (process.cwd()) is read-only — only /tmp is
-// writable, and even that doesn't persist across cold starts or instances.
-// This unblocks the crash-on-boot; it does not make uploads durable on Lambda
-// (see README/follow-up notes — media storage needs to move to S3).
-const UPLOADS_DIR = process.env.LAMBDA_TASK_ROOT
-  ? join('/tmp', 'uploads')
-  : join(process.cwd(), 'uploads')
+const listMediaQuerySchema = cursorQuerySchema(10).extend({
+  search: z.string().optional(),
+})
+
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 
 export async function mediaRoutes(app: FastifyInstance) {
-  // Ensure uploads directory exists
-  if (!existsSync(UPLOADS_DIR)) {
-    await mkdir(UPLOADS_DIR, { recursive: true })
-  }
-
   // ── POST /media/upload ─────────────────────────────────────────────────────
-  app.post('/upload', { preHandler: [authenticate, authorize('admin')] }, async (request, reply) => {
+  // Tightened beyond the global default, keyed per-user, to bound storage
+  // costs while still allowing legitimate multi-file drag-drop uploads.
+  app.post('/upload', {
+    preHandler: [authenticate, authorize('admin')],
+    config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+  }, async (request, reply) => {
     const data = await request.file()
 
     if (!data) {
@@ -47,14 +46,9 @@ export async function mediaRoutes(app: FastifyInstance) {
     // Generate unique filename
     const ext = extname(data.filename) || mimeToExt(data.mimetype)
     const filename = `${randomUUID()}${ext}`
-    const filepath = join(UPLOADS_DIR, filename)
 
-    // Save to disk
-    await writeFile(filepath, buffer)
-
-    // Build public URL
-    const baseUrl = process.env.API_URL || `http://localhost:${process.env.PORT || 3001}`
-    const url = `${baseUrl}/media/files/${filename}`
+    // Upload to S3 — this is the public URL used to serve the image
+    const url = await uploadObject(filename, buffer, data.mimetype)
 
     // Save to database
     const media = await prisma.media.create({
@@ -72,46 +66,32 @@ export async function mediaRoutes(app: FastifyInstance) {
 
   // ── GET /media ─────────────────────────────────────────────────────────────
   app.get('/', { preHandler: [authenticate, authorize('admin')] }, async (request, reply) => {
-    const { page = '1', limit = '10', search = '' } = request.query as {
-      page?: string
-      limit?: string
-      search?: string
-    }
-
-    const pageNum = Math.max(1, parseInt(page))
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit)))
+    const { cursor, limit, search } = listMediaQuerySchema.parse(request.query)
 
     const where = search
       ? { originalName: { contains: search, mode: 'insensitive' as const } }
       : {}
 
-    const [total, media] = await prisma.$transaction([
-      prisma.media.count({ where }),
-      prisma.media.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (pageNum - 1) * limitNum,
-        take: limitNum,
-        include: {
-          _count: { select: { posts: true } },
-        },
-      }),
-    ])
-
-    const result = media.map((m) => ({
-      ...m,
-      usageCount: m._count.posts,
-      _count: undefined,
-    }))
+    const result = await paginateWithCursor(
+      (args) =>
+        prisma.media.findMany({
+          where,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          include: {
+            _count: { select: { posts: true, aboutPages: true } },
+          },
+          ...args,
+        }),
+      { cursor, limit }
+    )
 
     return reply.send({
-      data: result,
-      meta: {
-        total,
-        page: pageNum,
-        limit: limitNum,
-        totalPages: Math.ceil(total / limitNum),
-      },
+      ...result,
+      data: result.data.map((m) => ({
+        ...m,
+        usageCount: m._count.posts + m._count.aboutPages,
+        _count: undefined,
+      })),
     })
   })
 
@@ -127,6 +107,7 @@ export async function mediaRoutes(app: FastifyInstance) {
             post: { select: { id: true, title: true, slug: true } },
           },
         },
+        aboutPages: true,
       },
     })
 
@@ -137,6 +118,8 @@ export async function mediaRoutes(app: FastifyInstance) {
     return reply.send({
       ...media,
       posts: media.posts.map((mp) => mp.post),
+      usedInAboutPage: media.aboutPages.length > 0,
+      aboutPages: undefined,
     })
   })
 
@@ -153,12 +136,11 @@ export async function mediaRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Media not found' })
     }
 
-    // Delete file from disk
-    const filepath = join(UPLOADS_DIR, media.filename)
+    // Delete object from S3
     try {
-      await unlink(filepath)
+      await deleteObject(media.filename)
     } catch {
-      // File might already be gone — continue
+      // Object might already be gone — continue
     }
 
     // Delete from database (cascade removes MediaOnPosts)
@@ -181,6 +163,7 @@ export async function mediaRoutes(app: FastifyInstance) {
       where: { id },
       include: {
         posts: { include: { post: true } },
+        aboutPages: { include: { aboutPage: true } },
       },
     })
 
@@ -189,7 +172,7 @@ export async function mediaRoutes(app: FastifyInstance) {
     }
 
     // Update all posts that use this image
-    const updates = media.posts.map((mp) => {
+    const postUpdates = media.posts.map((mp) => {
       const updatedContent = mp.post.content.replace(
         new RegExp(escapeRegex(media.url), 'g'),
         newUrl
@@ -200,41 +183,24 @@ export async function mediaRoutes(app: FastifyInstance) {
       })
     })
 
-    await Promise.all(updates)
+    // Update the About page too, if it uses this image
+    const aboutUpdates = media.aboutPages.map((map) => {
+      const updatedContent = map.aboutPage.content.replace(
+        new RegExp(escapeRegex(media.url), 'g'),
+        newUrl
+      )
+      return prisma.aboutPage.update({
+        where: { id: map.aboutPage.id },
+        data: { content: updatedContent },
+      })
+    })
+
+    await Promise.all([...postUpdates, ...aboutUpdates])
 
     return reply.send({
-      message: `Replaced in ${updates.length} post(s)`,
-      postsUpdated: updates.length,
+      message: `Replaced in ${postUpdates.length} post(s)${aboutUpdates.length > 0 ? ' and the About page' : ''}`,
+      postsUpdated: postUpdates.length,
     })
-  })
-
-  // ── GET /media/files/:filename (serve uploaded files) ──────────────────────
-  app.get('/files/:filename', async (request, reply) => {
-    const { filename } = request.params as { filename: string }
-    const filepath = join(UPLOADS_DIR, filename)
-
-    if (!existsSync(filepath)) {
-      return reply.status(404).send({ error: 'File not found' })
-    }
-
-    const { readFile } = await import('fs/promises')
-    const buffer = await readFile(filepath)
-
-    // Determine content type from extension
-    const ext = extname(filename).toLowerCase()
-    const mimeMap: Record<string, string> = {
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.webp': 'image/webp',
-      '.gif': 'image/gif',
-    }
-
-    const contentType = mimeMap[ext] || 'application/octet-stream'
-    return reply
-      .header('Content-Type', contentType)
-      .header('Cross-Origin-Resource-Policy', 'cross-origin')
-      .send(buffer)
   })
 }
 

@@ -6,8 +6,13 @@ import { authorize } from '../middlewares/authorize'
 export async function newsletterRoutes(app: FastifyInstance) {
   // ── Public ───────────────────────────────────────────────────────────────────
 
-  // POST /newsletter/subscribe
-  app.post('/subscribe', newsletterController.subscribe)
+  // POST /newsletter/subscribe — tightened beyond the global default: public,
+  // unauthenticated, and a prime spam target that costs real SES sends.
+  app.post(
+    '/subscribe',
+    { config: { rateLimit: { max: 5, timeWindow: '10 minutes' } } },
+    newsletterController.subscribe
+  )
 
   // GET /newsletter/confirm?token=xxx
   app.get('/confirm', newsletterController.confirm)

@@ -2,6 +2,7 @@
   "header": {
     "blogName": "Broomn's Blog",
     "home": "Home",
+    "about": "About",
     "newsletter": "Newsletter",
     "admin": "Admin",
     "signIn": "Sign in",
@@ -21,8 +22,7 @@
     "searchButton": "Search",
     "clearFilters": "Clear",
     "previousPage": "← Previous",
-    "nextPage": "Next →",
-    "pageOf": "Page {current} of {total}"
+    "nextPage": "Next →"
   },
   "newsletter": {
     "title": "Newsletter",
@@ -77,5 +77,9 @@
   },
   "footer": {
     "rights": "All rights reserved."
+  },
+  "about": {
+    "title": "About",
+    "backHome": "← Back to home"
   }
 }
