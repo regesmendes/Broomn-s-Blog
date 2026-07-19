@@ -135,8 +135,7 @@ export class ApiStack extends Stack {
     // trigger — invoke manually after deploying new migrations:
     //   aws lambda invoke --function-name broomns-blog-migrate --region us-east-1 /dev/stdout
     // NOTE: bundling requires node_modules/@prisma/engines/schema-engine-rhel-openssl-3.0.x
-    // locally. If missing, fetch it with:
-    //   PRISMA_CLI_BINARY_TARGETS=native,rhel-openssl-3.0.x npm rebuild @prisma/engines
+    // locally. If missing, fetch it with: node api/scripts/fetch-migrate-engine.js
     const migrateFunction = new NodejsFunction(this, 'MigrateFn', {
       functionName: 'broomns-blog-migrate',
       runtime: lambda.Runtime.NODEJS_20_X,
