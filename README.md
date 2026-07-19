@@ -22,7 +22,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 ### What's working
 
 - ✅ REST API with all CRUD endpoints (posts, comments, newsletter, auth)
-- ✅ 49 passing tests covering all API modules
+- ✅ 68 passing tests covering all API modules
 - ✅ Role-based access control (public, authenticated user, admin)
 - ✅ JWT authentication with access/refresh token flow
 - ✅ Cognito integration with real Google OAuth login, live in production
@@ -38,7 +38,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 - ✅ Custom typography (Cinzel headings, Lora body — manuscript/scroll feel)
 - ✅ i18n: Portuguese (default) + English with language switcher — all pages, including auth/login and newsletter flows
 - ✅ On-the-fly post translation via MyMemory API (preserves HTML structure)
-- ✅ TypeScript compiles clean across both projects
+- ✅ TypeScript compiles clean across all three projects (api, frontend, infrastructure)
 
 ### Known Issues
 
@@ -57,7 +57,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 | **UI** | React | 19 |
 | **CSS** | Tailwind CSS | 4 |
 | **Auth** | Amazon Cognito (Google OAuth) | — |
-| **Testing** | Vitest | 3.2 |
+| **Testing** | Vitest (api: 3.2, frontend: 4.1, + React Testing Library) | — |
 | **Package Manager** | npm | — |
 
 ### Why these choices?
@@ -73,6 +73,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 
 ```
 foradoprograma/
+├── .github/workflows/      # CI (ci.yml) and prod deploy (deploy.yml) — see CI/CD pipeline below
 ├── api/                    # Node.js REST API
 │   ├── src/
 │   │   ├── app.ts         # Fastify instance + plugin registration
@@ -85,12 +86,13 @@ foradoprograma/
 │   │   ├── repositories/  # Database queries
 │   │   ├── schemas/       # Zod validation schemas
 │   │   ├── middlewares/   # authenticate, authorize
-│   │   ├── lib/           # Shared utilities (Prisma client, SES client)
+│   │   ├── lib/           # Shared utilities (Prisma client, SES client, S3 client, cursor pagination helper)
 │   │   ├── types/         # TypeScript type definitions
 │   │   └── __tests__/     # Vitest test files
 │   ├── prisma/
 │   │   └── schema.prisma  # Database schema
 │   ├── .env.example
+│   ├── eslint.config.mjs
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── vitest.config.ts
@@ -107,13 +109,16 @@ foradoprograma/
 │   │   │   ├── auth/callback/             # OAuth redirect handler
 │   │   │   ├── admin/posts/               # Post management
 │   │   │   ├── admin/comments/            # Comment moderation
-│   │   │   └── admin/newsletter/          # Newsletter send + subscribers
+│   │   │   ├── admin/newsletter/          # Newsletter send + subscribers
+│   │   │   └── admin/media/               # Media library
 │   │   ├── components/layout/    # Header, Footer
 │   │   ├── lib/api.ts            # Typed API client
+│   │   ├── lib/useCursorPagination.ts  # Shared cursor pagination state (Prev/Next)
 │   │   └── pages/                # Legacy router files (framework bug workaround)
 │   ├── next.config.ts
 │   ├── open-next.config.ts       # Disables the ISR queue/tag cache (nothing uses ISR — see Deployment)
 │   ├── tailwind.config.ts (not needed — Tailwind v4 auto-detects)
+│   ├── vitest.config.ts
 │   └── package.json
 │
 ├── infrastructure/         # AWS CDK — deployed, see Deployment (AWS CDK) below
@@ -157,7 +162,8 @@ foradoprograma/
 | DELETE | `/posts/:id` | Delete a post |
 | PATCH | `/posts/:id/publish` | Publish/unpublish/schedule a post |
 | GET | `/posts/admin/:id` | Get any post (including drafts) |
-| GET | `/posts/:postId/comments/all` | List all comments (including unapproved) |
+| GET | `/posts/:postId/comments/all` | List all comments for one post (including unapproved) |
+| GET | `/comments/admin` | List all comments across every post, filterable by approval status |
 | PATCH | `/comments/:id/approve` | Approve/reject a comment |
 | GET | `/newsletter/subscribers` | List all subscribers |
 | POST | `/newsletter/send` | Send newsletter to confirmed subscribers |
@@ -174,6 +180,7 @@ foradoprograma/
 - **Tag**: name, slug — many-to-many with posts
 - **Comment**: content, approved flag, belongs to user and post
 - **Newsletter**: email, status (PENDING/CONFIRMED/UNSUBSCRIBED), optional user link
+- **Media**: filename (S3 key), original name, mime type, size, public URL — many-to-many with posts via `MediaOnPosts`, kept in sync automatically when a post's content is saved (see `syncMediaUsage` in `post.service.ts`)
 
 ## Running Locally
 
@@ -242,7 +249,7 @@ Node.js 25 introduced a built-in `localStorage` global that requires `--localsto
 
 ```bash
 cd api
-npm test              # Runs all 49 tests
+npm test              # Runs all 68 tests
 ```
 
 ## Authentication Flow
@@ -328,6 +335,8 @@ The infrastructure is defined in the `infrastructure/` directory using AWS CDK (
 - Route53 hosted zone for `blogdobroomn.com`
 
 ### Deploy
+
+**Normal path**: merge a PR into `prod` — the CI/CD pipeline (see Architecture Decisions) builds and deploys everything automatically. The manual command below is for the very first deploy of a fresh environment, or for troubleshooting independently of the pipeline:
 
 ```bash
 cd infrastructure
@@ -447,6 +456,7 @@ Note: `prisma db execute` runs the statement but doesn't print `SELECT` results 
 | Migration/admin-SQL Lambda | `broomns-blog-migrate` |
 | Frontend SSR Lambda | `broomns-blog-frontend-server` |
 | CDK Bootstrap Assets Bucket | `cdk-hnb659fds-assets-099710233970-us-east-1` |
+| GitHub Actions deploy role | `broomns-blog-github-deploy` (OIDC, trust-scoped to this repo's `prod` branch only) |
 
 ### Node.js 25 Compatibility Note
 
@@ -455,15 +465,6 @@ The project runs on Node.js 25 which has a built-in `localStorage` global requir
 - OpenNext build: must pass `NODE_OPTIONS='--localstorage-file=.next/.localStorage'` when running `npx open-next build`
 - Lambda runtime: uses Node.js 20 (no issue there)
 
-## What's Next (Planned)
-
-These are the remaining pieces to complete the project:
-
-### DevOps
-- [x] GitHub Actions CI pipeline (lint, test, build) — see "CI/CD pipeline" under Architecture Decisions
-- [x] Deployment pipeline (CDK deploy on merge to prod) — see "CI/CD pipeline" under Architecture Decisions
-- [x] `api/` now has a real ESLint config (flat config, typescript-eslint) — `npm run lint` works
-
 ## Contributing
 
 This is a personal project. If you're reading this as a collaborator or future-me, the key things to know:
@@ -471,5 +472,5 @@ This is a personal project. If you're reading this as a collaborator or future-m
 1. **API pattern**: routes → controllers → services → repositories. Add new features by following the existing post/comment/newsletter pattern.
 2. **Tests**: Run `npm test` in `api/` before committing. Add tests for new endpoints.
 3. **Frontend**: Run `npm run dev` in `frontend/`. TypeScript errors caught by `npx tsc --noEmit`.
-4. **No commits to master without tests passing.**
+4. **No commits to master without tests passing.** CI runs automatically on every PR/push to `master`, but only `prod` has branch protection actually enforcing it (see "CI/CD pipeline" under Architecture Decisions) — `master` still relies on this being followed by convention.
 5. **Always update this README** when adding features or changing architecture before raising a PR.
