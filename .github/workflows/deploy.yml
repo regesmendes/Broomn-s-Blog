@@ -18,16 +18,6 @@ jobs:
   deploy:
     name: Deploy to AWS
     runs-on: ubuntu-latest
-    # CDK's own Lambda bundling (for both ApiFn and MigrateFn) runs its own
-    # internal `npm install` for the `nodeModules` it needs, in the same root
-    # project context as depsLockFilePath. That reinstall re-triggers
-    # @prisma/engines' postinstall script — without this var set for that
-    # install too, it only fetches the default "native" binary and wipes out
-    # the rhel-openssl-3.0.x one fetched below. Setting it job-wide (not just
-    # on the explicit rebuild step) makes sure every npm install in this job,
-    # ours or CDK's own, fetches both binary targets.
-    env:
-      PRISMA_CLI_BINARY_TARGETS: native,rhel-openssl-3.0.x
     steps:
       - uses: actions/checkout@v4
 
@@ -53,13 +43,17 @@ jobs:
       # The migrate Lambda's bundling hook (api-stack.ts) separately expects
       # node_modules/@prisma/engines/schema-engine-rhel-openssl-3.0.x to
       # already exist — that's @prisma/engines' own binary cache, which
-      # `prisma generate` does NOT populate; it needs an explicit rebuild
-      # (PRISMA_CLI_BINARY_TARGETS is set job-wide above).
+      # `prisma generate` does NOT populate; it needs an explicit rebuild.
+      #
+      # PRISMA_CLI_BINARY_TARGETS must NOT be set for `prisma generate` —
+      # its CLI rejects the literal "native" value in that env var (it only
+      # auto-resolves "native" when read from schema.prisma directly), so
+      # it's scoped to just the rebuild command instead.
       - name: Install api deps and generate Prisma client
         run: |
           npm ci
           npx prisma generate --schema=api/prisma/schema.prisma
-          npm rebuild @prisma/engines
+          PRISMA_CLI_BINARY_TARGETS=native,rhel-openssl-3.0.x npm rebuild @prisma/engines
 
       # 2. Build the frontend via OpenNext. NEXT_PUBLIC_* vars are inlined at
       # build time, so they must be set here, not just at Lambda runtime.
@@ -86,8 +80,19 @@ jobs:
       # (GitHub Secrets) so this never falls into the placeholder-credential
       # path that once overwrote Cognito's real Google IdP secret — see
       # README's "Two footguns" section under Deployment.
+      #
+      # PRISMA_CLI_BINARY_TARGETS is scoped to just this step: CDK's own
+      # Lambda bundling (for both ApiFn and MigrateFn) runs its own internal
+      # npm install for the nodeModules it needs, which re-triggers
+      # @prisma/engines' postinstall script — without this var set for that
+      # install too, it fetches only the default "native" binary and wipes
+      # out the rhel-openssl-3.0.x one the previous step just fetched. This
+      # step only runs `npm ci`/`cdk deploy`, never `prisma generate`
+      # directly, so the "native" value here is safe (unlike that step).
       - name: cdk deploy --all
         working-directory: infrastructure
+        env:
+          PRISMA_CLI_BINARY_TARGETS: native,rhel-openssl-3.0.x
         run: |
           npm ci
           npx cdk deploy --all --require-approval never \
