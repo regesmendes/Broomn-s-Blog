@@ -192,6 +192,18 @@ export class FrontendStack extends Stack {
       ),
     });
 
+    // Google Search Console domain verification. A DNS TXT record, not an
+    // HTTP-based method (meta tag / GA snippet) — those both fail here since
+    // next-intl's locale-redirect middleware sends the bare apex domain to
+    // /pt with an empty body before any page ever renders, and Google's
+    // verifier deliberately does not follow redirects when checking site
+    // ownership (otherwise a redirect to someone else's tagged site would
+    // "verify" ownership of this domain).
+    new route53.TxtRecord(this, 'GoogleSiteVerification', {
+      zone: hostedZone,
+      values: ['google-site-verification=gAUjhnUNhnqGXHszsBrzX3y7biCncLa6eVx5fp7jv-c'],
+    });
+
     // Store references for cross-stack usage
     this.distributionId = distribution.distributionId;
     this.domainNameOutput = siteDomain;
