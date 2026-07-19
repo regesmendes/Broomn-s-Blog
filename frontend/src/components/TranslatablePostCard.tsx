@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import { Link } from '@/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { Post } from '@/lib/api';
-
-const MYMEMORY_URL = 'https://api.mymemory.translated.net/get';
+import { translatePlainText } from '@/lib/translate';
 
 interface TranslatablePostCardProps {
   post: Post;
@@ -32,12 +31,12 @@ export function TranslatablePostCard({ post, dateLocale }: TranslatablePostCardP
 
     try {
       // Translate title
-      const translatedTitle = await translateText(post.title);
+      const translatedTitle = await translatePlainText(post.title, 'pt|en');
       setTitle(translatedTitle);
 
       // Translate excerpt if it exists
       if (post.excerpt) {
-        const translatedExcerpt = await translateText(post.excerpt);
+        const translatedExcerpt = await translatePlainText(post.excerpt, 'pt|en');
         setExcerpt(translatedExcerpt);
       }
     } catch {
@@ -104,27 +103,4 @@ export function TranslatablePostCard({ post, dateLocale }: TranslatablePostCardP
       </div>
     </article>
   );
-}
-
-// ─── Helper ────────────────────────────────────────────────────────────────────
-
-async function translateText(text: string): Promise<string> {
-  const params = new URLSearchParams({
-    q: text,
-    langpair: 'pt|en',
-  });
-
-  const response = await fetch(`${MYMEMORY_URL}?${params}`);
-
-  if (!response.ok) {
-    throw new Error('Translation unavailable');
-  }
-
-  const data = await response.json();
-
-  if (data.responseStatus !== 200) {
-    throw new Error(data.responseDetails || 'Translation failed');
-  }
-
-  return data.responseData.translatedText;
 }
