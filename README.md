@@ -438,7 +438,7 @@ These are the remaining pieces to complete the project:
 - [ ] GitHub Actions CI pipeline (lint, test, build) — planned to eventually replace the manual `cdk deploy` workflow (see the footguns documented under Deployment above) with deploy-on-merge to a deploy branch
 - [ ] Deployment pipeline (CDK deploy on merge to master)
 - [ ] Environment separation (dev/staging/prod)
-- [ ] `api/` has no ESLint config despite a `lint` script in `package.json` — currently a no-op
+- [x] `api/` now has a real ESLint config (flat config, typescript-eslint) — `npm run lint` works
 
 ## Contributing
 

@@ -97,7 +97,7 @@ export const postService = {
  *   tags: [{ id, name, slug }]
  */
 function flattenTags<T extends { tags?: { tag: unknown }[] }>(post: T) {
-  const { tags, ...rest } = post as any
+  const { tags, ...rest } = post
   return {
     ...rest,
     tags: (tags ?? []).map((t: { tag: unknown }) => t.tag),
