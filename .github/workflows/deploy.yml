@@ -39,10 +39,16 @@ jobs:
       # targets from schema.prisma: native + rhel-openssl-3.0.x for Lambda).
       # cdk deploy's esbuild bundling copies api/node_modules/.prisma
       # straight into the Lambda bundle, so this must happen before it runs.
+      #
+      # The migrate Lambda's bundling hook (api-stack.ts) separately expects
+      # node_modules/@prisma/engines/schema-engine-rhel-openssl-3.0.x to
+      # already exist — that's @prisma/engines' own binary cache, which
+      # `prisma generate` does NOT populate; it needs an explicit rebuild.
       - name: Install api deps and generate Prisma client
         run: |
           npm ci
           npx prisma generate --schema=api/prisma/schema.prisma
+          PRISMA_CLI_BINARY_TARGETS=native,rhel-openssl-3.0.x npm rebuild @prisma/engines
 
       # 2. Build the frontend via OpenNext. NEXT_PUBLIC_* vars are inlined at
       # build time, so they must be set here, not just at Lambda runtime.
