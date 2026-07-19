@@ -18,6 +18,16 @@ jobs:
   deploy:
     name: Deploy to AWS
     runs-on: ubuntu-latest
+    # CDK's own Lambda bundling (for both ApiFn and MigrateFn) runs its own
+    # internal `npm install` for the `nodeModules` it needs, in the same root
+    # project context as depsLockFilePath. That reinstall re-triggers
+    # @prisma/engines' postinstall script — without this var set for that
+    # install too, it only fetches the default "native" binary and wipes out
+    # the rhel-openssl-3.0.x one fetched below. Setting it job-wide (not just
+    # on the explicit rebuild step) makes sure every npm install in this job,
+    # ours or CDK's own, fetches both binary targets.
+    env:
+      PRISMA_CLI_BINARY_TARGETS: native,rhel-openssl-3.0.x
     steps:
       - uses: actions/checkout@v4
 
@@ -43,12 +53,13 @@ jobs:
       # The migrate Lambda's bundling hook (api-stack.ts) separately expects
       # node_modules/@prisma/engines/schema-engine-rhel-openssl-3.0.x to
       # already exist — that's @prisma/engines' own binary cache, which
-      # `prisma generate` does NOT populate; it needs an explicit rebuild.
+      # `prisma generate` does NOT populate; it needs an explicit rebuild
+      # (PRISMA_CLI_BINARY_TARGETS is set job-wide above).
       - name: Install api deps and generate Prisma client
         run: |
           npm ci
           npx prisma generate --schema=api/prisma/schema.prisma
-          PRISMA_CLI_BINARY_TARGETS=native,rhel-openssl-3.0.x npm rebuild @prisma/engines
+          npm rebuild @prisma/engines
 
       # 2. Build the frontend via OpenNext. NEXT_PUBLIC_* vars are inlined at
       # build time, so they must be set here, not just at Lambda runtime.
