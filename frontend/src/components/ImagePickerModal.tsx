@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '@/lib/api';
 import type { MediaItem } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useCursorPagination } from '@/lib/useCursorPagination';
 
 interface ImagePickerModalProps {
   isOpen: boolean;
@@ -18,8 +19,9 @@ export function ImagePickerModal({ isOpen, onClose, onSelect }: ImagePickerModal
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const pagination = useCursorPagination();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadMedia = useCallback(async () => {
@@ -27,15 +29,16 @@ export function ImagePickerModal({ isOpen, onClose, onSelect }: ImagePickerModal
     if (!token) return;
     try {
       setLoading(true);
-      const result = await api.getMedia(token, { page, limit: 12, search: search || undefined });
+      const result = await api.getMedia(token, { cursor: pagination.cursor, limit: 12, search: search || undefined });
       setMedia(result.data);
-      setTotalPages(result.meta.totalPages);
+      setHasMore(result.meta.hasMore);
+      setNextCursor(result.meta.nextCursor);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load media');
     } finally {
       setLoading(false);
     }
-  }, [getToken, page, search]);
+  }, [getToken, pagination.cursor, search]);
 
   useEffect(() => {
     if (isOpen) {
@@ -142,7 +145,7 @@ export function ImagePickerModal({ isOpen, onClose, onSelect }: ImagePickerModal
             <input
               type="text"
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              onChange={(e) => { setSearch(e.target.value); pagination.reset(); }}
               placeholder="Search images..."
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
             />
@@ -174,19 +177,18 @@ export function ImagePickerModal({ isOpen, onClose, onSelect }: ImagePickerModal
                 </button>
               ))}
             </div>
-              {totalPages > 1 && (
+              {(pagination.hasPrevious || hasMore) && (
                 <div className="mt-3 flex items-center justify-center gap-3">
                   <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page <= 1}
+                    onClick={pagination.goPrevious}
+                    disabled={!pagination.hasPrevious}
                     className="cursor-pointer rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-200 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-700"
                   >
                     ←
                   </button>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">{page}/{totalPages}</span>
                   <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page >= totalPages}
+                    onClick={() => pagination.goNext(nextCursor)}
+                    disabled={!hasMore}
                     className="cursor-pointer rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-200 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-700"
                   >
                     →

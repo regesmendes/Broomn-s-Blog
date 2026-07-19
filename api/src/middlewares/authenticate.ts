@@ -6,7 +6,7 @@ export async function authenticate(
 ): Promise<void> {
   try {
     await request.jwtVerify()
-  } catch (err) {
+  } catch (_err) {
     reply.status(401).send({ error: 'Unauthorized' })
   }
 }

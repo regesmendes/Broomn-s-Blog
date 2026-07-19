@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
 import api, { Post } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
@@ -16,7 +16,7 @@ export default function AdminPostsPage() {
 
   const loadPosts = async () => {
     try {
-      const { data } = await api.getPosts({ page: 1, limit: 100 });
+      const { data } = await api.getPosts({ limit: 100 });
       setPosts(data);
     } catch {
       console.error('Failed to load posts');

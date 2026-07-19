@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master, prod]
+  push:
+    branches: [master, prod]
+
+jobs:
+  api:
+    name: API (lint, build, test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      # Match the npm version lockfiles are generated with locally — an
+      # older npm bundled with a given Node version can disagree with a
+      # newer one about whether a lockfile is "in sync", causing spurious
+      # `npm ci` EUSAGE failures on a lockfile that's actually fine.
+      - run: npm install -g npm@11
+
+      - run: npm ci
+
+      - run: npm run lint --workspace=api
+
+      # @prisma/client's generated types (e.g. enums like SubscriptionStatus)
+      # aren't produced by `npm ci` alone — they depend on the current
+      # schema.prisma and must be generated explicitly.
+      - run: npx prisma generate --schema=api/prisma/schema.prisma
+
+      # api's build script is `tsc --project tsconfig.json` — this is also
+      # the typecheck step, there's no separate one.
+      - run: npm run build:api
+
+      - run: npm test
+
+  frontend:
+    name: Frontend (lint, typecheck, test, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm install -g npm@11
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm test
+
+      # Local build only, to catch build-breaking errors — production is
+      # built via OpenNext in the deploy workflow, not this plain next build.
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_COGNITO_DOMAIN: ${{ vars.NEXT_PUBLIC_COGNITO_DOMAIN }}
+          NEXT_PUBLIC_COGNITO_CLIENT_ID: ${{ vars.NEXT_PUBLIC_COGNITO_CLIENT_ID }}
+          NEXT_PUBLIC_COGNITO_REDIRECT_URI: ${{ vars.NEXT_PUBLIC_COGNITO_REDIRECT_URI }}
+
+  infrastructure:
+    name: Infrastructure (build, test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infrastructure
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: infrastructure/package-lock.json
+
+      - run: npm install -g npm@11
+      - run: npm ci
+      - run: npm run build
+      - run: npm test

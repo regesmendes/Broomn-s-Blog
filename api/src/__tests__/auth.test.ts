@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { createTestApp, generateTestToken } from './helpers'
 import { prisma } from '../lib/prisma'
 import { FastifyInstance } from 'fastify'
+import { JwtPayload } from '../types'
 
 const mockPrisma = prisma as unknown as {
   user: { [k: string]: ReturnType<typeof vi.fn> }
@@ -60,7 +61,7 @@ describe('Auth API', () => {
     it('returns new access token with valid refresh token', async () => {
       // Generate a refresh token the same way the auth service does
       const refreshToken = app.jwt.sign(
-        { sub: 'user-123', type: 'refresh' } as any,
+        { sub: 'user-123', type: 'refresh' } as unknown as JwtPayload,
         { expiresIn: '7d' }
       )
 

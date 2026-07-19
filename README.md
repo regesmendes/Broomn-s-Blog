@@ -22,7 +22,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 ### What's working
 
 - ✅ REST API with all CRUD endpoints (posts, comments, newsletter, auth)
-- ✅ 49 passing tests covering all API modules
+- ✅ 68 passing tests covering all API modules
 - ✅ Role-based access control (public, authenticated user, admin)
 - ✅ JWT authentication with access/refresh token flow
 - ✅ Cognito integration with real Google OAuth login, live in production
@@ -38,11 +38,12 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 - ✅ Custom typography (Cinzel headings, Lora body — manuscript/scroll feel)
 - ✅ i18n: Portuguese (default) + English with language switcher — all pages, including auth/login and newsletter flows
 - ✅ On-the-fly post translation via MyMemory API (preserves HTML structure)
-- ✅ TypeScript compiles clean across both projects
+- ✅ TypeScript compiles clean across all three projects (api, frontend, infrastructure)
 
 ### Known Issues
 
 - **Next.js 15.3.9 build warning**: The build emits a non-fatal warning about `/404` page prerendering (`<Html> should not be imported outside of pages/_document`). This is a confirmed framework bug where Next.js internally generates a legacy pages-router `/404` page even in app-router-only projects. The validation check fires against the framework's own internal rendering. We added `src/pages/_document.tsx` and `src/pages/_error.tsx` to make the error non-fatal (build exits 0), but the warning message persists. **The app runs perfectly fine** — the app router's `not-found.tsx` handles 404s correctly for users.
+- **`npm audit` reports 4 vulnerabilities in `frontend/` (3 moderate, 1 high), accepted for now** (checked 2026-07-19): `postcss@8.4.31` (XSS advisory) and `esbuild@0.19.2` (dev-server CORS advisory) are bundled *inside* `next`'s and `open-next`'s own dependency trees respectively — not top-level deps we control. Confirmed even `next@16.2.10` (latest) still pins the same vulnerable postcss internally, so upgrading `next` within its current major wouldn't help. `npm audit fix --force` would downgrade `open-next` to `0.0.1` (an ancient pre-1.0 release) to "fix" esbuild — worse than the vulnerability. The remaining `next` advisories (SSRF/DoS/cache-poisoning in Image Optimization, middleware) mostly affect features this app doesn't use heavily. **Recheck on the next `next`/`open-next` version bump** — a future release may finally drop the vulnerable nested deps.
 
 ## Tech Stack
 
@@ -56,7 +57,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 | **UI** | React | 19 |
 | **CSS** | Tailwind CSS | 4 |
 | **Auth** | Amazon Cognito (Google OAuth) | — |
-| **Testing** | Vitest | 3.2 |
+| **Testing** | Vitest (api: 3.2, frontend: 4.1, + React Testing Library) | — |
 | **Package Manager** | npm | — |
 
 ### Why these choices?
@@ -72,6 +73,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 
 ```
 foradoprograma/
+├── .github/workflows/      # CI (ci.yml) and prod deploy (deploy.yml) — see CI/CD pipeline below
 ├── api/                    # Node.js REST API
 │   ├── src/
 │   │   ├── app.ts         # Fastify instance + plugin registration
@@ -84,12 +86,13 @@ foradoprograma/
 │   │   ├── repositories/  # Database queries
 │   │   ├── schemas/       # Zod validation schemas
 │   │   ├── middlewares/   # authenticate, authorize
-│   │   ├── lib/           # Shared utilities (Prisma client, SES client)
+│   │   ├── lib/           # Shared utilities (Prisma client, SES client, S3 client, cursor pagination helper)
 │   │   ├── types/         # TypeScript type definitions
 │   │   └── __tests__/     # Vitest test files
 │   ├── prisma/
 │   │   └── schema.prisma  # Database schema
 │   ├── .env.example
+│   ├── eslint.config.mjs
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── vitest.config.ts
@@ -106,13 +109,16 @@ foradoprograma/
 │   │   │   ├── auth/callback/             # OAuth redirect handler
 │   │   │   ├── admin/posts/               # Post management
 │   │   │   ├── admin/comments/            # Comment moderation
-│   │   │   └── admin/newsletter/          # Newsletter send + subscribers
+│   │   │   ├── admin/newsletter/          # Newsletter send + subscribers
+│   │   │   └── admin/media/               # Media library
 │   │   ├── components/layout/    # Header, Footer
 │   │   ├── lib/api.ts            # Typed API client
+│   │   ├── lib/useCursorPagination.ts  # Shared cursor pagination state (Prev/Next)
 │   │   └── pages/                # Legacy router files (framework bug workaround)
 │   ├── next.config.ts
 │   ├── open-next.config.ts       # Disables the ISR queue/tag cache (nothing uses ISR — see Deployment)
 │   ├── tailwind.config.ts (not needed — Tailwind v4 auto-detects)
+│   ├── vitest.config.ts
 │   └── package.json
 │
 ├── infrastructure/         # AWS CDK — deployed, see Deployment (AWS CDK) below
@@ -156,7 +162,8 @@ foradoprograma/
 | DELETE | `/posts/:id` | Delete a post |
 | PATCH | `/posts/:id/publish` | Publish/unpublish/schedule a post |
 | GET | `/posts/admin/:id` | Get any post (including drafts) |
-| GET | `/posts/:postId/comments/all` | List all comments (including unapproved) |
+| GET | `/posts/:postId/comments/all` | List all comments for one post (including unapproved) |
+| GET | `/comments/admin` | List all comments across every post, filterable by approval status |
 | PATCH | `/comments/:id/approve` | Approve/reject a comment |
 | GET | `/newsletter/subscribers` | List all subscribers |
 | POST | `/newsletter/send` | Send newsletter to confirmed subscribers |
@@ -173,6 +180,7 @@ foradoprograma/
 - **Tag**: name, slug — many-to-many with posts
 - **Comment**: content, approved flag, belongs to user and post
 - **Newsletter**: email, status (PENDING/CONFIRMED/UNSUBSCRIBED), optional user link
+- **Media**: filename (S3 key), original name, mime type, size, public URL — many-to-many with posts via `MediaOnPosts`, kept in sync automatically when a post's content is saved (see `syncMediaUsage` in `post.service.ts`)
 
 ## Running Locally
 
@@ -241,7 +249,7 @@ Node.js 25 introduced a built-in `localStorage` global that requires `--localsto
 
 ```bash
 cd api
-npm test              # Runs all 49 tests
+npm test              # Runs all 68 tests
 ```
 
 ## Authentication Flow
@@ -257,6 +265,15 @@ npm test              # Runs all 49 tests
 
 ## Architecture Decisions
 
+### Cursor-based pagination
+
+All list endpoints (`/posts`, `/posts/:postId/comments[/all]`, `/comments/admin`, `/newsletter/subscribers`, `/media`) use cursor pagination instead of `OFFSET`/`page`: the client passes `cursor` (the last-seen row's `id`) and gets back `{ data, meta: { nextCursor, hasMore } }`. This avoids two problems `page`/`skip` has at scale — the database has to walk past all skipped rows on every request (so page 500 costs far more than page 1), and rows can be duplicated or skipped across pages if data changes between requests.
+
+- `api/src/lib/pagination.ts`'s `paginateWithCursor` fetches `limit + 1` rows to derive `hasMore` without a separate `COUNT(*)`.
+- Every query orders by `[{ <field>: 'desc' }, { id: 'desc' }]` — the `id` tiebreaker is required because the primary sort field (e.g. `createdAt`) isn't unique; without it, rows with identical timestamps could be skipped or repeated across pages. Verified empirically against real Postgres with intentionally-tied timestamps, not just mocked unit tests.
+- The API is forward-only (no `direction`/backward cursor) — the frontend's `useCursorPagination` hook keeps a client-side history of visited cursors so a "Previous" button works without the backend needing to support it, the same approach Stripe's and GitHub's APIs use.
+- This trades away numbered-page jumping (no more "go to page 47") and any endpoint-wide `total` count. Where a total/breakdown is still genuinely useful for a dashboard (newsletter subscriber counts by status, admin comment moderation count), it's a separate, cheap indexed `COUNT()`/`groupBy` — unrelated to how deep the cursor pagination goes, so it doesn't reintroduce the scaling problem.
+
 ### Post scheduling via publishedAt
 
 Rather than a simple boolean "published" flag, we use a `publishedAt` datetime combined with a `status` enum. A post is visible when `status = PUBLISHED AND publishedAt <= now()`. This means:
@@ -271,6 +288,28 @@ Instead of storing confirmation tokens in the database, we generate HMAC tokens:
 ### Comment moderation
 
 Comments are created with `approved = false` by default. They only appear publicly after an admin approves them. Comment owners can delete their own comments; admins can delete any comment.
+
+### Per-user rate limiting
+
+The global rate limiter (`@fastify/rate-limit`, 100 req/min default) keys by authenticated user instead of IP when possible: its `keyGenerator` (in `api/src/app.ts`) attempts `request.jwtVerify()` and keys by `user:<sub>` on success, falling back to IP for anonymous requests. It verifies the token rather than just decoding it — trusting an unverified `sub` claim would let anyone dodge the limit by sending a fresh made-up token per request. A few high-abuse-risk routes are tightened further via per-route `config.rateLimit` (which inherits this same keyGenerator): `/newsletter/subscribe` (5/10min, public and a real SES-cost target), comment creation (10/min per user), and media upload (20/min per user).
+
+**Known limitation, accepted for now**: `@fastify/rate-limit`'s default store is an in-memory `Map`, scoped to a single Lambda execution environment. Since API Gateway can spin up multiple concurrent Lambda instances, each with its own independent counter, this is a soft/best-effort limit rather than a mathematically exact global one under concurrent load. A true distributed limit would need a shared store (e.g. `@fastify/rate-limit`'s Redis option, via ElastiCache or Upstash) — real infra/cost disproportionate to this app's actual traffic. Revisit if usage ever grows enough for this gap to matter.
+
+### CI/CD pipeline
+
+**Branch flow**: feature branches → PR into `master` (everyday development, ungated) → PR from `master` into `prod` (a deliberate promotion step — merging into `prod` is what triggers a production deploy). `prod` has real GitHub branch protection: a PR is required (no direct pushes, no force-pushes, no deletions), and the CI workflow's three checks (`API`, `Frontend`, `Infrastructure`) must all pass against an up-to-date branch before the merge button is even enabled — this applies to repo admins too (`enforce_admins: true`). This repo was made **public** specifically to unlock branch protection: GitHub disables both classic branch protection rules and the newer Rulesets on private repos unless the account has GitHub Pro. The repo's git history was checked for secrets before flipping visibility — none found (no `.env` files, no AWS keys, no private keys were ever committed).
+
+**CI** (`.github/workflows/ci.yml`) runs on every PR/push touching `master` or `prod`: lint + build (which is also the typecheck, via `tsc`) + test for `api`, and lint + typecheck + test + build for `frontend`, and build + test for `infrastructure`. Nothing here touches AWS.
+
+**Deploy** (`.github/workflows/deploy.yml`) runs on push to `prod` (i.e. after a merge) and replays the manual procedure documented above in order — build frontend via OpenNext, sync static assets to S3, `cdk deploy --all`, invalidate CloudFront, invoke the migrate Lambda — as one automated job. Real Google OAuth credentials are always passed to `cdk deploy` (from GitHub Secrets), so it can never hit the placeholder-credential fallback that once overwrote Cognito's real Google IdP secret (see the footguns above) — every deploy is a full-stack deploy, safely.
+
+**AWS auth**: GitHub Actions authenticates via OIDC (GitHub's `token.actions.githubusercontent.com` provider, already registered in this AWS account for another project) assuming a dedicated IAM role, `broomns-blog-github-deploy`. Its trust policy restricts assumption to `repo:regesmendes/Broomn-s-Blog:ref:refs/heads/prod` only — no other branch, PR, or repo can assume it. No long-lived AWS access keys are stored anywhere. Its permissions are least-privilege, not broad admin:
+- `sts:AssumeRole`/`sts:TagSession` on the existing CDK bootstrap roles (`cdk-hnb659fds-*`) — the same mechanism the CDK CLI already uses for the human deploy user; the actual CloudFormation/resource permissions live on those pre-existing bootstrap roles, scoped by CDK itself.
+- `s3:PutObject`/`DeleteObject`/`ListBucket` on the frontend bucket only.
+- `cloudfront:CreateInvalidation`/`GetInvalidation` on the one distribution only.
+- `lambda:InvokeFunction` on the one migrate Lambda only.
+
+**GitHub repo configuration** (for reproducing this setup, or auditing what's in place): Secrets — `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (pulled from the live Cognito Google IdP config, not re-typed by hand). Variables (non-secret) — `AWS_DEPLOY_ROLE_ARN`, `AWS_REGION`, `HOSTED_ZONE_ID`, `CLOUDFRONT_DISTRIBUTION_ID`, `FRONTEND_BUCKET`, `MIGRATE_FUNCTION_NAME`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_COGNITO_DOMAIN`, `NEXT_PUBLIC_COGNITO_CLIENT_ID`, `NEXT_PUBLIC_COGNITO_REDIRECT_URI`.
 
 ### Frontend outside npm workspace
 
@@ -296,6 +335,8 @@ The infrastructure is defined in the `infrastructure/` directory using AWS CDK (
 - Route53 hosted zone for `blogdobroomn.com`
 
 ### Deploy
+
+**Normal path**: merge a PR into `prod` — the CI/CD pipeline (see Architecture Decisions) builds and deploys everything automatically. The manual command below is for the very first deploy of a fresh environment, or for troubleshooting independently of the pipeline:
 
 ```bash
 cd infrastructure
@@ -329,10 +370,10 @@ npx cdk deploy --all \
 
 - ✅ BromnBlog-Cognito (User Pool ID: `us-east-1_ApHF59Xas`, Client ID: `535qq83rh90srom3ij4ospn78e`) — real Google OAuth login working end-to-end
 - ✅ BromnBlog-Database (RDS PostgreSQL t4g.micro in private subnet) — migrations applied via the on-demand migration Lambda (see below)
-- ✅ BromnBlog-Storage (S3 bucket: `broomns-blog-media-099710233970`) — **not actually used by the app yet**: media uploads still go to local disk / Lambda `/tmp`, not this bucket. Real gap, see What's Next.
+- ✅ BromnBlog-Storage (S3 bucket: `broomns-blog-media-099710233970`) — media uploads/deletes now go directly to this bucket via `api/src/lib/s3.ts` (`S3_BUCKET_NAME` env var, already wired to the Lambda; IAM already granted `s3:PutObject`/`s3:DeleteObject`)
 - ✅ BromnBlog-Api (Lambda + API Gateway, domain: `api.blogdobroomn.com`) — Fastify app wrapped via `@fastify/aws-lambda`, bundled with esbuild (`NodejsFunction`), running in a `PRIVATE_WITH_EGRESS` subnet (not `PRIVATE_ISOLATED` — it needs real internet egress for SES and Cognito's JWKS endpoint, neither of which has a VPC Gateway Endpoint)
 - ✅ BromnBlog-Frontend (S3 + CloudFront distribution: `EKN0G1CK1QQC`) — full SSR via OpenNext + a Lambda Function URL behind CloudFront OAC, not just static files
-- ✅ BromnBlog-Ses — `blogdobroomn.com` domain verified (DKIM via Route53, automatic). **Account is still in SES sandbox** — production access requested, pending AWS review; until approved, sending only works to individually pre-verified recipient addresses
+- ✅ BromnBlog-Ses — `blogdobroomn.com` domain verified (DKIM via Route53, automatic, `DkimAttributes.Status: SUCCESS`). **Production access granted** (confirmed via `aws sesv2 get-account`: `ProductionAccessEnabled: true`, review case `178438314600754` status `GRANTED`) — sending works to any recipient, not just pre-verified addresses. Quota: 50,000 emails/24h, 14/sec.
 - ✅ Google OAuth configured and confirmed working (redirect URI registered in Google Cloud Console, real login tested)
 
 ### ⚠️ Two footguns that already caused real incidents — read before touching `cdk deploy`
@@ -415,6 +456,7 @@ Note: `prisma db execute` runs the statement but doesn't print `SELECT` results 
 | Migration/admin-SQL Lambda | `broomns-blog-migrate` |
 | Frontend SSR Lambda | `broomns-blog-frontend-server` |
 | CDK Bootstrap Assets Bucket | `cdk-hnb659fds-assets-099710233970-us-east-1` |
+| GitHub Actions deploy role | `broomns-blog-github-deploy` (OIDC, trust-scoped to this repo's `prod` branch only) |
 
 ### Node.js 25 Compatibility Note
 
@@ -423,23 +465,6 @@ The project runs on Node.js 25 which has a built-in `localStorage` global requir
 - OpenNext build: must pass `NODE_OPTIONS='--localstorage-file=.next/.localStorage'` when running `npx open-next build`
 - Lambda runtime: uses Node.js 20 (no issue there)
 
-## What's Next (Planned)
-
-These are the remaining pieces to complete the project:
-
-### API enhancements
-- [ ] **Media storage → S3**: `api/src/routes/media.routes.ts` still writes uploads to local disk (`/tmp` on Lambda, which doesn't persist across cold starts or instances) despite the `BromnBlog-Storage` S3 bucket + IAM permissions already being provisioned and unused. Real gap — uploaded images can silently 404 in production.
-- [ ] SES production access — requested, pending AWS manual review; sending currently only works to individually pre-verified recipient addresses
-- [ ] Pagination cursors for better performance at scale
-- [ ] Per-user rate limiting
-- [ ] Confirm/unsubscribe email links currently point at the frontend pages which work fine, but consider whether newsletter sends should stay fully manual (`/admin/newsletter`) or auto-trigger on publish — discussed and deliberately deferred, not a bug
-
-### DevOps
-- [ ] GitHub Actions CI pipeline (lint, test, build) — planned to eventually replace the manual `cdk deploy` workflow (see the footguns documented under Deployment above) with deploy-on-merge to a deploy branch
-- [ ] Deployment pipeline (CDK deploy on merge to master)
-- [ ] Environment separation (dev/staging/prod)
-- [ ] `api/` has no ESLint config despite a `lint` script in `package.json` — currently a no-op
-
 ## Contributing
 
 This is a personal project. If you're reading this as a collaborator or future-me, the key things to know:
@@ -447,5 +472,5 @@ This is a personal project. If you're reading this as a collaborator or future-m
 1. **API pattern**: routes → controllers → services → repositories. Add new features by following the existing post/comment/newsletter pattern.
 2. **Tests**: Run `npm test` in `api/` before committing. Add tests for new endpoints.
 3. **Frontend**: Run `npm run dev` in `frontend/`. TypeScript errors caught by `npx tsc --noEmit`.
-4. **No commits to master without tests passing.**
+4. **No commits to master without tests passing.** CI runs automatically on every PR/push to `master`, but only `prod` has branch protection actually enforcing it (see "CI/CD pipeline" under Architecture Decisions) — `master` still relies on this being followed by convention.
 5. **Always update this README** when adding features or changing architecture before raising a PR.

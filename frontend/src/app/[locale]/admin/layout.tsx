@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 export default function AdminLayout({

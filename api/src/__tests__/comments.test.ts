@@ -33,7 +33,7 @@ describe('Comments API', () => {
         },
       ]
 
-      mockPrisma.$transaction.mockResolvedValue([1, mockComments])
+      mockPrisma.comment.findMany.mockResolvedValue(mockComments)
 
       const res = await app.inject({
         method: 'GET',
@@ -44,11 +44,11 @@ describe('Comments API', () => {
       const body = res.json()
       expect(body.data).toHaveLength(1)
       expect(body.data[0].content).toBe('Great post!')
-      expect(body.meta.total).toBe(1)
+      expect(body.meta.hasMore).toBe(false)
     })
 
     it('returns empty list for post with no comments', async () => {
-      mockPrisma.$transaction.mockResolvedValue([0, []])
+      mockPrisma.comment.findMany.mockResolvedValue([])
 
       const res = await app.inject({
         method: 'GET',
@@ -86,10 +86,10 @@ describe('Comments API', () => {
 
     it('returns all comments for admin', async () => {
       const token = generateAdminToken(app)
-      mockPrisma.$transaction.mockResolvedValue([2, [
+      mockPrisma.comment.findMany.mockResolvedValue([
         { id: 'c1', content: 'Approved', approved: true, createdAt: new Date(), user: { id: 'u1', name: 'A', avatarUrl: null } },
         { id: 'c2', content: 'Pending', approved: false, createdAt: new Date(), user: { id: 'u2', name: 'B', avatarUrl: null } },
-      ]])
+      ])
 
       const res = await app.inject({
         method: 'GET',
@@ -99,6 +99,41 @@ describe('Comments API', () => {
 
       expect(res.statusCode).toBe(200)
       expect(res.json().data).toHaveLength(2)
+    })
+  })
+
+  // ── GET /comments/admin (global admin view) ────────────────────────────────
+
+  describe('GET /comments/admin', () => {
+    it('returns 401 without authentication', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/comments/admin',
+      })
+
+      expect(res.statusCode).toBe(401)
+    })
+
+    it('returns comments across all posts with a total count', async () => {
+      const token = generateAdminToken(app)
+      mockPrisma.comment.count.mockResolvedValue(2)
+      mockPrisma.comment.findMany.mockResolvedValue([
+        { id: 'c1', content: 'A', approved: false, createdAt: new Date(), user: { id: 'u1', name: 'A', avatarUrl: null }, post: { id: 'p1', title: 'Post', slug: 'post' } },
+        { id: 'c2', content: 'B', approved: false, createdAt: new Date(), user: { id: 'u2', name: 'B', avatarUrl: null }, post: { id: 'p1', title: 'Post', slug: 'post' } },
+      ])
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/comments/admin?approved=false',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.data).toHaveLength(2)
+      expect(body.meta.total).toBe(2)
+      expect(body.meta.hasMore).toBe(false)
+      expect(mockPrisma.comment.count).toHaveBeenCalledWith({ where: { approved: false } })
     })
   })
 

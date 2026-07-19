@@ -21,8 +21,7 @@
     "searchButton": "Buscar",
     "clearFilters": "Limpar",
     "previousPage": "← Anterior",
-    "nextPage": "Próxima →",
-    "pageOf": "Página {current} de {total}"
+    "nextPage": "Próxima →"
   },
   "newsletter": {
     "title": "Newsletter",

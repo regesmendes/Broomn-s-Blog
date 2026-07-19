@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma'
+import { paginateWithCursor } from '../lib/pagination'
 
 const commentSelect = {
   id:        true,
@@ -37,39 +38,35 @@ const adminCommentSelect = {
 
 export const commentRepository = {
   /** Get approved comments for a post (public). */
-  async findApprovedByPost(postId: string, page: number, limit: number) {
+  async findApprovedByPost(postId: string, cursor: string | undefined, limit: number) {
     const where = { postId, approved: true }
 
-    const [total, comments] = await prisma.$transaction([
-      prisma.comment.count({ where }),
-      prisma.comment.findMany({
-        where,
-        select:  commentSelect,
-        orderBy: { createdAt: 'desc' },
-        skip:    (page - 1) * limit,
-        take:    limit,
-      }),
-    ])
-
-    return { total, comments }
+    return paginateWithCursor(
+      (args) =>
+        prisma.comment.findMany({
+          where,
+          select:  commentSelect,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          ...args,
+        }),
+      { cursor, limit }
+    )
   },
 
   /** Get ALL comments for a post — admin moderation view. */
-  async findAllByPost(postId: string, page: number, limit: number) {
+  async findAllByPost(postId: string, cursor: string | undefined, limit: number) {
     const where = { postId }
 
-    const [total, comments] = await prisma.$transaction([
-      prisma.comment.count({ where }),
-      prisma.comment.findMany({
-        where,
-        select:  commentSelect,
-        orderBy: { createdAt: 'desc' },
-        skip:    (page - 1) * limit,
-        take:    limit,
-      }),
-    ])
-
-    return { total, comments }
+    return paginateWithCursor(
+      (args) =>
+        prisma.comment.findMany({
+          where,
+          select:  commentSelect,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          ...args,
+        }),
+      { cursor, limit }
+    )
   },
 
   /** Create a comment (not approved by default). */
@@ -102,21 +99,28 @@ export const commentRepository = {
     return prisma.comment.delete({ where: { id } })
   },
 
-  /** Get all comments across all posts (admin). Filterable by approval status. */
-  async findAll(page: number, limit: number, approved?: boolean) {
+  /**
+   * Get all comments across all posts (admin). Filterable by approval status.
+   * Also returns a total count — a single indexed COUNT() for a dashboard
+   * stat, not the per-page cost cursor pagination replaces.
+   */
+  async findAll(cursor: string | undefined, limit: number, approved?: boolean) {
     const where = approved !== undefined ? { approved } : {}
 
-    const [total, comments] = await prisma.$transaction([
+    const [total, page] = await Promise.all([
       prisma.comment.count({ where }),
-      prisma.comment.findMany({
-        where,
-        select:  adminCommentSelect,
-        orderBy: { createdAt: 'desc' },
-        skip:    (page - 1) * limit,
-        take:    limit,
-      }),
+      paginateWithCursor(
+        (args) =>
+          prisma.comment.findMany({
+            where,
+            select:  adminCommentSelect,
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+            ...args,
+          }),
+        { cursor, limit }
+      ),
     ])
 
-    return { total, comments }
+    return { ...page, total }
   },
 }
