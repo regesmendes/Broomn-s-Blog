@@ -330,7 +330,7 @@ npx cdk deploy --all \
 
 - ✅ BromnBlog-Cognito (User Pool ID: `us-east-1_ApHF59Xas`, Client ID: `535qq83rh90srom3ij4ospn78e`) — real Google OAuth login working end-to-end
 - ✅ BromnBlog-Database (RDS PostgreSQL t4g.micro in private subnet) — migrations applied via the on-demand migration Lambda (see below)
-- ✅ BromnBlog-Storage (S3 bucket: `broomns-blog-media-099710233970`) — **not actually used by the app yet**: media uploads still go to local disk / Lambda `/tmp`, not this bucket. Real gap, see What's Next.
+- ✅ BromnBlog-Storage (S3 bucket: `broomns-blog-media-099710233970`) — media uploads/deletes now go directly to this bucket via `api/src/lib/s3.ts` (`S3_BUCKET_NAME` env var, already wired to the Lambda; IAM already granted `s3:PutObject`/`s3:DeleteObject`)
 - ✅ BromnBlog-Api (Lambda + API Gateway, domain: `api.blogdobroomn.com`) — Fastify app wrapped via `@fastify/aws-lambda`, bundled with esbuild (`NodejsFunction`), running in a `PRIVATE_WITH_EGRESS` subnet (not `PRIVATE_ISOLATED` — it needs real internet egress for SES and Cognito's JWKS endpoint, neither of which has a VPC Gateway Endpoint)
 - ✅ BromnBlog-Frontend (S3 + CloudFront distribution: `EKN0G1CK1QQC`) — full SSR via OpenNext + a Lambda Function URL behind CloudFront OAC, not just static files
 - ✅ BromnBlog-Ses — `blogdobroomn.com` domain verified (DKIM via Route53, automatic). **Account is still in SES sandbox** — production access requested, pending AWS review; until approved, sending only works to individually pre-verified recipient addresses
@@ -429,7 +429,7 @@ The project runs on Node.js 25 which has a built-in `localStorage` global requir
 These are the remaining pieces to complete the project:
 
 ### API enhancements
-- [ ] **Media storage → S3**: `api/src/routes/media.routes.ts` still writes uploads to local disk (`/tmp` on Lambda, which doesn't persist across cold starts or instances) despite the `BromnBlog-Storage` S3 bucket + IAM permissions already being provisioned and unused. Real gap — uploaded images can silently 404 in production.
+- [x] **Media storage → S3**: `api/src/routes/media.routes.ts` now uploads/deletes directly against the `BromnBlog-Storage` bucket via `api/src/lib/s3.ts`, instead of local disk / Lambda `/tmp`. No dev-mode fallback — local dev hits the real bucket too if AWS credentials are configured (same pattern as SES).
 - [ ] SES production access — requested, pending AWS manual review; sending currently only works to individually pre-verified recipient addresses
 - [ ] Pagination cursors for better performance at scale
 - [ ] Per-user rate limiting

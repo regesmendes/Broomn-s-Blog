@@ -31,7 +31,7 @@ Both `api` and `frontend` have real ESLint configs. `frontend`'s `next.config.ts
 - Local dev sends real newsletter emails via SES if `api/.env` has working AWS credentials — there is no dev/test stub for SES.
 - The `broomns-blog-migrate` Lambda is the only network path into the private-subnet RDS instance — it's used both for `prisma migrate deploy` and one-off admin SQL (e.g. promoting a user to ADMIN). See README's "Running database migrations / one-off admin SQL".
 - No CI pipeline exists yet — correctness is enforced by convention only (tests must pass locally before merging to `master`).
-- Media uploads currently write to local disk / Lambda `/tmp` (not persisted) even though an S3 bucket for this is already provisioned and unused — a known real gap, see README's "What's Next".
+- Media uploads go directly to S3 (`api/src/lib/s3.ts`, `S3_BUCKET_NAME` env var) — no dev-mode fallback, local dev hits the real bucket too if AWS credentials are configured (same pattern as SES).
 
 ## i18n
 
