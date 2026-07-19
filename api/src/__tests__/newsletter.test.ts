@@ -171,12 +171,16 @@ describe('Newsletter API', () => {
       expect(res.statusCode).toBe(403)
     })
 
-    it('returns paginated subscribers for admin', async () => {
+    it('returns paginated subscribers with status counts for admin', async () => {
       const token = generateAdminToken(app)
 
-      mockPrisma.$transaction.mockResolvedValue([1, [
+      mockPrisma.newsletter.findMany.mockResolvedValue([
         { id: 'sub-1', email: 'reader@example.com', status: 'CONFIRMED', confirmedAt: new Date(), createdAt: new Date() },
-      ]])
+      ])
+      mockPrisma.newsletter.groupBy.mockResolvedValue([
+        { status: 'CONFIRMED', _count: 1 },
+        { status: 'PENDING', _count: 2 },
+      ])
 
       const res = await app.inject({
         method: 'GET',
@@ -187,7 +191,8 @@ describe('Newsletter API', () => {
       expect(res.statusCode).toBe(200)
       const body = res.json()
       expect(body.data).toHaveLength(1)
-      expect(body.meta.total).toBe(1)
+      expect(body.meta.hasMore).toBe(false)
+      expect(body.counts).toEqual({ total: 3, confirmed: 1, pending: 2, unsubscribed: 0 })
     })
   })
 

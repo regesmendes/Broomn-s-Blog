@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 
 export default function AdminNewsletterPage() {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
-  const [total, setTotal] = useState(0);
+  const [counts, setCounts] = useState({ total: 0, confirmed: 0, pending: 0, unsubscribed: 0 });
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
@@ -24,7 +24,7 @@ export default function AdminNewsletterPage() {
     try {
       const result = await api.getSubscribers(getToken() || '');
       setSubscribers(result.data);
-      setTotal(result.meta.total);
+      setCounts(result.counts);
     } catch {
       console.error('Failed to load subscribers');
     } finally {
@@ -54,9 +54,6 @@ export default function AdminNewsletterPage() {
     }
   };
 
-  const confirmedCount = subscribers.filter((s) => s.status === 'CONFIRMED').length;
-  const pendingCount = subscribers.filter((s) => s.status === 'PENDING').length;
-
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold text-gray-900 dark:text-white">Newsletter</h1>
@@ -64,15 +61,15 @@ export default function AdminNewsletterPage() {
       {/* Stats */}
       <div className="mb-8 grid grid-cols-3 gap-4">
         <div className="rounded-lg border border-gray-200 bg-white p-4 text-center dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">{total}</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">{counts.total}</p>
           <p className="text-sm text-gray-500 dark:text-gray-400">Total Subscribers</p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4 text-center dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-2xl font-bold text-green-600 dark:text-green-400">{confirmedCount}</p>
+          <p className="text-2xl font-bold text-green-600 dark:text-green-400">{counts.confirmed}</p>
           <p className="text-sm text-gray-500 dark:text-gray-400">Confirmed</p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4 text-center dark:border-gray-700 dark:bg-gray-800">
-          <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{pendingCount}</p>
+          <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{counts.pending}</p>
           <p className="text-sm text-gray-500 dark:text-gray-400">Pending</p>
         </div>
       </div>

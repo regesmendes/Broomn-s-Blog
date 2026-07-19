@@ -21,8 +21,7 @@
     "searchButton": "Search",
     "clearFilters": "Clear",
     "previousPage": "← Previous",
-    "nextPage": "Next →",
-    "pageOf": "Page {current} of {total}"
+    "nextPage": "Next →"
   },
   "newsletter": {
     "title": "Newsletter",

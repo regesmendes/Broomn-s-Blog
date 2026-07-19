@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma'
 import { SubscriptionStatus } from '@prisma/client'
+import { paginateWithCursor } from '../lib/pagination'
 
 const subscriberSelect = {
   id:          true,
@@ -43,21 +44,48 @@ export const newsletterRepository = {
     })
   },
 
-  async listSubscribers(page: number, limit: number, status?: SubscriptionStatus) {
+  async listSubscribers(cursor: string | undefined, limit: number, status?: SubscriptionStatus) {
     const where = status ? { status } : {}
 
-    const [total, subscribers] = await prisma.$transaction([
-      prisma.newsletter.count({ where }),
-      prisma.newsletter.findMany({
-        where,
-        select:  subscriberSelect,
-        orderBy: { createdAt: 'desc' },
-        skip:    (page - 1) * limit,
-        take:    limit,
-      }),
-    ])
+    return paginateWithCursor(
+      (args) =>
+        prisma.newsletter.findMany({
+          where,
+          select:  subscriberSelect,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          ...args,
+        }),
+      { cursor, limit }
+    )
+  },
 
-    return { total, subscribers }
+  /**
+   * Aggregate subscriber counts by status, for the admin dashboard stat cards.
+   * A groupBy/count is a single indexed aggregate scan — independent of how
+   * deep the paginated list above is, unlike an OFFSET-based total.
+   */
+  async countByStatus(): Promise<{
+    total: number
+    confirmed: number
+    pending: number
+    unsubscribed: number
+  }> {
+    const counts = await prisma.newsletter.groupBy({
+      by: ['status'],
+      _count: true,
+    })
+
+    const byStatus = Object.fromEntries(counts.map((c) => [c.status, c._count])) as Record<
+      SubscriptionStatus,
+      number
+    >
+
+    return {
+      total:        counts.reduce((sum, c) => sum + c._count, 0),
+      confirmed:    byStatus.CONFIRMED ?? 0,
+      pending:      byStatus.PENDING ?? 0,
+      unsubscribed: byStatus.UNSUBSCRIBED ?? 0,
+    }
   },
 
   /** Get all confirmed subscribers (id + email, for sending with per-recipient unsubscribe links). */

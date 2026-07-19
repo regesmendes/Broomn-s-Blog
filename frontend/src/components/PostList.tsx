@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import api, { Post, PaginationMeta } from '@/lib/api';
+import api, { Post } from '@/lib/api';
+import { useCursorPagination } from '@/lib/useCursorPagination';
 import { SearchAndFilter } from '@/components/SearchAndFilter';
 import { Pagination } from '@/components/Pagination';
 import { TranslatablePostCard } from '@/components/TranslatablePostCard';
@@ -14,24 +15,26 @@ interface PostListProps {
 export function PostList({ dateLocale }: PostListProps) {
   const t = useTranslations('home');
   const [posts, setPosts] = useState<Post[]>([]);
-  const [meta, setMeta] = useState<PaginationMeta | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [page, setPage] = useState(1);
   const [tag, setTag] = useState<string | undefined>();
   const [search, setSearch] = useState<string | undefined>();
+  const pagination = useCursorPagination();
 
   useEffect(() => {
     loadPosts();
-  }, [page, tag, search]);
+  }, [pagination.cursor, tag, search]);
 
   async function loadPosts() {
     setLoading(true);
     setError(false);
     try {
-      const result = await api.getPosts({ page, limit: 10, tag, search });
+      const result = await api.getPosts({ cursor: pagination.cursor, limit: 10, tag, search });
       setPosts(result.data);
-      setMeta(result.meta);
+      setHasMore(result.meta.hasMore);
+      setNextCursor(result.meta.nextCursor);
     } catch {
       setError(true);
       setPosts([]);
@@ -43,12 +46,16 @@ export function PostList({ dateLocale }: PostListProps) {
   function handleFilter(params: { tag?: string; search?: string }) {
     setTag(params.tag);
     setSearch(params.search);
-    setPage(1); // Reset to first page on new filter
+    pagination.reset(); // Back to first page on new filter
   }
 
-  function handlePageChange(newPage: number) {
-    setPage(newPage);
-    // Scroll to top of post list
+  function handleNext() {
+    pagination.goNext(nextCursor);
+    window.scrollTo({ top: 400, behavior: 'smooth' });
+  }
+
+  function handlePrevious() {
+    pagination.goPrevious();
     window.scrollTo({ top: 400, behavior: 'smooth' });
   }
 
@@ -86,13 +93,12 @@ export function PostList({ dateLocale }: PostListProps) {
             ))}
           </div>
 
-          {meta && (
-            <Pagination
-              currentPage={meta.page}
-              totalPages={meta.totalPages}
-              onPageChange={handlePageChange}
-            />
-          )}
+          <Pagination
+            hasPrevious={pagination.hasPrevious}
+            hasNext={hasMore}
+            onPrevious={handlePrevious}
+            onNext={handleNext}
+          />
         </>
       )}
     </div>

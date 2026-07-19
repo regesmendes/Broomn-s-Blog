@@ -132,10 +132,7 @@ describe('Media API', () => {
   describe('GET /media', () => {
     it('returns paginated media with usage counts', async () => {
       const token = generateAdminToken(app)
-      mockPrisma.$transaction.mockResolvedValue([
-        1,
-        [{ ...mockMedia, _count: { posts: 2 } }],
-      ])
+      mockPrisma.media.findMany.mockResolvedValue([{ ...mockMedia, _count: { posts: 2 } }])
 
       const res = await app.inject({
         method: 'GET',
@@ -145,7 +142,7 @@ describe('Media API', () => {
 
       expect(res.statusCode).toBe(200)
       expect(res.json().data[0].usageCount).toBe(2)
-      expect(res.json().meta.total).toBe(1)
+      expect(res.json().meta.hasMore).toBe(false)
     })
   })
 

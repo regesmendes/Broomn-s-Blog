@@ -5,6 +5,7 @@ import { Link } from '@/i18n/navigation';
 import api from '@/lib/api';
 import type { MediaItem, MediaDetail } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useCursorPagination } from '@/lib/useCursorPagination';
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -21,8 +22,9 @@ export default function MediaLibraryPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const pagination = useCursorPagination();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadMedia = useCallback(async () => {
@@ -30,15 +32,16 @@ export default function MediaLibraryPage() {
     if (!token) return;
     try {
       setLoading(true);
-      const result = await api.getMedia(token, { page, limit: 10, search: search || undefined });
+      const result = await api.getMedia(token, { cursor: pagination.cursor, limit: 10, search: search || undefined });
       setMedia(result.data);
-      setTotalPages(result.meta.totalPages);
+      setHasMore(result.meta.hasMore);
+      setNextCursor(result.meta.nextCursor);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load media');
     } finally {
       setLoading(false);
     }
-  }, [getToken, page, search]);
+  }, [getToken, pagination.cursor, search]);
 
   useEffect(() => {
     loadMedia();
@@ -148,7 +151,7 @@ export default function MediaLibraryPage() {
             <input
               type="text"
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              onChange={(e) => { setSearch(e.target.value); pagination.reset(); }}
               placeholder="Search images by filename..."
               className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
             />
@@ -196,21 +199,18 @@ export default function MediaLibraryPage() {
                 </button>
               ))}
             </div>
-              {totalPages > 1 && (
+              {(pagination.hasPrevious || hasMore) && (
                 <div className="mt-4 flex items-center justify-center gap-4">
                   <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page <= 1}
+                    onClick={pagination.goPrevious}
+                    disabled={!pagination.hasPrevious}
                     className="cursor-pointer rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                   >
                     ← Previous
                   </button>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    {page} / {totalPages}
-                  </span>
                   <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page >= totalPages}
+                    onClick={() => pagination.goNext(nextCursor)}
+                    disabled={!hasMore}
                     className="cursor-pointer rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                   >
                     Next →

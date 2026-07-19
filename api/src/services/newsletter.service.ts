@@ -117,22 +117,13 @@ export const newsletterService = {
 
   /** List subscribers — admin view. */
   async list(query: ListSubscribersQuery) {
-    const { page, limit, status } = query
-    const { total, subscribers } = await newsletterRepository.listSubscribers(
-      page,
-      limit,
-      status as SubscriptionStatus | undefined
-    )
+    const { cursor, limit, status } = query
+    const [page, counts] = await Promise.all([
+      newsletterRepository.listSubscribers(cursor, limit, status as SubscriptionStatus | undefined),
+      newsletterRepository.countByStatus(),
+    ])
 
-    return {
-      data: subscribers,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    }
+    return { ...page, counts }
   },
 
   /** Send a newsletter to all confirmed subscribers, each with their own unsubscribe link. */

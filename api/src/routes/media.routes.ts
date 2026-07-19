@@ -1,10 +1,17 @@
 import { FastifyInstance } from 'fastify'
 import { randomUUID } from 'crypto'
 import { extname } from 'path'
+import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { uploadObject, deleteObject } from '../lib/s3'
+import { paginateWithCursor } from '../lib/pagination'
+import { cursorQuerySchema } from '../schemas/pagination.schema'
 import { authenticate } from '../middlewares/authenticate'
 import { authorize } from '../middlewares/authorize'
+
+const listMediaQuerySchema = cursorQuerySchema(10).extend({
+  search: z.string().optional(),
+})
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
@@ -54,46 +61,32 @@ export async function mediaRoutes(app: FastifyInstance) {
 
   // ── GET /media ─────────────────────────────────────────────────────────────
   app.get('/', { preHandler: [authenticate, authorize('admin')] }, async (request, reply) => {
-    const { page = '1', limit = '10', search = '' } = request.query as {
-      page?: string
-      limit?: string
-      search?: string
-    }
-
-    const pageNum = Math.max(1, parseInt(page))
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit)))
+    const { cursor, limit, search } = listMediaQuerySchema.parse(request.query)
 
     const where = search
       ? { originalName: { contains: search, mode: 'insensitive' as const } }
       : {}
 
-    const [total, media] = await prisma.$transaction([
-      prisma.media.count({ where }),
-      prisma.media.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip: (pageNum - 1) * limitNum,
-        take: limitNum,
-        include: {
-          _count: { select: { posts: true } },
-        },
-      }),
-    ])
-
-    const result = media.map((m) => ({
-      ...m,
-      usageCount: m._count.posts,
-      _count: undefined,
-    }))
+    const result = await paginateWithCursor(
+      (args) =>
+        prisma.media.findMany({
+          where,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          include: {
+            _count: { select: { posts: true } },
+          },
+          ...args,
+        }),
+      { cursor, limit }
+    )
 
     return reply.send({
-      data: result,
-      meta: {
-        total,
-        page: pageNum,
-        limit: limitNum,
-        totalPages: Math.ceil(total / limitNum),
-      },
+      ...result,
+      data: result.data.map((m) => ({
+        ...m,
+        usageCount: m._count.posts,
+        _count: undefined,
+      })),
     })
   })
 

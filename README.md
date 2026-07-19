@@ -258,6 +258,15 @@ npm test              # Runs all 49 tests
 
 ## Architecture Decisions
 
+### Cursor-based pagination
+
+All list endpoints (`/posts`, `/posts/:postId/comments[/all]`, `/comments/admin`, `/newsletter/subscribers`, `/media`) use cursor pagination instead of `OFFSET`/`page`: the client passes `cursor` (the last-seen row's `id`) and gets back `{ data, meta: { nextCursor, hasMore } }`. This avoids two problems `page`/`skip` has at scale — the database has to walk past all skipped rows on every request (so page 500 costs far more than page 1), and rows can be duplicated or skipped across pages if data changes between requests.
+
+- `api/src/lib/pagination.ts`'s `paginateWithCursor` fetches `limit + 1` rows to derive `hasMore` without a separate `COUNT(*)`.
+- Every query orders by `[{ <field>: 'desc' }, { id: 'desc' }]` — the `id` tiebreaker is required because the primary sort field (e.g. `createdAt`) isn't unique; without it, rows with identical timestamps could be skipped or repeated across pages. Verified empirically against real Postgres with intentionally-tied timestamps, not just mocked unit tests.
+- The API is forward-only (no `direction`/backward cursor) — the frontend's `useCursorPagination` hook keeps a client-side history of visited cursors so a "Previous" button works without the backend needing to support it, the same approach Stripe's and GitHub's APIs use.
+- This trades away numbered-page jumping (no more "go to page 47") and any endpoint-wide `total` count. Where a total/breakdown is still genuinely useful for a dashboard (newsletter subscriber counts by status, admin comment moderation count), it's a separate, cheap indexed `COUNT()`/`groupBy` — unrelated to how deep the cursor pagination goes, so it doesn't reintroduce the scaling problem.
+
 ### Post scheduling via publishedAt
 
 Rather than a simple boolean "published" flag, we use a `publishedAt` datetime combined with a `status` enum. A post is visible when `status = PUBLISHED AND publishedAt <= now()`. This means:
@@ -430,7 +439,7 @@ These are the remaining pieces to complete the project:
 
 ### API enhancements
 - [x] **Media storage → S3**: `api/src/routes/media.routes.ts` now uploads/deletes directly against the `BromnBlog-Storage` bucket via `api/src/lib/s3.ts`, instead of local disk / Lambda `/tmp`. No dev-mode fallback — local dev hits the real bucket too if AWS credentials are configured (same pattern as SES).
-- [ ] Pagination cursors for better performance at scale
+- [x] Pagination cursors for better performance at scale — see "Cursor-based pagination" under Architecture Decisions
 - [ ] Per-user rate limiting
 - [ ] Confirm/unsubscribe email links currently point at the frontend pages which work fine, but consider whether newsletter sends should stay fully manual (`/admin/newsletter`) or auto-trigger on publish — discussed and deliberately deferred, not a bug
 

@@ -7,31 +7,15 @@ import {
   ListPostsQuery,
 } from '../schemas/post.schema'
 
-// ─── Pagination meta ───────────────────────────────────────────────────────────
-
-export interface PaginationMeta {
-  total:      number
-  page:       number
-  limit:      number
-  totalPages: number
-}
-
 // ─── Service ───────────────────────────────────────────────────────────────────
 
 export const postService = {
   async listPublished(query: ListPostsQuery) {
-    const { page, limit, tag, search } = query
-    const { total, posts } = await postRepository.findPublished({ page, limit, tag, search })
-
-    const meta: PaginationMeta = {
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    }
+    const { cursor, limit, tag, search } = query
+    const result = await postRepository.findPublished({ cursor, limit, tag, search })
 
     // Flatten tags from join table shape to a clean array
-    return { data: posts.map(flattenTags), meta }
+    return { ...result, data: result.data.map(flattenTags) }
   },
 
   async getPublishedBySlug(slug: string) {
