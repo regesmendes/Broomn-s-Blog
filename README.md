@@ -10,7 +10,7 @@ A full-stack blog application with:
 - Public blog with posts, tags, and newsletter subscription
 - User registration via Google OAuth (through AWS Cognito)
 - Authenticated users can comment on posts
-- Admin panel to manage posts, moderate comments, and send newsletters
+- Admin panel to manage posts, moderate comments, send newsletters, and edit an About page
 - Scheduled post publishing (set a future date, post goes live automatically)
 
 ## Current Status
@@ -22,7 +22,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 ### What's working
 
 - ✅ REST API with all CRUD endpoints (posts, comments, newsletter, auth)
-- ✅ 68 passing tests covering all API modules
+- ✅ 78 passing tests covering all API modules
 - ✅ Role-based access control (public, authenticated user, admin)
 - ✅ JWT authentication with access/refresh token flow
 - ✅ Cognito integration with real Google OAuth login, live in production
@@ -38,6 +38,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 - ✅ Custom typography (Cinzel headings, Lora body — manuscript/scroll feel)
 - ✅ i18n: Portuguese (default) + English with language switcher — all pages, including auth/login and newsletter flows
 - ✅ On-the-fly post translation via MyMemory API (preserves HTML structure)
+- ✅ Editable About page (rich text, media library images) with a top-nav link, admin-editable, no comments
 - ✅ TypeScript compiles clean across all three projects (api, frontend, infrastructure)
 
 ### Known Issues
@@ -102,6 +103,7 @@ foradoprograma/
 │   │   ├── app/           # App Router pages
 │   │   │   ├── page.tsx                   # Home (post list)
 │   │   │   ├── posts/[slug]/              # Post detail
+│   │   │   ├── about/                     # About page (public)
 │   │   │   ├── newsletter/                # Subscribe form
 │   │   │   ├── newsletter/confirm/        # Confirm-subscription landing page
 │   │   │   ├── newsletter/unsubscribe/    # Unsubscribe landing page
@@ -110,7 +112,8 @@ foradoprograma/
 │   │   │   ├── admin/posts/               # Post management
 │   │   │   ├── admin/comments/            # Comment moderation
 │   │   │   ├── admin/newsletter/          # Newsletter send + subscribers
-│   │   │   └── admin/media/               # Media library
+│   │   │   ├── admin/media/               # Media library
+│   │   │   └── admin/about/               # About page editor
 │   │   ├── components/layout/    # Header, Footer
 │   │   ├── lib/api.ts            # Typed API client
 │   │   ├── lib/useCursorPagination.ts  # Shared cursor pagination state (Prev/Next)
@@ -142,6 +145,7 @@ foradoprograma/
 | POST | `/newsletter/subscribe` | Subscribe to newsletter |
 | GET | `/newsletter/confirm?token=` | Confirm subscription |
 | GET | `/newsletter/unsubscribe?token=` | Unsubscribe |
+| GET | `/about` | Get the About page content |
 
 ### Authenticated (any logged-in user)
 
@@ -169,9 +173,10 @@ foradoprograma/
 | POST | `/newsletter/send` | Send newsletter to confirmed subscribers |
 | POST | `/media/upload` | Upload an image (multipart, 5MB max) |
 | GET | `/media` | List all media with usage count |
-| GET | `/media/:id` | Get media details with posts using it |
+| GET | `/media/:id` | Get media details with posts (and whether the About page) uses it |
 | DELETE | `/media/:id` | Delete a media file |
-| PATCH | `/media/:id/replace` | Replace image URL across all posts |
+| PATCH | `/media/:id/replace` | Replace image URL across all posts and the About page |
+| PUT | `/about` | Update the About page content |
 
 ## Data Model
 
@@ -180,7 +185,8 @@ foradoprograma/
 - **Tag**: name, slug — many-to-many with posts
 - **Comment**: content, approved flag, belongs to user and post
 - **Newsletter**: email, status (PENDING/CONFIRMED/UNSUBSCRIBED), optional user link
-- **Media**: filename (S3 key), original name, mime type, size, public URL — many-to-many with posts via `MediaOnPosts`, kept in sync automatically when a post's content is saved (see `syncMediaUsage` in `post.service.ts`)
+- **Media**: filename (S3 key), original name, mime type, size, public URL — many-to-many with posts via `MediaOnPosts` and with the About page via `MediaOnAboutPage`, kept in sync automatically whenever a post's or the About page's content is saved (see `syncMediaUsage` in `post.service.ts` / `about.service.ts`)
+- **AboutPage**: content (HTML) — a singleton, exactly one row (seeded by migration), no title/tags/scheduling; many-to-many with media via `MediaOnAboutPage`
 
 ## Running Locally
 
@@ -249,7 +255,7 @@ Node.js 25 introduced a built-in `localStorage` global that requires `--localsto
 
 ```bash
 cd api
-npm test              # Runs all 68 tests
+npm test              # Runs all 78 tests
 ```
 
 ## Authentication Flow
@@ -288,6 +294,10 @@ Instead of storing confirmation tokens in the database, we generate HMAC tokens:
 ### Comment moderation
 
 Comments are created with `approved = false` by default. They only appear publicly after an admin approves them. Comment owners can delete their own comments; admins can delete any comment.
+
+### About page is a singleton, not a Post
+
+The About page (`/about`, admin editor at `/admin/about`) is deliberately its own model rather than a `Post` with a reserved slug — it doesn't need tags, a publish/schedule workflow, or listing/search, and reusing `Post` would mean filtering it out of every place that lists or searches posts. `AboutPage` has exactly one row, seeded by its migration so `/about` never 404s waiting for an admin to save content the first time; the API only ever finds-or-updates that row, there's no create/delete. It reuses the same editor UI (`RichTextEditor` + `ImagePickerModal`) and public rendering (`PostContent`, with the same on-the-fly Portuguese→English translation) as posts, and has its own `MediaOnAboutPage` join table — mirroring `MediaOnPosts` — so the media library's usage counts, the media detail panel, and "replace this image everywhere" all correctly account for images used on the About page too.
 
 ### Per-user rate limiting
 

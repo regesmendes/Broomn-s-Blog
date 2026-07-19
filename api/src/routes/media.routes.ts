@@ -78,7 +78,7 @@ export async function mediaRoutes(app: FastifyInstance) {
           where,
           orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
           include: {
-            _count: { select: { posts: true } },
+            _count: { select: { posts: true, aboutPages: true } },
           },
           ...args,
         }),
@@ -89,7 +89,7 @@ export async function mediaRoutes(app: FastifyInstance) {
       ...result,
       data: result.data.map((m) => ({
         ...m,
-        usageCount: m._count.posts,
+        usageCount: m._count.posts + m._count.aboutPages,
         _count: undefined,
       })),
     })
@@ -107,6 +107,7 @@ export async function mediaRoutes(app: FastifyInstance) {
             post: { select: { id: true, title: true, slug: true } },
           },
         },
+        aboutPages: true,
       },
     })
 
@@ -117,6 +118,8 @@ export async function mediaRoutes(app: FastifyInstance) {
     return reply.send({
       ...media,
       posts: media.posts.map((mp) => mp.post),
+      usedInAboutPage: media.aboutPages.length > 0,
+      aboutPages: undefined,
     })
   })
 
@@ -160,6 +163,7 @@ export async function mediaRoutes(app: FastifyInstance) {
       where: { id },
       include: {
         posts: { include: { post: true } },
+        aboutPages: { include: { aboutPage: true } },
       },
     })
 
@@ -168,7 +172,7 @@ export async function mediaRoutes(app: FastifyInstance) {
     }
 
     // Update all posts that use this image
-    const updates = media.posts.map((mp) => {
+    const postUpdates = media.posts.map((mp) => {
       const updatedContent = mp.post.content.replace(
         new RegExp(escapeRegex(media.url), 'g'),
         newUrl
@@ -179,11 +183,23 @@ export async function mediaRoutes(app: FastifyInstance) {
       })
     })
 
-    await Promise.all(updates)
+    // Update the About page too, if it uses this image
+    const aboutUpdates = media.aboutPages.map((map) => {
+      const updatedContent = map.aboutPage.content.replace(
+        new RegExp(escapeRegex(media.url), 'g'),
+        newUrl
+      )
+      return prisma.aboutPage.update({
+        where: { id: map.aboutPage.id },
+        data: { content: updatedContent },
+      })
+    })
+
+    await Promise.all([...postUpdates, ...aboutUpdates])
 
     return reply.send({
-      message: `Replaced in ${updates.length} post(s)`,
-      postsUpdated: updates.length,
+      message: `Replaced in ${postUpdates.length} post(s)${aboutUpdates.length > 0 ? ' and the About page' : ''}`,
+      postsUpdated: postUpdates.length,
     })
   })
 }
