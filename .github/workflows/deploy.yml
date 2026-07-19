@@ -1,0 +1,82 @@
+name: Deploy
+
+on:
+  push:
+    branches: [prod]
+
+# Required for GitHub's OIDC token used to assume the AWS deploy role —
+# no long-lived AWS keys are stored in this repo.
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to AWS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # 1. Build the frontend via OpenNext. NEXT_PUBLIC_* vars are inlined at
+      # build time, so they must be set here, not just at Lambda runtime.
+      - name: Build frontend (OpenNext)
+        working-directory: frontend
+        run: |
+          npm ci
+          rm -rf .next .open-next
+          npx open-next build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_COGNITO_DOMAIN: ${{ vars.NEXT_PUBLIC_COGNITO_DOMAIN }}
+          NEXT_PUBLIC_COGNITO_CLIENT_ID: ${{ vars.NEXT_PUBLIC_COGNITO_CLIENT_ID }}
+          NEXT_PUBLIC_COGNITO_REDIRECT_URI: ${{ vars.NEXT_PUBLIC_COGNITO_REDIRECT_URI }}
+
+      # 2. Sync static assets to S3 before the CDK deploy, matching the
+      # order in README's documented manual procedure.
+      - name: Sync frontend static assets to S3
+        run: |
+          aws s3 sync frontend/.open-next/assets \
+            s3://${{ vars.FRONTEND_BUCKET }}/_assets --delete
+
+      # 3. Deploy every stack. Real Google OAuth creds are always passed
+      # (GitHub Secrets) so this never falls into the placeholder-credential
+      # path that once overwrote Cognito's real Google IdP secret — see
+      # README's "Two footguns" section under Deployment.
+      - name: cdk deploy --all
+        working-directory: infrastructure
+        run: |
+          npm ci
+          npx cdk deploy --all --require-approval never \
+            --context googleClientId=${{ secrets.GOOGLE_CLIENT_ID }} \
+            --context googleClientSecret=${{ secrets.GOOGLE_CLIENT_SECRET }} \
+            --context hostedZoneId=${{ vars.HOSTED_ZONE_ID }}
+
+      # 4. Invalidate CloudFront so viewers see the new content immediately.
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+
+      # 5. Apply any pending Prisma migrations via the on-demand migration
+      # Lambda — the only network path into the private-subnet RDS instance.
+      - name: Run pending database migrations
+        run: |
+          aws lambda invoke \
+            --function-name ${{ vars.MIGRATE_FUNCTION_NAME }} \
+            --region ${{ vars.AWS_REGION }} \
+            /tmp/migrate-output.json
+          cat /tmp/migrate-output.json
