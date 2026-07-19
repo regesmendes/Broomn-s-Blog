@@ -443,12 +443,6 @@ The project runs on Node.js 25 which has a built-in `localStorage` global requir
 
 These are the remaining pieces to complete the project:
 
-### API enhancements
-- [x] **Media storage → S3**: `api/src/routes/media.routes.ts` now uploads/deletes directly against the `BromnBlog-Storage` bucket via `api/src/lib/s3.ts`, instead of local disk / Lambda `/tmp`. No dev-mode fallback — local dev hits the real bucket too if AWS credentials are configured (same pattern as SES).
-- [x] Pagination cursors for better performance at scale — see "Cursor-based pagination" under Architecture Decisions
-- [x] Per-user rate limiting — see "Per-user rate limiting" under Architecture Decisions
-- [ ] Confirm/unsubscribe email links currently point at the frontend pages which work fine, but consider whether newsletter sends should stay fully manual (`/admin/newsletter`) or auto-trigger on publish — discussed and deliberately deferred, not a bug
-
 ### DevOps
 - [ ] GitHub Actions CI pipeline (lint, test, build) — planned to eventually replace the manual `cdk deploy` workflow (see the footguns documented under Deployment above) with deploy-on-merge to a deploy branch
 - [ ] Deployment pipeline (CDK deploy on merge to master)
