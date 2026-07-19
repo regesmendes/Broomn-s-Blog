@@ -69,7 +69,7 @@ export class FrontendStack extends Stack {
     // needed — unlike the API Lambda in api-stack.ts.
     const serverFunction = new lambda.Function(this, 'ServerFn', {
       functionName: 'broomns-blog-frontend-server',
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_24_X,
       code: lambda.Code.fromAsset(path.join(openNextDir, 'server-functions', 'default')),
       handler: 'index.handler',
       memorySize: 1024,
