@@ -136,12 +136,11 @@ function slugify(value: string): string {
  * Automatically adds/removes relations based on what images are actually in the content.
  */
 async function syncMediaUsage(postId: string, content: string) {
-  // Find all media URLs in the content
-  const urlRegex = /\/media\/files\/[a-zA-Z0-9-]+\.[a-z]+/g
-  const matches = content.match(urlRegex) || []
-
-  // Extract filenames from URLs
-  const filenames = matches.map((url) => url.split('/').pop()!).filter(Boolean)
+  // Match media filenames (uuid.ext, as generated in media.routes.ts) anywhere in
+  // the content, regardless of what URL they're embedded in — S3 URLs today,
+  // but this stays robust if the storage backend or URL shape changes again.
+  const filenameRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-z]+/g
+  const filenames = content.match(filenameRegex) || []
 
   if (filenames.length === 0) {
     // No media in post — clear all relations
