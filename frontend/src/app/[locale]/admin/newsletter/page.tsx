@@ -59,30 +59,30 @@ export default function AdminNewsletterPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold text-gray-900">Newsletter</h1>
+      <h1 className="mb-6 text-2xl font-bold text-gray-900 dark:text-white">Newsletter</h1>
 
       {/* Stats */}
       <div className="mb-8 grid grid-cols-3 gap-4">
-        <div className="rounded-lg border border-gray-200 bg-white p-4 text-center">
-          <p className="text-2xl font-bold text-gray-900">{total}</p>
-          <p className="text-sm text-gray-500">Total Subscribers</p>
+        <div className="rounded-lg border border-gray-200 bg-white p-4 text-center dark:border-gray-700 dark:bg-gray-800">
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">{total}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Total Subscribers</p>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-4 text-center">
-          <p className="text-2xl font-bold text-green-600">{confirmedCount}</p>
-          <p className="text-sm text-gray-500">Confirmed</p>
+        <div className="rounded-lg border border-gray-200 bg-white p-4 text-center dark:border-gray-700 dark:bg-gray-800">
+          <p className="text-2xl font-bold text-green-600 dark:text-green-400">{confirmedCount}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Confirmed</p>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-4 text-center">
-          <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
-          <p className="text-sm text-gray-500">Pending</p>
+        <div className="rounded-lg border border-gray-200 bg-white p-4 text-center dark:border-gray-700 dark:bg-gray-800">
+          <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{pendingCount}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Pending</p>
         </div>
       </div>
 
       {/* Send form */}
-      <div className="mb-8 rounded-lg border border-gray-200 bg-white p-6">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">Send Newsletter</h2>
+      <div className="mb-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">Send Newsletter</h2>
         <form onSubmit={handleSend} className="space-y-4">
           <div>
-            <label htmlFor="subject" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="subject" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Subject
             </label>
             <input
@@ -95,7 +95,7 @@ export default function AdminNewsletterPage() {
             />
           </div>
           <div>
-            <label htmlFor="nl-content" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="nl-content" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Content
             </label>
             <textarea
@@ -108,8 +108,8 @@ export default function AdminNewsletterPage() {
             />
           </div>
 
-          {sendSuccess && <p className="text-sm text-green-600">{sendSuccess}</p>}
-          {sendError && <p className="text-sm text-red-600">{sendError}</p>}
+          {sendSuccess && <p className="text-sm text-green-600 dark:text-green-400">{sendSuccess}</p>}
+          {sendError && <p className="text-sm text-red-600 dark:text-red-400">{sendError}</p>}
 
           <button
             type="submit"
@@ -122,33 +122,33 @@ export default function AdminNewsletterPage() {
       </div>
 
       {/* Subscribers table */}
-      <div className="rounded-lg border border-gray-200 bg-white">
-        <h2 className="border-b border-gray-200 px-4 py-3 text-lg font-semibold text-gray-900">
+      <div className="rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+        <h2 className="border-b border-gray-200 px-4 py-3 text-lg font-semibold text-gray-900 dark:border-gray-700 dark:text-white">
           Subscribers
         </h2>
         {loading ? (
-          <p className="p-4 text-gray-500">Loading...</p>
+          <p className="p-4 text-gray-500 dark:text-gray-400">Loading...</p>
         ) : (
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50">
+            <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
               <tr>
-                <th className="px-4 py-3 font-medium text-gray-700">Email</th>
-                <th className="px-4 py-3 font-medium text-gray-700">Status</th>
-                <th className="px-4 py-3 font-medium text-gray-700">Subscribed</th>
+                <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Email</th>
+                <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Status</th>
+                <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Subscribed</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {subscribers.map((sub) => (
                 <tr key={sub.id}>
-                  <td className="px-4 py-3 text-gray-900">{sub.email}</td>
+                  <td className="px-4 py-3 text-gray-900 dark:text-white">{sub.email}</td>
                   <td className="px-4 py-3">
                     <span
                       className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
                         sub.status === 'CONFIRMED'
-                          ? 'bg-green-100 text-green-700'
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
                           : sub.status === 'UNSUBSCRIBED'
-                            ? 'bg-gray-100 text-gray-700'
-                            : 'bg-yellow-100 text-yellow-700'
+                            ? 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                            : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
                       }`}
                     >
                       {sub.status === 'CONFIRMED'
@@ -158,7 +158,7 @@ export default function AdminNewsletterPage() {
                           : 'Pending'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-500">
+                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
                     {new Date(sub.createdAt).toLocaleDateString('pt-BR')}
                   </td>
                 </tr>
@@ -168,7 +168,7 @@ export default function AdminNewsletterPage() {
         )}
 
         {!loading && subscribers.length === 0 && (
-          <p className="p-4 text-center text-gray-500">No subscribers yet.</p>
+          <p className="p-4 text-center text-gray-500 dark:text-gray-400">No subscribers yet.</p>
         )}
       </div>
     </div>
