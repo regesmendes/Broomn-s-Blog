@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-
-const MYMEMORY_URL = 'https://api.mymemory.translated.net/get';
+import { translateHtml } from '@/lib/translate';
 
 interface PostContentProps {
   content: string;
@@ -37,31 +36,7 @@ export function PostContent({ content }: PostContentProps) {
     setTranslating(true);
 
     try {
-      // Split HTML content into chunks (MyMemory has ~500 char limit)
-      const chunks = splitHtmlContent(content, 450);
-      const translatedChunks: string[] = [];
-
-      for (const chunk of chunks) {
-        const params = new URLSearchParams({
-          q: chunk,
-          langpair: 'pt|en',
-        });
-
-        const response = await fetch(`${MYMEMORY_URL}?${params}`);
-
-        if (!response.ok) {
-          throw new Error(`Translation service returned ${response.status}`);
-        }
-
-        const data = await response.json();
-        if (data.responseStatus !== 200) {
-          throw new Error(data.responseDetails || 'Translation failed');
-        }
-
-        translatedChunks.push(data.responseData.translatedText);
-      }
-
-      const translatedHtml = translatedChunks.join('');
+      const translatedHtml = await translateHtml(content, 'pt|en');
       cacheRef.current = translatedHtml;
       setDisplayContent(translatedHtml);
       setIsTranslated(true);
@@ -120,33 +95,4 @@ export function PostContent({ content }: PostContentProps) {
       />
     </>
   );
-}
-
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-
-/**
- * Split HTML content into chunks that respect tag boundaries.
- * Splits on block-level elements (p, h1-h6, li, blockquote, etc.)
- * to keep each chunk as valid HTML.
- */
-function splitHtmlContent(html: string, maxLength: number): string[] {
-  // Split on block-level closing tags
-  const blocks = html.split(/(?<=<\/(?:p|h[1-6]|li|blockquote|div|pre)>)/i);
-  const chunks: string[] = [];
-  let current = '';
-
-  for (const block of blocks) {
-    if ((current + block).length > maxLength && current) {
-      chunks.push(current);
-      current = block;
-    } else {
-      current += block;
-    }
-  }
-
-  if (current) {
-    chunks.push(current);
-  }
-
-  return chunks.length > 0 ? chunks : [html];
 }
