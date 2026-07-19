@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
 import api, { ApiError, Post } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { RichTextEditor } from '@/components/RichTextEditor';

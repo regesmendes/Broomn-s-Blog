@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
 import api from '@/lib/api';
 import type { MediaItem, MediaDetail } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
