@@ -72,6 +72,7 @@ jobs:
           NEXT_PUBLIC_COGNITO_DOMAIN: ${{ vars.NEXT_PUBLIC_COGNITO_DOMAIN }}
           NEXT_PUBLIC_COGNITO_CLIENT_ID: ${{ vars.NEXT_PUBLIC_COGNITO_CLIENT_ID }}
           NEXT_PUBLIC_COGNITO_REDIRECT_URI: ${{ vars.NEXT_PUBLIC_COGNITO_REDIRECT_URI }}
+          NEXT_PUBLIC_GA_MEASUREMENT_ID: ${{ vars.NEXT_PUBLIC_GA_MEASUREMENT_ID }}
 
       # 3. Sync static assets to S3 before the CDK deploy, matching the
       # order in README's documented manual procedure.
