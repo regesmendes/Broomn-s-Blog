@@ -50,19 +50,19 @@ export function TranslatablePostCard({ post, dateLocale }: TranslatablePostCardP
   }
 
   return (
-    <article className="flex gap-4 rounded-lg bg-white p-4 shadow-sm transition hover:shadow-md dark:bg-gray-800">
+    <article className="flex gap-4 overflow-hidden rounded-lg bg-white shadow-sm transition hover:shadow-md dark:bg-gray-800">
       {post.coverImage && (
         <Link href={`/posts/${post.slug}`} className="flex-shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={post.coverImage}
             alt={post.title}
-            className="h-24 w-24 rounded-lg object-cover sm:h-32 sm:w-32"
+            className="h-full w-32 object-cover sm:w-40"
           />
         </Link>
       )}
 
-      <div className="min-w-0 flex-1">
+      <div className={`min-w-0 flex-1 ${post.coverImage ? 'py-4 pr-4' : 'p-4'}`}>
         <Link href={`/posts/${post.slug}`}>
           <h2 className="mb-2 text-xl font-semibold text-gray-900 hover:text-emerald-600 dark:text-white dark:hover:text-emerald-400">
             {translating ? (
