@@ -4,6 +4,7 @@ import { Metadata } from 'next';
 import api, { ApiError } from '@/lib/api';
 import { CommentSection } from '@/components/CommentSection';
 import { PostContent } from '@/components/PostContent';
+import { TranslatableTitle } from '@/components/TranslatableTitle';
 import { Divider } from '@/components/Divider';
 
 export const dynamic = 'force-dynamic';
@@ -68,9 +69,10 @@ export default async function PostPage({
       )}
 
       <header className="mb-10 text-center">
-        <h1 className="mb-4 text-4xl font-bold text-emerald-900 dark:text-emerald-100 md:text-5xl">
-          {post.title}
-        </h1>
+        <TranslatableTitle
+          title={post.title}
+          className="mb-4 text-4xl font-bold text-emerald-900 dark:text-emerald-100 md:text-5xl"
+        />
 
         <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-gray-500 dark:text-gray-400">
           {post.publishedAt && (

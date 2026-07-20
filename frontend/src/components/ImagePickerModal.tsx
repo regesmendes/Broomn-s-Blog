@@ -104,6 +104,7 @@ export function ImagePickerModal({ isOpen, onClose, onSelect }: ImagePickerModal
             Select Image
           </h2>
           <button
+            type="button"
             onClick={onClose}
             className="rounded-md p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
             aria-label="Close"
@@ -117,6 +118,7 @@ export function ImagePickerModal({ isOpen, onClose, onSelect }: ImagePickerModal
         {/* Upload button */}
         <div className="border-b border-gray-200 px-6 py-3 dark:border-gray-700">
           <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
             className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
@@ -163,6 +165,7 @@ export function ImagePickerModal({ isOpen, onClose, onSelect }: ImagePickerModal
               {media.map((item) => (
                 <button
                   key={item.id}
+                  type="button"
                   onClick={() => handleSelect(item)}
                   className="group relative aspect-square overflow-hidden rounded-lg border border-gray-200 bg-gray-100 transition-all hover:border-emerald-500 hover:ring-2 hover:ring-emerald-500 dark:border-gray-700 dark:bg-gray-700"
                 >
@@ -180,6 +183,7 @@ export function ImagePickerModal({ isOpen, onClose, onSelect }: ImagePickerModal
               {(pagination.hasPrevious || hasMore) && (
                 <div className="mt-3 flex items-center justify-center gap-3">
                   <button
+                    type="button"
                     onClick={pagination.goPrevious}
                     disabled={!pagination.hasPrevious}
                     className="cursor-pointer rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-200 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-700"
@@ -187,6 +191,7 @@ export function ImagePickerModal({ isOpen, onClose, onSelect }: ImagePickerModal
                     ←
                   </button>
                   <button
+                    type="button"
                     onClick={() => pagination.goNext(nextCursor)}
                     disabled={!hasMore}
                     className="cursor-pointer rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-200 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-700"
