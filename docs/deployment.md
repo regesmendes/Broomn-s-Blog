@@ -31,7 +31,7 @@ npx cdk deploy --all \
 | BromnBlog-Cognito | User Pool, Google IdP, App Client, Hosted UI |
 | BromnBlog-Database | VPC (3-tier: public/private-with-egress/isolated), RDS PostgreSQL 16 (t4g.micro), Security Groups |
 | BromnBlog-Storage | S3 bucket (media uploads, public read) |
-| BromnBlog-Api | Lambda, API Gateway HTTP API, custom domain, WAF Web ACL |
+| BromnBlog-Api | Lambda, API Gateway HTTP API, custom domain |
 | BromnBlog-Frontend | S3 + CloudFront + ACM cert + Route53 |
 | BromnBlog-Ses | SES domain identity for email |
 
@@ -130,7 +130,6 @@ Note: `prisma db execute` runs the statement but doesn't print `SELECT` results 
 | S3 Frontend Bucket | `broomns-blog-frontend-099710233970` |
 | API Lambda | `broomns-blog-api` |
 | API Gateway | `58m9fzd8lj` |
-| WAF Web ACL (API) | `broomns-blog-api-waf` (see [architecture](./architecture.md#waf-in-front-of-the-api-gateway)) |
 | Migration/admin-SQL Lambda | `broomns-blog-migrate` |
 | Frontend SSR Lambda | `broomns-blog-frontend-server` |
 | CDK Bootstrap Assets Bucket | `cdk-hnb659fds-assets-099710233970-us-east-1` |
