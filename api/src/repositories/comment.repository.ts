@@ -85,6 +85,11 @@ export const commentRepository = {
     })
   },
 
+  /** Count a user's comments still awaiting moderation. */
+  async countPendingByUser(userId: string) {
+    return prisma.comment.count({ where: { userId, approved: false } })
+  },
+
   /** Approve or reject a comment. */
   async setApproval(id: string, approved: boolean) {
     return prisma.comment.update({

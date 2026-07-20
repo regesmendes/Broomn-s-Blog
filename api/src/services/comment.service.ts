@@ -1,6 +1,11 @@
 import { commentRepository } from '../repositories/comment.repository'
 import { ListCommentsQuery } from '../schemas/comment.schema'
 
+// Caps how many comments a single user can have awaiting moderation at once —
+// both a flood-protection measure and a bound on the admin moderation queue.
+// Read at call time (not module load) so tests can override it per-case.
+const MAX_PENDING_COMMENTS_PER_USER = () => Number(process.env.MAX_PENDING_COMMENTS_PER_USER ?? 15)
+
 export const commentService = {
   /** List approved comments for a post (public). */
   async listApproved(postId: string, query: ListCommentsQuery) {
@@ -23,8 +28,12 @@ export const commentService = {
     return { data, meta: { ...meta, total } }
   },
 
-  /** Create a comment. */
+  /** Create a comment. Blocked once the user has too many comments pending moderation. */
   async create(postId: string, userId: string, content: string) {
+    const pendingCount = await commentRepository.countPendingByUser(userId)
+    if (pendingCount >= MAX_PENDING_COMMENTS_PER_USER()) {
+      return 'limit_reached'
+    }
     return commentRepository.create(postId, userId, content)
   },
 
