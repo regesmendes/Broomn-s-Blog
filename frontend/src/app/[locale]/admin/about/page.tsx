@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api, { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { RichTextEditor } from '@/components/RichTextEditor';
+import { RichTextEditor, RichTextEditorHandle } from '@/components/RichTextEditor';
 import { ImagePickerModal } from '@/components/ImagePickerModal';
 
 export default function AdminAboutPage() {
@@ -14,6 +14,7 @@ export default function AdminAboutPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const editorRef = useRef<RichTextEditorHandle>(null);
 
   useEffect(() => {
     loadAbout();
@@ -66,6 +67,7 @@ export default function AdminAboutPage() {
           </label>
           <div className="mt-1">
             <RichTextEditor
+              ref={editorRef}
               content={content}
               onChange={setContent}
               placeholder="Write the About page content..."
@@ -75,7 +77,7 @@ export default function AdminAboutPage() {
               isOpen={imagePickerOpen}
               onClose={() => setImagePickerOpen(false)}
               onSelect={(url) => {
-                setContent((prev) => prev + `<img src="${url}" alt="" />`);
+                editorRef.current?.insertImage(url);
                 setImagePickerOpen(false);
               }}
             />
