@@ -73,7 +73,8 @@
     "posting": "Publicando...",
     "commentingAs": "Comentando como",
     "signInToComment": "Entre para deixar um comentário.",
-    "awaitingModeration": "Seu comentário foi enviado e está aguardando moderação."
+    "awaitingModeration": "Seu comentário foi enviado e está aguardando moderação.",
+    "commentLimitReached": "Você tem muitos comentários aguardando moderação. Aguarde um administrador revisar seus comentários existentes antes de postar mais."
   },
   "footer": {
     "rights": "Todos os direitos reservados."
