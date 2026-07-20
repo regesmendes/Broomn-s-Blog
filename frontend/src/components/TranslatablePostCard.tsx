@@ -50,56 +50,69 @@ export function TranslatablePostCard({ post, dateLocale }: TranslatablePostCardP
   }
 
   return (
-    <article className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition hover:shadow-md dark:border-gray-700 dark:bg-gray-800">
-      <Link href={`/posts/${post.slug}`}>
-        <h2 className="mb-2 text-xl font-semibold text-gray-900 hover:text-emerald-600 dark:text-white dark:hover:text-emerald-400">
-          {translating ? (
-            <span className="inline-block animate-pulse text-gray-400 dark:text-gray-500">{post.title}</span>
-          ) : (
-            title
-          )}
-        </h2>
-      </Link>
-
-      {(excerpt || post.excerpt) && (
-        <p className="mb-4 text-gray-600 dark:text-gray-400">
-          {translating ? (
-            <span className="animate-pulse text-gray-400 dark:text-gray-500">{post.excerpt}</span>
-          ) : (
-            excerpt
-          )}
-        </p>
+    <article className="flex gap-4 rounded-lg bg-white p-4 shadow-sm transition hover:shadow-md dark:bg-gray-800">
+      {post.coverImage && (
+        <Link href={`/posts/${post.slug}`} className="flex-shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={post.coverImage}
+            alt={post.title}
+            className="h-24 w-24 rounded-lg object-cover sm:h-32 sm:w-32"
+          />
+        </Link>
       )}
 
-      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-500">
-        {post.publishedAt && (
-          <time dateTime={post.publishedAt}>
-            {new Date(post.publishedAt).toLocaleDateString(dateLocale, {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })}
-          </time>
+      <div className="min-w-0 flex-1">
+        <Link href={`/posts/${post.slug}`}>
+          <h2 className="mb-2 text-xl font-semibold text-gray-900 hover:text-emerald-600 dark:text-white dark:hover:text-emerald-400">
+            {translating ? (
+              <span className="inline-block animate-pulse text-gray-400 dark:text-gray-500">{post.title}</span>
+            ) : (
+              title
+            )}
+          </h2>
+        </Link>
+
+        {(excerpt || post.excerpt) && (
+          <p className="mb-4 text-gray-600 dark:text-gray-400">
+            {translating ? (
+              <span className="animate-pulse text-gray-400 dark:text-gray-500">{post.excerpt}</span>
+            ) : (
+              excerpt
+            )}
+          </p>
         )}
 
-        {post.tags.length > 0 && (
-          <div className="flex gap-2">
-            {post.tags.map((tag) => (
-              <span
-                key={tag.id}
-                className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
-              >
-                {tag.name}
-              </span>
-            ))}
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-500">
+          {post.publishedAt && (
+            <time dateTime={post.publishedAt}>
+              {new Date(post.publishedAt).toLocaleDateString(dateLocale, {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              })}
+            </time>
+          )}
 
-        {failed && (
-          <span className="text-xs italic text-amber-600 dark:text-amber-400">
-            {t('translationUnavailable')}
-          </span>
-        )}
+          {post.tags.length > 0 && (
+            <div className="flex gap-2">
+              {post.tags.map((tag) => (
+                <span
+                  key={tag.id}
+                  className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
+                >
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {failed && (
+            <span className="text-xs italic text-amber-600 dark:text-amber-400">
+              {t('translationUnavailable')}
+            </span>
+          )}
+        </div>
       </div>
     </article>
   );

@@ -32,13 +32,13 @@ async function translateChunk(text: string, langpair: string): Promise<string> {
  * the results joined back together.
  *
  * Pass 1 splits between block-level elements (p, h1-6, li, blockquote, div,
- * pre) — a boundary between blocks is never inside a tag, so this is always
- * safe. Pass 2 (splitOversizedBlock) catches any single block that's still
- * too long on its own (e.g. one long paragraph) — this used to slip through
- * untouched and get rejected outright by MyMemory.
+ * pre, figure) — a boundary between blocks is never inside a tag, so this is
+ * always safe. Pass 2 (splitOversizedBlock) catches any single block that's
+ * still too long on its own (e.g. one long paragraph) — this used to slip
+ * through untouched and get rejected outright by MyMemory.
  */
 export function splitHtmlContent(html: string, maxLength: number = MAX_CHUNK_LENGTH): string[] {
-  const blocks = html.split(/(?<=<\/(?:p|h[1-6]|li|blockquote|div|pre)>)/i);
+  const blocks = html.split(/(?<=<\/(?:p|h[1-6]|li|blockquote|div|figure|pre)>)/i);
   const chunks: string[] = [];
   let current = '';
 
@@ -105,18 +105,36 @@ function splitOversizedBlock(block: string, maxLength: number): string[] {
 // index right after every ". "/"! "/"? " that occurs at depth 0 (i.e.
 // outside any open tag). Always includes the block's full length as a final
 // candidate so the last chunk closes out correctly.
+//
+// The block's own outer wrapper tag (e.g. the <p>...</p> around everything)
+// is stripped before scanning: it isn't an inline mark, so it must not count
+// toward depth the same way <strong> does — otherwise depth starts at 1 and
+// never returns to 0 anywhere inside the block's real text, and no sentence
+// boundary is ever found. Split-point indices are offset back by the
+// stripped prefix length so they still index into the original full string.
 function findSafeSplitPoints(html: string): number[] {
+  const outerMatch = html.match(/^<([a-z0-9]+)(?:\s[^>]*)?>/i);
+  let prefixLength = 0;
+  let inner = html;
+  if (outerMatch) {
+    const closeTag = `</${outerMatch[1]}>`;
+    if (html.toLowerCase().endsWith(closeTag.toLowerCase())) {
+      prefixLength = outerMatch[0].length;
+      inner = html.slice(prefixLength, html.length - closeTag.length);
+    }
+  }
+
   const points: number[] = [];
   let depth = 0;
   let i = 0;
 
-  while (i < html.length) {
-    if (html[i] === '<') {
-      const tagEnd = html.indexOf('>', i);
+  while (i < inner.length) {
+    if (inner[i] === '<') {
+      const tagEnd = inner.indexOf('>', i);
       if (tagEnd === -1) break;
-      const tag = html.slice(i, tagEnd + 1);
+      const tag = inner.slice(i, tagEnd + 1);
       const isClosing = tag.startsWith('</');
-      const isVoidElement = /\/>$/.test(tag) || /^<(img|br|hr|input|meta|link)\b/i.test(tag);
+      const isVoidElement = /\/>$/.test(tag) || /^<\/?(img|br|hr|input|meta|link|figcaption)\b/i.test(tag);
       if (!isVoidElement) {
         depth = isClosing ? Math.max(0, depth - 1) : depth + 1;
       }
@@ -124,8 +142,8 @@ function findSafeSplitPoints(html: string): number[] {
       continue;
     }
 
-    if (depth === 0 && /[.!?]/.test(html[i]) && /\s/.test(html[i + 1] ?? '')) {
-      points.push(i + 2);
+    if (depth === 0 && /[.!?]/.test(inner[i]) && /\s/.test(inner[i + 1] ?? '')) {
+      points.push(prefixLength + i + 2);
     }
     i++;
   }

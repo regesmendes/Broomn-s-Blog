@@ -125,6 +125,28 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 0.5rem;
 }
 
+.prose figure {
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.prose figure img {
+  margin: 0 auto;
+}
+
+.prose figcaption {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  font-style: italic;
+  color: #6b7280;
+  text-align: center;
+}
+
+/* Images inserted without a caption leave an empty <figcaption> */
+.prose figcaption:empty {
+  display: none;
+}
+
 .prose hr {
   border-top: 1px solid #e5e7eb;
   margin-top: 2rem;
@@ -154,6 +176,10 @@ h1, h2, h3, h4, h5, h6 {
 
 .dark .prose blockquote {
   border-left-color: #4b5563;
+  color: #9ca3af;
+}
+
+.dark .prose figcaption {
   color: #9ca3af;
 }
 

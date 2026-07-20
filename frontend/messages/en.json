@@ -62,8 +62,6 @@
   },
   "post": {
     "backToAll": "← Back to all posts",
-    "translateButton": "Translate to English",
-    "showOriginal": "Show original (Portuguese)",
     "translating": "Translating...",
     "translatedDisclaimer": "Automatically translated from Portuguese.",
     "comments": "Comments",

@@ -46,6 +46,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 - ✅ Custom typography (Cinzel headings, Lora body — manuscript/scroll feel)
 - ✅ i18n: Portuguese (default) + English with language switcher — all pages, including auth/login and newsletter flows
 - ✅ On-the-fly post translation via MyMemory API (preserves HTML structure)
+- ✅ Image captions in the post editor, tied to that specific image occurrence in that specific post
 - ✅ Editable About page (rich text, media library images) with a top-nav link, admin-editable, no comments
 - ✅ TypeScript compiles clean across all three projects (api, frontend, infrastructure)
 - ✅ `robots.txt`/`sitemap.xml` (`frontend/src/app/robots.ts`/`sitemap.ts`) — the sitemap is dynamically generated from live published posts, in both locales
