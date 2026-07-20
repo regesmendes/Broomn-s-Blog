@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
-import api, { Comment } from '@/lib/api';
+import api, { ApiError, Comment } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
 interface CommentSectionProps {
@@ -15,7 +15,7 @@ export function CommentSection({ postId }: CommentSectionProps) {
   const [loading, setLoading] = useState(true);
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const { isAuthenticated, user, getToken } = useAuth();
   const t = useTranslations('post');
 
@@ -39,22 +39,25 @@ export function CommentSection({ postId }: CommentSectionProps) {
     if (!content.trim()) return;
 
     setSubmitting(true);
-    setError('');
+    setMessage(null);
 
     try {
       const token = getToken() || '';
       const newComment = await api.createComment(postId, content.trim(), token);
       // Comment might need approval — show optimistic message
       setContent('');
-      setError('');
       // If auto-approved, add to list; otherwise show pending message
       if (newComment.approved) {
         setComments([newComment, ...comments]);
       } else {
-        setError(t('awaitingModeration'));
+        setMessage({ text: t('awaitingModeration'), type: 'success' });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to post comment');
+      if (err instanceof ApiError && err.status === 429) {
+        setMessage({ text: t('commentLimitReached'), type: 'error' });
+      } else {
+        setMessage({ text: err instanceof Error ? err.message : 'Failed to post comment', type: 'error' });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -89,9 +92,9 @@ export function CommentSection({ postId }: CommentSectionProps) {
               {submitting ? t('posting') : t('postComment')}
             </button>
           </div>
-          {error && (
-            <p className={`mt-2 text-sm ${error.includes('awaiting') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-              {error}
+          {message && (
+            <p className={`mt-2 text-sm ${message.type === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+              {message.text}
             </p>
           )}
         </form>

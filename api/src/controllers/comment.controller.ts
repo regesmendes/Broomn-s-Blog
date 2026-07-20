@@ -38,8 +38,15 @@ export const commentController = {
     const { content } = createCommentSchema.parse(request.body)
     const userId = request.user.sub
 
-    const comment = await commentService.create(postId, userId, content)
-    return reply.status(201).send(comment)
+    const result = await commentService.create(postId, userId, content)
+
+    if (result === 'limit_reached') {
+      return reply.status(429).send({
+        error: 'You have too many comments awaiting moderation. Please wait until an admin reviews some of your existing comments before posting more.',
+      })
+    }
+
+    return reply.status(201).send(result)
   },
 
   // ── PATCH /comments/:id/approve (admin only) ─────────────────────────────────

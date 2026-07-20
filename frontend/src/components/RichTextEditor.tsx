@@ -5,7 +5,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
-import { useEffect } from 'react';
+import { useEffect, forwardRef, useImperativeHandle } from 'react';
 
 // ─── Toolbar Button ────────────────────────────────────────────────────────────
 
@@ -199,7 +199,15 @@ interface RichTextEditorProps {
   onImagePick?: () => void;
 }
 
-export function RichTextEditor({ content, onChange, placeholder, onImagePick }: RichTextEditorProps) {
+export interface RichTextEditorHandle {
+  /** Inserts an image at the current cursor/selection position. */
+  insertImage: (url: string) => void;
+}
+
+export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(function RichTextEditor(
+  { content, onChange, placeholder, onImagePick },
+  ref
+) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -234,6 +242,12 @@ export function RichTextEditor({ content, onChange, placeholder, onImagePick }: 
     }
   }, [content, editor]);
 
+  useImperativeHandle(ref, () => ({
+    insertImage: (url: string) => {
+      editor?.chain().focus().setImage({ src: url }).run();
+    },
+  }), [editor]);
+
   if (!editor) return null;
 
   return (
@@ -242,4 +256,4 @@ export function RichTextEditor({ content, onChange, placeholder, onImagePick }: 
       <EditorContent editor={editor} />
     </div>
   );
-}
+});

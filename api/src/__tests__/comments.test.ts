@@ -153,6 +153,7 @@ describe('Comments API', () => {
     it('creates a comment for authenticated user', async () => {
       const token = generateTestToken(app, { sub: 'user-789' })
 
+      mockPrisma.comment.count.mockResolvedValue(0)
       mockPrisma.comment.create.mockResolvedValue({
         id: 'new-comment',
         content: 'Nice post!',
@@ -171,6 +172,45 @@ describe('Comments API', () => {
       expect(res.statusCode).toBe(201)
       expect(res.json().content).toBe('Nice post!')
       expect(res.json().approved).toBe(false)
+      expect(mockPrisma.comment.count).toHaveBeenCalledWith({
+        where: { userId: 'user-789', approved: false },
+      })
+    })
+
+    it('returns 429 when the user has reached the pending-comment limit', async () => {
+      const token = generateTestToken(app, { sub: 'user-789' })
+
+      mockPrisma.comment.count.mockResolvedValue(15)
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/posts/post-123/comments',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { content: 'One more!' },
+      })
+
+      expect(res.statusCode).toBe(429)
+      expect(res.json().error).toMatch(/too many comments/i)
+      expect(mockPrisma.comment.create).not.toHaveBeenCalled()
+    })
+
+    it('respects a custom MAX_PENDING_COMMENTS_PER_USER', async () => {
+      const original = process.env.MAX_PENDING_COMMENTS_PER_USER
+      process.env.MAX_PENDING_COMMENTS_PER_USER = '2'
+
+      const token = generateTestToken(app, { sub: 'user-789' })
+      mockPrisma.comment.count.mockResolvedValue(2)
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/posts/post-123/comments',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { content: 'One more!' },
+      })
+
+      expect(res.statusCode).toBe(429)
+
+      process.env.MAX_PENDING_COMMENTS_PER_USER = original
     })
   })
 

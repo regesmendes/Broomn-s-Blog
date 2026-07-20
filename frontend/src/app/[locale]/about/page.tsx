@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import api from '@/lib/api';
 import { PostContent } from '@/components/PostContent';
+import { Divider } from '@/components/Divider';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,11 +33,7 @@ export default async function AboutPage() {
         </h1>
       </header>
 
-      {/* Decorative divider before content */}
-      <div className="mb-8 flex justify-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/images/divider.png" alt="" className="h-10 w-auto opacity-60 dark:opacity-40" />
-      </div>
+      <Divider />
 
       <PostContent content={about.content} />
 

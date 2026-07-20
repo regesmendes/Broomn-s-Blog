@@ -152,7 +152,7 @@ class ApiClient {
     if (!response.ok) {
       const body = await response.json().catch(() => null);
       throw new ApiError(
-        body?.message || `Request failed with status ${response.status}`,
+        body?.error || `Request failed with status ${response.status}`,
         response.status,
         body
       );
@@ -361,7 +361,7 @@ class ApiClient {
     if (!response.ok) {
       const body = await response.json().catch(() => null);
       throw new ApiError(
-        body?.message || `Request failed with status ${response.status}`,
+        body?.error || `Request failed with status ${response.status}`,
         response.status,
         body
       );

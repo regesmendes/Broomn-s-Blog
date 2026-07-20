@@ -4,6 +4,7 @@ import { Metadata } from 'next';
 import api, { ApiError } from '@/lib/api';
 import { CommentSection } from '@/components/CommentSection';
 import { PostContent } from '@/components/PostContent';
+import { Divider } from '@/components/Divider';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,11 +98,7 @@ export default async function PostPage({
         </div>
       </header>
 
-      {/* Decorative divider before content */}
-      <div className="mb-8 flex justify-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/images/divider.png" alt="" className="h-10 w-auto opacity-60 dark:opacity-40" />
-      </div>
+      <Divider />
 
       <PostContent content={post.content} />
 

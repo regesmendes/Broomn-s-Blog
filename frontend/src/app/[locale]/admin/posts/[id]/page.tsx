@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/navigation';
 import api, { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { RichTextEditor } from '@/components/RichTextEditor';
+import { RichTextEditor, RichTextEditorHandle } from '@/components/RichTextEditor';
 import { ImagePickerModal } from '@/components/ImagePickerModal';
 
 interface PostFormData {
@@ -28,6 +28,7 @@ export default function EditPostPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const editorRef = useRef<RichTextEditorHandle>(null);
   const [form, setForm] = useState<PostFormData>({
     title: '',
     excerpt: '',
@@ -154,6 +155,7 @@ export default function EditPostPage() {
           </label>
           <div className="mt-1">
             <RichTextEditor
+              ref={editorRef}
               content={form.content}
               onChange={(html) => setForm((prev) => ({ ...prev, content: html }))}
               placeholder="Start writing your post..."
@@ -163,10 +165,7 @@ export default function EditPostPage() {
               isOpen={imagePickerOpen}
               onClose={() => setImagePickerOpen(false)}
               onSelect={(url) => {
-                setForm((prev) => ({
-                  ...prev,
-                  content: prev.content + `<img src="${url}" alt="" />`,
-                }));
+                editorRef.current?.insertImage(url);
                 setImagePickerOpen(false);
               }}
             />
