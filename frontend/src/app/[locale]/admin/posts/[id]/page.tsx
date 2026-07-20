@@ -27,6 +27,7 @@ export default function EditPostPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const editorRef = useRef<RichTextEditorHandle>(null);
   const [form, setForm] = useState<PostFormData>({
@@ -78,6 +79,7 @@ export default function EditPostPage() {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    setSuccess(false);
 
     const token = getToken() || '';
     const tagsArray = form.tags
@@ -99,7 +101,11 @@ export default function EditPostPage() {
         },
         token
       );
-      router.push('/admin/posts');
+      // Posts are typically edited several times before publishing — stay
+      // here instead of redirecting to the list, so drafting isn't
+      // interrupted by a trip back and forth. "Cancel" below is the
+      // deliberate way to leave.
+      setSuccess(true);
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -234,6 +240,7 @@ export default function EditPostPage() {
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
+        {success && <p className="text-sm text-green-600 dark:text-green-400">Saved.</p>}
 
         <div className="flex gap-3">
           <button
