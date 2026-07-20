@@ -6,6 +6,7 @@ import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import { useEffect, forwardRef, useImperativeHandle } from 'react';
+import { FigureImage, Caption } from './tiptapFigureImage';
 
 // ─── Toolbar Button ────────────────────────────────────────────────────────────
 
@@ -55,7 +56,7 @@ function Toolbar({ editor, onImagePick }: { editor: Editor; onImagePick?: () => 
     } else {
       const url = prompt('Enter image URL:');
       if (url) {
-        editor.chain().focus().setImage({ src: url }).run();
+        editor.chain().focus().setFigureImage({ src: url }).run();
       }
     }
   };
@@ -220,8 +221,17 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
       Image.configure({
         HTMLAttributes: { class: 'rounded-lg my-4 max-w-full' },
       }),
+      FigureImage,
+      Caption,
       Placeholder.configure({
-        placeholder: placeholder ?? 'Start writing your post...',
+        // Captions live nested inside a figureImage node (doc > figureImage >
+        // caption); includeChildren is required for the placeholder plugin to
+        // find and decorate a textblock that isn't a direct child of doc.
+        includeChildren: true,
+        placeholder: ({ node }) =>
+          node.type.name === 'caption'
+            ? 'Add a caption... (optional)'
+            : placeholder ?? 'Start writing your post...',
       }),
     ],
     content,
@@ -244,7 +254,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
 
   useImperativeHandle(ref, () => ({
     insertImage: (url: string) => {
-      editor?.chain().focus().setImage({ src: url }).run();
+      editor?.chain().focus().setFigureImage({ src: url }).run();
     },
   }), [editor]);
 
