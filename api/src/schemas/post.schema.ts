@@ -8,6 +8,10 @@ export const listPostsQuerySchema = cursorQuerySchema(10).extend({
   search: z.string().optional(),
 })
 
+export const listAllPostsQuerySchema = cursorQuerySchema(10).extend({
+  status: z.enum(['DRAFT', 'PUBLISHED']).optional(),
+})
+
 export const postSlugParamSchema = z.object({
   slug: z.string().min(1),
 })
@@ -38,7 +42,8 @@ export const publishPostSchema = z.object({
 
 // ─── Inferred types ────────────────────────────────────────────────────────────
 
-export type ListPostsQuery  = z.infer<typeof listPostsQuerySchema>
+export type ListPostsQuery    = z.infer<typeof listPostsQuerySchema>
+export type ListAllPostsQuery = z.infer<typeof listAllPostsQuerySchema>
 export type PostSlugParam   = z.infer<typeof postSlugParamSchema>
 export type PostIdParam     = z.infer<typeof postIdParamSchema>
 export type CreatePostBody  = z.infer<typeof createPostSchema>

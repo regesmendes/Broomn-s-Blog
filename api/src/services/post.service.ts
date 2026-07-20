@@ -5,6 +5,7 @@ import {
   UpdatePostBody,
   PublishPostBody,
   ListPostsQuery,
+  ListAllPostsQuery,
 } from '../schemas/post.schema'
 
 // ─── Service ───────────────────────────────────────────────────────────────────
@@ -16,6 +17,13 @@ export const postService = {
 
     // Flatten tags from join table shape to a clean array
     return { ...result, data: result.data.map(flattenTags) }
+  },
+
+  /** List ALL posts regardless of status (admin) — powers the admin Posts list. */
+  async listAll(query: ListAllPostsQuery) {
+    const { cursor, limit, status } = query
+    const { data, meta, total } = await postRepository.findAll({ cursor, limit, status })
+    return { data: data.map(flattenTags), meta: { ...meta, total } }
   },
 
   async getPublishedBySlug(slug: string) {
