@@ -29,6 +29,7 @@ export default function EditPostPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const [imagePickerTarget, setImagePickerTarget] = useState<'content' | 'cover'>('content');
   const editorRef = useRef<RichTextEditorHandle>(null);
   const [form, setForm] = useState<PostFormData>({
     title: '',
@@ -165,13 +166,20 @@ export default function EditPostPage() {
               content={form.content}
               onChange={(html) => setForm((prev) => ({ ...prev, content: html }))}
               placeholder="Start writing your post..."
-              onImagePick={() => setImagePickerOpen(true)}
+              onImagePick={() => {
+                setImagePickerTarget('content');
+                setImagePickerOpen(true);
+              }}
             />
             <ImagePickerModal
               isOpen={imagePickerOpen}
               onClose={() => setImagePickerOpen(false)}
               onSelect={(url) => {
-                editorRef.current?.insertImage(url);
+                if (imagePickerTarget === 'cover') {
+                  setForm((prev) => ({ ...prev, coverImage: url }));
+                } else {
+                  editorRef.current?.insertImage(url);
+                }
                 setImagePickerOpen(false);
               }}
             />
@@ -182,14 +190,26 @@ export default function EditPostPage() {
           <label htmlFor="coverImage" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
             Cover Image URL
           </label>
-          <input
-            id="coverImage"
-            name="coverImage"
-            type="url"
-            value={form.coverImage}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
-          />
+          <div className="mt-1 flex gap-2">
+            <input
+              id="coverImage"
+              name="coverImage"
+              type="url"
+              value={form.coverImage}
+              onChange={handleChange}
+              className="block w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setImagePickerTarget('cover');
+                setImagePickerOpen(true);
+              }}
+              className="flex-shrink-0 rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Browse
+            </button>
+          </div>
         </div>
 
         <div>
