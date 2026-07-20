@@ -62,8 +62,6 @@
   },
   "post": {
     "backToAll": "← Voltar para todas as publicações",
-    "translateButton": "Traduzir para Inglês",
-    "showOriginal": "Mostrar original",
     "translating": "Traduzindo...",
     "translatedDisclaimer": "Traduzido automaticamente. O texto original está em português.",
     "comments": "Comentários",

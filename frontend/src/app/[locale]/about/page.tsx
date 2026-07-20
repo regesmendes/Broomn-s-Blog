@@ -3,8 +3,6 @@ import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import api from '@/lib/api';
 import { PostContent } from '@/components/PostContent';
-import { TranslationProvider } from '@/components/TranslationProvider';
-import { TranslateControls } from '@/components/TranslateControls';
 import { Divider } from '@/components/Divider';
 
 export const dynamic = 'force-dynamic';
@@ -29,21 +27,15 @@ export default async function AboutPage() {
 
   return (
     <article className="mx-auto max-w-3xl px-4 py-12">
-      <TranslationProvider content={about.content}>
-        <header className="relative mb-10 text-center">
-          <div className="absolute top-0 right-0">
-            <TranslateControls />
-          </div>
+      <header className="mb-10 text-center">
+        <h1 className="mb-4 text-4xl font-bold text-emerald-900 dark:text-emerald-100 md:text-5xl">
+          {t('title')}
+        </h1>
+      </header>
 
-          <h1 className="mb-4 text-4xl font-bold text-emerald-900 dark:text-emerald-100 md:text-5xl">
-            {t('title')}
-          </h1>
-        </header>
+      <Divider />
 
-        <Divider />
-
-        <PostContent />
-      </TranslationProvider>
+      <PostContent content={about.content} />
 
       <div className="mt-8 border-t border-emerald-200/50 pt-8 dark:border-emerald-900/50">
         <Link href="/" className="text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-300">

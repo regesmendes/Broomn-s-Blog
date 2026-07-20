@@ -4,8 +4,7 @@ import { Metadata } from 'next';
 import api, { ApiError } from '@/lib/api';
 import { CommentSection } from '@/components/CommentSection';
 import { PostContent } from '@/components/PostContent';
-import { TranslationProvider } from '@/components/TranslationProvider';
-import { TranslateControls } from '@/components/TranslateControls';
+import { TranslatableTitle } from '@/components/TranslatableTitle';
 import { Divider } from '@/components/Divider';
 
 export const dynamic = 'force-dynamic';
@@ -69,46 +68,41 @@ export default async function PostPage({
         />
       )}
 
-      <TranslationProvider content={post.content}>
-        <header className="relative mb-10 text-center">
-          <div className="absolute top-0 right-0">
-            <TranslateControls />
-          </div>
+      <header className="mb-10 text-center">
+        <TranslatableTitle
+          title={post.title}
+          className="mb-4 text-4xl font-bold text-emerald-900 dark:text-emerald-100 md:text-5xl"
+        />
 
-          <h1 className="mb-4 text-4xl font-bold text-emerald-900 dark:text-emerald-100 md:text-5xl">
-            {post.title}
-          </h1>
+        <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+          {post.publishedAt && (
+            <time dateTime={post.publishedAt}>
+              {new Date(post.publishedAt).toLocaleDateString(locale === 'pt' ? 'pt-BR' : 'en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              })}
+            </time>
+          )}
 
-          <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-            {post.publishedAt && (
-              <time dateTime={post.publishedAt}>
-                {new Date(post.publishedAt).toLocaleDateString(locale === 'pt' ? 'pt-BR' : 'en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </time>
-            )}
+          {post.tags.length > 0 && (
+            <div className="flex gap-2">
+              {post.tags.map((tag) => (
+                <span
+                  key={tag.id}
+                  className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
+                >
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </header>
 
-            {post.tags.length > 0 && (
-              <div className="flex gap-2">
-                {post.tags.map((tag) => (
-                  <span
-                    key={tag.id}
-                    className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300"
-                  >
-                    {tag.name}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        </header>
+      <Divider />
 
-        <Divider />
-
-        <PostContent />
-      </TranslationProvider>
+      <PostContent content={post.content} />
 
       {/* Comments */}
       <CommentSection postId={post.id} />

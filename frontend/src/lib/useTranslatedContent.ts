@@ -1,34 +1,26 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLocale } from 'next-intl';
 import { translateHtml } from '@/lib/translate';
 
-/** Shared translation state for a post/About page body, lifted out of
- * PostContent so the toggle control can render elsewhere (e.g. next to the
- * title) while the content still shares the same state. */
+/** Auto-translates a post/About page body to English when the locale is
+ * 'en' (content is authored in Portuguese) — no manual toggle. The language
+ * selector already covers "see the Portuguese original" by navigating to
+ * /pt, so a separate in-page toggle was redundant. */
 export function useTranslatedContent(content: string) {
   const locale = useLocale();
   const [displayContent, setDisplayContent] = useState(content);
   const [isTranslated, setIsTranslated] = useState(false);
   const [translating, setTranslating] = useState(false);
   const [error, setError] = useState('');
-  const cacheRef = useRef<string | null>(null);
 
   const handleTranslate = useCallback(async () => {
     setError('');
-
-    if (cacheRef.current) {
-      setDisplayContent(cacheRef.current);
-      setIsTranslated(true);
-      return;
-    }
-
     setTranslating(true);
 
     try {
       const translatedHtml = await translateHtml(content, 'pt|en');
-      cacheRef.current = translatedHtml;
       setDisplayContent(translatedHtml);
       setIsTranslated(true);
     } catch (err) {
@@ -47,17 +39,5 @@ export function useTranslatedContent(content: string) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locale]);
 
-  function toggle() {
-    if (isTranslated) {
-      setDisplayContent(content);
-      setIsTranslated(false);
-    } else if (cacheRef.current) {
-      setDisplayContent(cacheRef.current);
-      setIsTranslated(true);
-    } else {
-      handleTranslate();
-    }
-  }
-
-  return { displayContent, isTranslated, translating, error, toggle };
+  return { displayContent, isTranslated, translating, error };
 }
