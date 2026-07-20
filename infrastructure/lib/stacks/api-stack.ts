@@ -12,6 +12,7 @@ import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as rds from 'aws-cdk-lib/aws-rds';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 
 export interface ApiStackProps extends StackProps {
   /** VPC for Lambda to access Aurora */
@@ -261,6 +262,105 @@ export class ApiStack extends Stack {
       ),
     });
 
+    // ── WAF ──────────────────────────────────────────────────────────────────
+    // Regional Web ACL in front of the API Gateway HTTP API. Added after real
+    // vulnerability-scanner traffic was observed hitting the API directly —
+    // exhaustive probing for .env, .git/config, AWS/SSH credentials, etc. The
+    // app-level rate limiter (api/src/app.ts) throttles abuse per user/IP but
+    // doesn't recognize known-malicious IPs or common attack signatures
+    // before they even reach the Lambda. ~$9-10/month (Web ACL + 4 rules,
+    // request volume negligible at this app's traffic).
+    const webAcl = new wafv2.CfnWebACL(this, 'ApiWebAcl', {
+      name: 'broomns-blog-api-waf',
+      scope: 'REGIONAL',
+      defaultAction: { allow: {} },
+      visibilityConfig: {
+        sampledRequestsEnabled: true,
+        cloudWatchMetricsEnabled: true,
+        metricName: 'broomns-blog-api-waf',
+      },
+      rules: [
+        {
+          name: 'AWS-AWSManagedRulesCommonRuleSet',
+          priority: 0,
+          overrideAction: { none: {} },
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: 'AWS',
+              name: 'AWSManagedRulesCommonRuleSet',
+            },
+          },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: 'CommonRuleSet',
+          },
+        },
+        {
+          name: 'AWS-AWSManagedRulesKnownBadInputsRuleSet',
+          priority: 1,
+          overrideAction: { none: {} },
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: 'AWS',
+              name: 'AWSManagedRulesKnownBadInputsRuleSet',
+            },
+          },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: 'KnownBadInputs',
+          },
+        },
+        {
+          name: 'AWS-AWSManagedRulesAmazonIpReputationList',
+          priority: 2,
+          overrideAction: { none: {} },
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: 'AWS',
+              name: 'AWSManagedRulesAmazonIpReputationList',
+            },
+          },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: 'IpReputationList',
+          },
+        },
+        {
+          // Blocks an IP once it crosses 300 requests in a rolling 5-minute
+          // window — well above real usage (the app's own per-user rate
+          // limit is 100/min already), but catches exactly the scanning
+          // behavior observed in production (one IP hit 120+ distinct paths
+          // within seconds).
+          name: 'RateLimitPerIp',
+          priority: 3,
+          action: { block: {} },
+          statement: {
+            rateBasedStatement: {
+              limit: 300,
+              aggregateKeyType: 'IP',
+            },
+          },
+          visibilityConfig: {
+            sampledRequestsEnabled: true,
+            cloudWatchMetricsEnabled: true,
+            metricName: 'RateLimitPerIp',
+          },
+        },
+      ],
+    });
+
+    // HTTP API stages can't be referenced as an IStage with a WAF-compatible
+    // ARN via the L2 construct, so build the association ARN directly —
+    // `new HttpApi(...)` above (no `createDefaultStage: false`) always
+    // auto-creates the `$default` stage.
+    new wafv2.CfnWebACLAssociation(this, 'ApiWebAclAssociation', {
+      resourceArn: `arn:aws:apigateway:${this.region}::/apis/${httpApi.httpApiId}/stages/$default`,
+      webAclArn: webAcl.attrArn,
+    });
+
     // Route53 A record pointing to API Gateway custom domain
     new route53.ARecord(this, 'ApiARecord', {
       zone: hostedZone,
@@ -290,6 +390,11 @@ export class ApiStack extends Stack {
     new CfnOutput(this, 'LambdaFunctionArn', {
       value: apiFunction.functionArn,
       description: 'API Lambda function ARN',
+    });
+
+    new CfnOutput(this, 'WebAclArn', {
+      value: webAcl.attrArn,
+      description: 'WAF Web ACL protecting the API Gateway',
     });
   }
 }

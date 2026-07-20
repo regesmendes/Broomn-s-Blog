@@ -14,6 +14,9 @@ export async function postRoutes(app: FastifyInstance) {
 
   // ── Admin routes (JWT + admin role required) ─────────────────────────────────
 
+  // GET /posts/admin — all posts, any status (drafts included)
+  app.get('/admin', { preHandler: [authenticate, authorize('admin')] }, postController.listAll)
+
   // GET /posts/admin/:id
   app.get('/admin/:id', { preHandler: [authenticate, authorize('admin')] }, postController.getById)
 

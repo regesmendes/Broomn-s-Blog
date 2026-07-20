@@ -111,6 +111,11 @@ export interface SubscribersResponse extends CursorPaginatedResponse<Subscriber>
   counts: { total: number; confirmed: number; pending: number; unsubscribed: number };
 }
 
+/** Admin post listing — includes drafts, also returns a total count. */
+export interface AdminPostsResponse extends CursorPaginatedResponse<Post> {
+  meta: CursorPaginationMeta & { total: number };
+}
+
 export interface AuthResponse {
   accessToken: string;
   refreshToken: string;
@@ -180,6 +185,16 @@ class ApiClient {
     if (params?.search) searchParams.set('search', params.search);
     const query = searchParams.toString();
     return this.request<CursorPaginatedResponse<Post>>(`/posts${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminPosts(token: string, params?: { cursor?: string; status?: 'DRAFT' | 'PUBLISHED' }): Promise<AdminPostsResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.cursor) searchParams.set('cursor', params.cursor);
+    if (params?.status) searchParams.set('status', params.status);
+    const query = searchParams.toString();
+    return this.request<AdminPostsResponse>(`/posts/admin${query ? `?${query}` : ''}`, {
+      headers: this.authHeaders(token),
+    });
   }
 
   async getTags(): Promise<TagWithCount[]> {

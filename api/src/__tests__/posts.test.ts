@@ -82,6 +82,69 @@ describe('Posts API', () => {
     })
   })
 
+  // ── GET /posts/admin (admin — all posts, any status) ─────────────────────────
+
+  describe('GET /posts/admin', () => {
+    it('returns 401 without authentication', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/posts/admin',
+      })
+
+      expect(res.statusCode).toBe(401)
+    })
+
+    it('returns 403 for non-admin users', async () => {
+      const token = generateTestToken(app, { role: 'user' })
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/posts/admin',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(403)
+    })
+
+    it('returns posts of any status with a total count', async () => {
+      const token = generateAdminToken(app)
+      mockPrisma.post.count.mockResolvedValue(2)
+      mockPrisma.post.findMany.mockResolvedValue([
+        { id: '1', title: 'Draft Post', slug: 'draft-post', excerpt: null, coverImage: null, status: 'DRAFT', publishedAt: null, createdAt: new Date(), tags: [] },
+        { id: '2', title: 'Published Post', slug: 'published-post', excerpt: null, coverImage: null, status: 'PUBLISHED', publishedAt: new Date(), createdAt: new Date(), tags: [] },
+      ])
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/posts/admin',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.data).toHaveLength(2)
+      expect(body.meta.total).toBe(2)
+      expect(mockPrisma.post.count).toHaveBeenCalledWith({ where: {} })
+    })
+
+    it('filters by status when provided', async () => {
+      const token = generateAdminToken(app)
+      mockPrisma.post.count.mockResolvedValue(1)
+      mockPrisma.post.findMany.mockResolvedValue([
+        { id: '1', title: 'Draft Post', slug: 'draft-post', excerpt: null, coverImage: null, status: 'DRAFT', publishedAt: null, createdAt: new Date(), tags: [] },
+      ])
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/posts/admin?status=DRAFT',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(mockPrisma.post.count).toHaveBeenCalledWith({ where: { status: 'DRAFT' } })
+    })
+  })
+
   // ── GET /posts/:slug ───────────────────────────────────────────────────────
 
   describe('GET /posts/:slug', () => {

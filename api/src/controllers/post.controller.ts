@@ -2,6 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify'
 import { postService } from '../services/post.service'
 import {
   listPostsQuerySchema,
+  listAllPostsQuerySchema,
   postSlugParamSchema,
   postIdParamSchema,
   createPostSchema,
@@ -27,6 +28,13 @@ export const postController = {
     }
 
     return reply.send(post)
+  },
+
+  // ── GET /admin/posts (admin — all posts, any status) ─────────────────────────
+  async listAll(request: FastifyRequest, reply: FastifyReply) {
+    const query = listAllPostsQuerySchema.parse(request.query)
+    const result = await postService.listAll(query)
+    return reply.send(result)
   },
 
   // ── GET /admin/posts/:id ─────────────────────────────────────────────────────
