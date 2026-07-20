@@ -34,6 +34,7 @@ See the root [README](../README.md) for setup and the [architecture doc](./archi
 | PUT | `/posts/:id` | Update a post |
 | DELETE | `/posts/:id` | Delete a post |
 | PATCH | `/posts/:id/publish` | Publish/unpublish/schedule a post |
+| GET | `/posts/admin` | List all posts regardless of status (drafts included), optionally filtered by `status` |
 | GET | `/posts/admin/:id` | Get any post (including drafts) |
 | GET | `/posts/:postId/comments/all` | List all comments for one post (including unapproved) |
 | GET | `/comments/admin` | List all comments across every post, filterable by approval status |

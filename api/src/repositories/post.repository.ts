@@ -11,6 +11,12 @@ export interface FindPublishedPostsOptions {
   search?: string
 }
 
+export interface FindAllPostsOptions {
+  cursor?: string
+  limit:   number
+  status?: 'DRAFT' | 'PUBLISHED'
+}
+
 export interface UpsertTagsResult {
   tagId: string
 }
@@ -80,6 +86,31 @@ export const postRepository = {
         }),
       { cursor, limit }
     )
+  },
+
+  /**
+   * Count and fetch ALL posts regardless of status (admin use), optionally
+   * filtered to one status. Also returns a total count — a single indexed
+   * COUNT(), not tied to how deep the cursor pagination goes.
+   */
+  async findAll({ cursor, limit, status }: FindAllPostsOptions) {
+    const where = status ? { status } : {}
+
+    const [total, page] = await Promise.all([
+      prisma.post.count({ where }),
+      paginateWithCursor(
+        (args) =>
+          prisma.post.findMany({
+            where,
+            select:  postSummarySelect,
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+            ...args,
+          }),
+        { cursor, limit }
+      ),
+    ])
+
+    return { ...page, total }
   },
 
   /** Find a single published post by slug. */

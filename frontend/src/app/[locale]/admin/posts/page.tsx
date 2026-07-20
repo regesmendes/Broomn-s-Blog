@@ -5,18 +5,25 @@ import { Link } from '@/i18n/navigation';
 import api, { Post } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
+type StatusFilter = 'ALL' | 'DRAFT' | 'PUBLISHED';
+
 export default function AdminPostsPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const { getToken } = useAuth();
 
   useEffect(() => {
     loadPosts();
-  }, []);
+  }, [statusFilter]);
 
   const loadPosts = async () => {
+    setLoading(true);
     try {
-      const { data } = await api.getPosts({ limit: 100 });
+      const token = getToken() || '';
+      const { data } = await api.getAdminPosts(token, {
+        status: statusFilter === 'ALL' ? undefined : statusFilter,
+      });
       setPosts(data);
     } catch {
       console.error('Failed to load posts');
@@ -36,10 +43,6 @@ export default function AdminPostsPage() {
     }
   };
 
-  if (loading) {
-    return <p className="text-gray-500">Loading posts...</p>;
-  }
-
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -52,6 +55,25 @@ export default function AdminPostsPage() {
         </Link>
       </div>
 
+      <div className="mb-4 flex gap-1">
+        {(['ALL', 'DRAFT', 'PUBLISHED'] as const).map((filter) => (
+          <button
+            key={filter}
+            onClick={() => setStatusFilter(filter)}
+            className={`cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium ${
+              statusFilter === filter
+                ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900'
+                : 'text-gray-600 hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700'
+            }`}
+          >
+            {filter === 'ALL' ? 'All' : filter === 'DRAFT' ? 'Draft' : 'Published'}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <p className="text-gray-500">Loading posts...</p>
+      ) : (
       <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
@@ -104,6 +126,7 @@ export default function AdminPostsPage() {
           <p className="p-4 text-center text-gray-500 dark:text-gray-400">No posts found.</p>
         )}
       </div>
+      )}
     </div>
   );
 }

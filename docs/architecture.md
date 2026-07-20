@@ -65,6 +65,17 @@ The global rate limiter (`@fastify/rate-limit`, 100 req/min default) keys by aut
 
 **Known limitation, accepted for now**: `@fastify/rate-limit`'s default store is an in-memory `Map`, scoped to a single Lambda execution environment. Since API Gateway can spin up multiple concurrent Lambda instances, each with its own independent counter, this is a soft/best-effort limit rather than a mathematically exact global one under concurrent load. A true distributed limit would need a shared store (e.g. `@fastify/rate-limit`'s Redis option, via ElastiCache or Upstash) — real infra/cost disproportionate to this app's actual traffic. Revisit if usage ever grows enough for this gap to matter.
 
+### WAF in front of the API Gateway
+
+Added after real vulnerability-scanner traffic was found in production: CloudWatch Logs Insights queries against `/aws/lambda/broomns-blog-api` showed several IPs doing exhaustive, automated probing for `.env`, `.git/config`, AWS/SSH credentials, `service-account.json`, GraphQL introspection, etc. — one IP alone hit 120+ such paths across three sweeps. That traffic reaches the Lambda before the application-level rate limiter above ever sees it (the rate limiter throttles *speed*, it doesn't recognize known-bad IPs or attack signatures).
+
+A regional `AWS::WAFv2::WebACL` (`infrastructure/lib/stacks/api-stack.ts`) sits in front of the HTTP API's `$default` stage via `CfnWebACLAssociation`, running:
+- `AWSManagedRulesCommonRuleSet` and `AWSManagedRulesKnownBadInputsRuleSet` — AWS-managed baseline protections that cover exactly the scanning patterns observed (path traversal, injection, common exploit signatures).
+- `AWSManagedRulesAmazonIpReputationList` — blocks IPs on AWS's own maintained reputation list.
+- A custom rate-based rule blocking any single IP once it crosses 300 requests in a rolling 5-minute window — well above real usage (the app's own per-user limit is already 100/min), but catches the kind of rapid-fire scanning observed (one IP hit 120+ distinct paths within seconds).
+
+Cost: ~$9-10/month ($5 Web ACL + $1/rule × 4; request-volume charges are negligible at this app's traffic). Scoped to the API Gateway only, not the CloudFront distribution in front of the frontend — no comparable scanning traffic was observed there, and it would need a separate `CLOUDFRONT`-scoped Web ACL (in `us-east-1` specifically) if that changes.
+
 ### CI/CD pipeline
 
 **Branch flow**: feature branches → PR into `master` (everyday development, ungated) → PR from `master` into `prod` (a deliberate promotion step — merging into `prod` is what triggers a production deploy). `prod` has real GitHub branch protection: a PR is required (no direct pushes, no force-pushes, no deletions), and the CI workflow's three checks (`API`, `Frontend`, `Infrastructure`) must all pass against an up-to-date branch before the merge button is even enabled — this applies to repo admins too (`enforce_admins: true`). This repo was made **public** specifically to unlock branch protection: GitHub disables both classic branch protection rules and the newer Rulesets on private repos unless the account has GitHub Pro. The repo's git history was checked for secrets before flipping visibility — none found (no `.env` files, no AWS keys, no private keys were ever committed).
