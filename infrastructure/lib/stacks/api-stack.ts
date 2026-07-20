@@ -119,6 +119,7 @@ export class ApiStack extends Stack {
         NODE_ENV: 'production',
         DATABASE_URL: `postgresql://${dbUsername}:${dbPassword}@${props.dbInstance.dbInstanceEndpointAddress}:${props.dbInstance.dbInstanceEndpointPort}/broomnsblog`,
         JWT_SECRET: jwtSecretValue,
+        CORS_ORIGIN: `https://${props.domainName}`,
         COGNITO_USER_POOL_ID: props.userPoolId,
         COGNITO_CLIENT_ID: props.userPoolClientId,
         COGNITO_DOMAIN: props.cognitoDomain,
