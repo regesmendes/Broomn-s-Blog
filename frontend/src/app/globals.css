@@ -122,7 +122,11 @@ h1, h2, h3, h4, h5, h6 {
 .prose img {
   margin-top: 1.5rem;
   margin-bottom: 1.5rem;
-  border-radius: 0.5rem;
+  border-radius: 0.25rem;
+  /* Same tone as the caption text below it (see .prose figcaption) — the
+     dark-mode shade is overridden alongside the caption's own. */
+  border: 10px solid #78716c;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 .prose figure {
@@ -131,15 +135,27 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .prose figure img {
+  display: block;
   margin: 0 auto;
 }
 
 .prose figcaption {
-  margin-top: 0.5rem;
+  margin-top: 0.75rem;
+  font-family: var(--font-body);
   font-size: 0.875rem;
   font-style: italic;
-  color: #6b7280;
+  letter-spacing: 0.01em;
+  color: #78716c;
   text-align: center;
+}
+
+.prose figcaption:not(:empty)::after {
+  content: '';
+  display: block;
+  width: 3rem;
+  height: 1px;
+  margin: 0.5rem auto 0;
+  background: #d6cbb3;
 }
 
 /* Images inserted without a caption leave an empty <figcaption> */
@@ -179,8 +195,17 @@ h1, h2, h3, h4, h5, h6 {
   color: #9ca3af;
 }
 
+.dark .prose img {
+  border-color: #a8a29e;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
 .dark .prose figcaption {
-  color: #9ca3af;
+  color: #a8a29e;
+}
+
+.dark .prose figcaption:not(:empty)::after {
+  background: #57503f;
 }
 
 .dark .prose code {
