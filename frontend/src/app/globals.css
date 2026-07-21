@@ -59,7 +59,7 @@ h1, h2, h3, h4, h5, h6 {
    default visited color. */
 .prose a {
   color: #065f46;
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 .prose a:hover {
