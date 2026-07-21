@@ -35,12 +35,15 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 - ✅ JWT authentication with access/refresh token flow
 - ✅ Cognito integration with real Google OAuth login, live in production
 - ✅ Newsletter with HMAC-based email confirmation/unsubscribe tokens — real SES sending, graceful confirm/unsubscribe pages (not bare API JSON)
+- ✅ Rich-text newsletter composer (same Tiptap editor as posts, including images) — the HTML goes straight into the styled email template, no more plain-textarea content collapsing into one paragraph
+- ✅ Newsletter subscriber search (by email) and admin block/unblock — a blocked address stops receiving newsletters and can't re-subscribe, independent of unsubscribe status
 - ✅ Frontend with all pages (public blog, admin panel, auth flow) — server-rendered via OpenNext/Lambda, not just static
 - ✅ Auth context with token management and auto-refresh
 - ✅ Protected admin routes (redirects to login if unauthenticated)
 - ✅ Rich text editor (Tiptap) for creating/editing posts
 - ✅ Dark mode with toggle (persists preference)
 - ✅ Comment section on post detail page with moderation, capped per-user pending queue (flood protection)
+- ✅ Admin can reply to comments as "Broomn" — one level of threading, identity masked server-side (never just in the UI), auto-approved, notifies the original commenter by email
 - ✅ SEO metadata (dynamic og:title, description, og:image per post)
 - ✅ Mulgore-inspired visual identity (landscape hero, druidic emblem, vine dividers)
 - ✅ Custom typography (Cinzel headings, Lora body — manuscript/scroll feel)
@@ -49,6 +52,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 - ✅ Image captions in the post editor, tied to that specific image occurrence in that specific post
 - ✅ Editable About page (rich text, media library images) with a top-nav link, admin-editable, no comments
 - ✅ TypeScript compiles clean across all three projects (api, frontend, infrastructure)
+- ✅ Tab favicon spins while any API request is in flight — feedback that a click registered, even before the page itself shows anything
 - ✅ `robots.txt`/`sitemap.xml` (`frontend/src/app/robots.ts`/`sitemap.ts`) — the sitemap is dynamically generated from live published posts, in both locales
 - ✅ Google Analytics (GA4), wired via `next/script` with manual page_view tracking on client-side route changes (App Router navigations don't trigger gtag's automatic one)
 

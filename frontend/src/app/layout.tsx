@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Cinzel, Lora } from 'next/font/google';
 import { Providers } from '@/components/Providers';
 import { GoogleAnalytics } from '@/components/GoogleAnalytics';
+import { FaviconLoadingIndicator } from '@/components/FaviconLoadingIndicator';
 import './globals.css';
 
 const cinzel = Cinzel({
@@ -40,6 +41,7 @@ export default function RootLayout({
           }}
         />
         <GoogleAnalytics />
+        <FaviconLoadingIndicator />
         <Providers>
           {children}
         </Providers>

@@ -38,8 +38,12 @@ See the root [README](../README.md) for setup and the [architecture doc](./archi
 | GET | `/posts/admin/:id` | Get any post (including drafts) |
 | GET | `/posts/:postId/comments/all` | List all comments for one post (including unapproved) |
 | GET | `/comments/admin` | List all comments across every post, filterable by approval status |
+| POST | `/comments/:id/reply` | Reply to a top-level comment as "Broomn" — auto-approved, notifies the original commenter by email |
 | PATCH | `/comments/:id/approve` | Approve/reject a comment |
-| GET | `/newsletter/subscribers` | List all subscribers |
+| GET | `/newsletter/subscribers` | List all subscribers, optionally filtered by `status` and/or a case-insensitive `email` search |
+| POST | `/newsletter/subscribers/:id/unsubscribe` | Manually unsubscribe an address on the admin's behalf |
+| PATCH | `/newsletter/subscribers/:id/block` | Block an address — stops delivery, prevents re-subscribing |
+| PATCH | `/newsletter/subscribers/:id/unblock` | Unblock an address |
 | POST | `/newsletter/send` | Send newsletter to confirmed subscribers |
 | POST | `/media/upload` | Upload an image (multipart, 5MB max) |
 | GET | `/media` | List all media with usage count |

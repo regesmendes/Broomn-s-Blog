@@ -63,8 +63,15 @@ export function TranslatablePostCard({ post, dateLocale }: TranslatablePostCardP
       )}
 
       <div className={`min-w-0 flex-1 ${post.coverImage ? 'py-4 pr-4' : 'p-4'}`}>
-        <Link href={`/posts/${post.slug}`}>
-          <h2 className="mb-2 text-xl font-semibold text-gray-900 hover:text-emerald-600 dark:text-white dark:hover:text-emerald-400">
+        {/* Color/hover/visited live on the anchor itself, not the heading —
+            :visited can only restyle the link element it matches, never a
+            descendant, so an h2-level color class would silently never
+            apply once the link had been visited. */}
+        <Link
+          href={`/posts/${post.slug}`}
+          className="text-emerald-800 hover:text-emerald-600 visited:text-emerald-800 dark:text-emerald-200 dark:hover:text-emerald-400 dark:visited:text-emerald-200"
+        >
+          <h2 className="mb-2 text-xl font-semibold">
             {translating ? (
               <span className="inline-block animate-pulse text-gray-400 dark:text-gray-500">{post.title}</span>
             ) : (

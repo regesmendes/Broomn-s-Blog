@@ -1,12 +1,15 @@
 import { describe, it, expect, vi } from 'vitest'
 import { createTestApp, generateAdminToken, generateTestToken } from './helpers'
 import { prisma } from '../lib/prisma'
+import { sendEmail } from '../lib/ses'
 import { FastifyInstance } from 'fastify'
 
 const mockPrisma = prisma as unknown as {
   comment: { [k: string]: ReturnType<typeof vi.fn> }
   $transaction: ReturnType<typeof vi.fn>
 }
+
+const mockSendEmail = vi.mocked(sendEmail)
 
 describe('Comments API', () => {
   let app: FastifyInstance
@@ -57,6 +60,62 @@ describe('Comments API', () => {
 
       expect(res.statusCode).toBe(200)
       expect(res.json().data).toHaveLength(0)
+    })
+
+    it('only queries top-level comments (parentId: null)', async () => {
+      mockPrisma.comment.findMany.mockResolvedValue([])
+
+      await app.inject({ method: 'GET', url: '/posts/post-123/comments' })
+
+      expect(mockPrisma.comment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { postId: 'post-123', approved: true, parentId: null },
+        })
+      )
+    })
+
+    it('masks the real identity on an owner-reply comment and its nested replies', async () => {
+      mockPrisma.comment.findMany.mockResolvedValue([
+        {
+          id: 'c1',
+          content: 'Great post!',
+          approved: true,
+          isOwnerReply: false,
+          parentId: null,
+          createdAt: new Date(),
+          user: { id: 'u1', name: 'Alice', avatarUrl: null },
+          replies: [
+            {
+              id: 'r1',
+              content: 'Thanks for reading!',
+              approved: true,
+              isOwnerReply: true,
+              parentId: 'c1',
+              createdAt: new Date(),
+              user: { id: 'admin-user-id', name: 'Reges', avatarUrl: 'https://real-avatar.example/x.png' },
+              replies: [],
+            },
+          ],
+        },
+      ])
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/posts/post-123/comments',
+      })
+
+      expect(res.statusCode).toBe(200)
+      const [comment] = res.json().data
+      expect(comment.user.name).toBe('Alice')
+      expect(comment.replies).toHaveLength(1)
+      expect(comment.replies[0].user).toEqual({
+        id:        null,
+        name:      'Broomn',
+        avatarUrl: '/favicon.png',
+      })
+      // The real name/avatar must not appear anywhere in the response.
+      expect(JSON.stringify(res.json())).not.toContain('Reges')
+      expect(JSON.stringify(res.json())).not.toContain('real-avatar.example')
     })
   })
 
@@ -133,7 +192,83 @@ describe('Comments API', () => {
       expect(body.data).toHaveLength(2)
       expect(body.meta.total).toBe(2)
       expect(body.meta.hasMore).toBe(false)
-      expect(mockPrisma.comment.count).toHaveBeenCalledWith({ where: { approved: false } })
+      expect(mockPrisma.comment.count).toHaveBeenCalledWith({ where: { parentId: null, approved: false } })
+    })
+
+    it('filters by the top-level comment\'s own status only — a reply never pulls its parent into a tab it doesn\'t belong to', async () => {
+      const token = generateAdminToken(app)
+      mockPrisma.comment.count.mockResolvedValue(0)
+      mockPrisma.comment.findMany.mockResolvedValue([])
+
+      // A still-pending comment can have an already-approved Broomn reply —
+      // that must not make the pending comment show up under "Approved".
+      await app.inject({
+        method: 'GET',
+        url: '/comments/admin?approved=true',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      const expectedWhere = { parentId: null, approved: true }
+      expect(mockPrisma.comment.count).toHaveBeenCalledWith({ where: expectedWhere })
+      expect(mockPrisma.comment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expectedWhere })
+      )
+    })
+
+    it('only queries top-level comments (parentId: null)', async () => {
+      mockPrisma.comment.count.mockResolvedValue(0)
+      mockPrisma.comment.findMany.mockResolvedValue([])
+      const token = generateAdminToken(app)
+
+      await app.inject({
+        method: 'GET',
+        url: '/comments/admin',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(mockPrisma.comment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { parentId: null } })
+      )
+    })
+
+    it('nests replies under their parent, unmasked (admin sees the real identity)', async () => {
+      const token = generateAdminToken(app)
+      mockPrisma.comment.count.mockResolvedValue(1)
+      mockPrisma.comment.findMany.mockResolvedValue([
+        {
+          id: 'c1',
+          content: 'A',
+          approved: true,
+          isOwnerReply: false,
+          parentId: null,
+          createdAt: new Date(),
+          user: { id: 'u1', name: 'A', avatarUrl: null },
+          post: { id: 'p1', title: 'Post', slug: 'post' },
+          replies: [
+            {
+              id: 'r1',
+              content: 'Reply',
+              approved: true,
+              isOwnerReply: true,
+              parentId: 'c1',
+              createdAt: new Date(),
+              user: { id: 'admin-user-id', name: 'Reges', avatarUrl: null },
+            },
+          ],
+        },
+      ])
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/comments/admin',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      const [comment] = res.json().data
+      expect(comment.replies).toHaveLength(1)
+      // Unlike the public endpoint, the admin view shows the real name.
+      expect(comment.replies[0].user.name).toBe('Reges')
     })
   })
 
@@ -211,6 +346,146 @@ describe('Comments API', () => {
       expect(res.statusCode).toBe(429)
 
       process.env.MAX_PENDING_COMMENTS_PER_USER = original
+    })
+  })
+
+  // ── POST /comments/:id/reply (reply as Broomn) ─────────────────────────────
+
+  describe('POST /comments/:id/reply', () => {
+    it('returns 401 without authentication', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/comments/c1/reply',
+        payload: { content: 'Thanks!' },
+      })
+
+      expect(res.statusCode).toBe(401)
+    })
+
+    it('returns 403 for non-admin users', async () => {
+      const token = generateTestToken(app, { role: 'user' })
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/comments/c1/reply',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { content: 'Thanks!' },
+      })
+
+      expect(res.statusCode).toBe(403)
+    })
+
+    it('returns 404 if the parent comment does not exist', async () => {
+      const token = generateAdminToken(app)
+      mockPrisma.comment.findUnique.mockResolvedValue(null)
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/comments/missing/reply',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { content: 'Thanks!' },
+      })
+
+      expect(res.statusCode).toBe(404)
+    })
+
+    it('returns 400 when replying to a comment that is itself a reply', async () => {
+      const token = generateAdminToken(app)
+      mockPrisma.comment.findUnique.mockResolvedValue({
+        id: 'r1',
+        postId: 'post-123',
+        parentId: 'c1',
+        user: { email: 'commenter@example.com' },
+        post: { title: 'A Post', slug: 'a-post' },
+      })
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/comments/r1/reply',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { content: 'Thanks!' },
+      })
+
+      expect(res.statusCode).toBe(400)
+      expect(mockPrisma.comment.create).not.toHaveBeenCalled()
+    })
+
+    it('creates an auto-approved, masked reply and emails the original commenter', async () => {
+      const token = generateAdminToken(app)
+      mockPrisma.comment.findUnique.mockResolvedValue({
+        id: 'c1',
+        postId: 'post-123',
+        parentId: null,
+        user: { email: 'commenter@example.com' },
+        post: { title: 'A Post', slug: 'a-post' },
+      })
+      mockPrisma.comment.create.mockResolvedValue({
+        id: 'r1',
+        content: 'Thanks for reading!',
+        approved: true,
+        isOwnerReply: true,
+        parentId: 'c1',
+        createdAt: new Date(),
+        user: { id: 'admin-user-id', name: 'Reges', avatarUrl: null },
+      })
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/comments/c1/reply',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { content: 'Thanks for reading!' },
+      })
+
+      expect(res.statusCode).toBe(201)
+      const body = res.json()
+      expect(body.approved).toBe(true)
+      expect(body.user).toEqual({ id: null, name: 'Broomn', avatarUrl: '/favicon.png' })
+
+      expect(mockPrisma.comment.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            postId: 'post-123',
+            parentId: 'c1',
+            isOwnerReply: true,
+            approved: true,
+            userId: 'admin-user-id',
+          }),
+        })
+      )
+
+      expect(mockSendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ to: 'commenter@example.com' })
+      )
+    })
+
+    it('still creates the reply if the notification email fails to send', async () => {
+      const token = generateAdminToken(app)
+      mockPrisma.comment.findUnique.mockResolvedValue({
+        id: 'c1',
+        postId: 'post-123',
+        parentId: null,
+        user: { email: 'commenter@example.com' },
+        post: { title: 'A Post', slug: 'a-post' },
+      })
+      mockPrisma.comment.create.mockResolvedValue({
+        id: 'r1',
+        content: 'Thanks!',
+        approved: true,
+        isOwnerReply: true,
+        parentId: 'c1',
+        createdAt: new Date(),
+        user: { id: 'admin-user-id', name: 'Reges', avatarUrl: null },
+      })
+      mockSendEmail.mockRejectedValueOnce(new Error('SES down'))
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/comments/c1/reply',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { content: 'Thanks!' },
+      })
+
+      expect(res.statusCode).toBe(201)
     })
   })
 

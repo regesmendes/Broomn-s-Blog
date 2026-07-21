@@ -85,17 +85,21 @@ model TagsOnPosts {
 // ─── Comments ─────────────────────────────────────────────────────────────────
 
 model Comment {
-  id        String   @id @default(cuid())
-  content   String
-  approved  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  content      String
+  approved     Boolean  @default(false)
+  isOwnerReply Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  userId String
-  postId String
+  userId   String
+  postId   String
+  parentId String?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post    Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[] @relation("CommentReplies")
 
   @@map("comments")
 }
@@ -108,6 +112,7 @@ model Newsletter {
   status      SubscriptionStatus @default(PENDING)
   confirmedAt DateTime?
   createdAt   DateTime           @default(now())
+  blockedAt   DateTime?
 
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)

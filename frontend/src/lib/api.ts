@@ -1,3 +1,5 @@
+import { startLoading, stopLoading } from './loadingIndicator';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 // Types
@@ -34,12 +36,17 @@ export interface Comment {
   id: string;
   content: string;
   approved: boolean;
+  isOwnerReply: boolean;
+  parentId: string | null;
   createdAt: string;
   user: {
-    id: string;
+    id: string | null;
     name: string;
     avatarUrl: string | null;
   };
+  /** Only present on top-level comments — from the public list endpoint
+   * (masked, approved only) or the admin endpoints (real identity, all). */
+  replies?: Comment[];
 }
 
 export interface AdminComment extends Comment {
@@ -65,6 +72,7 @@ export interface Subscriber {
   status: 'PENDING' | 'CONFIRMED' | 'UNSUBSCRIBED';
   confirmedAt: string | null;
   createdAt: string;
+  blockedAt: string | null;
 }
 
 export interface MediaItem {
@@ -146,28 +154,33 @@ class ApiClient {
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`;
-    const headers: HeadersInit = {
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...options.headers,
-    };
+    startLoading();
+    try {
+      const url = `${this.baseUrl}${endpoint}`;
+      const headers: HeadersInit = {
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...options.headers,
+      };
 
-    const response = await fetch(url, { ...options, headers });
+      const response = await fetch(url, { ...options, headers });
 
-    if (!response.ok) {
-      const body = await response.json().catch(() => null);
-      throw new ApiError(
-        body?.error || `Request failed with status ${response.status}`,
-        response.status,
-        body
-      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new ApiError(
+          body?.error || `Request failed with status ${response.status}`,
+          response.status,
+          body
+        );
+      }
+
+      if (response.status === 204) {
+        return undefined as T;
+      }
+
+      return response.json();
+    } finally {
+      stopLoading();
     }
-
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    return response.json();
   }
 
   private authHeaders(token?: string): HeadersInit {
@@ -290,6 +303,14 @@ class ApiClient {
     });
   }
 
+  async replyAsBroomn(id: string, content: string, token: string): Promise<Comment> {
+    return this.request<Comment>(`/comments/${id}/reply`, {
+      method: 'POST',
+      headers: this.authHeaders(token),
+      body: JSON.stringify({ content }),
+    });
+  }
+
   async approveComment(id: string, approved: boolean, token: string): Promise<Comment> {
     return this.request<Comment>(`/comments/${id}/approve`, {
       method: 'PATCH',
@@ -344,8 +365,37 @@ class ApiClient {
     return this.request(`/newsletter/unsubscribe?token=${encodeURIComponent(token)}`);
   }
 
-  async getSubscribers(token: string): Promise<SubscribersResponse> {
-    return this.request<SubscribersResponse>('/newsletter/subscribers', {
+  async getSubscribers(
+    token: string,
+    params?: { cursor?: string; status?: string; email?: string }
+  ): Promise<SubscribersResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.cursor) searchParams.set('cursor', params.cursor);
+    if (params?.status) searchParams.set('status', params.status);
+    if (params?.email) searchParams.set('email', params.email);
+    const query = searchParams.toString();
+    return this.request<SubscribersResponse>(`/newsletter/subscribers${query ? `?${query}` : ''}`, {
+      headers: this.authHeaders(token),
+    });
+  }
+
+  async adminUnsubscribeSubscriber(id: string, token: string): Promise<Subscriber> {
+    return this.request<Subscriber>(`/newsletter/subscribers/${id}/unsubscribe`, {
+      method: 'POST',
+      headers: this.authHeaders(token),
+    });
+  }
+
+  async blockSubscriber(id: string, token: string): Promise<Subscriber> {
+    return this.request<Subscriber>(`/newsletter/subscribers/${id}/block`, {
+      method: 'PATCH',
+      headers: this.authHeaders(token),
+    });
+  }
+
+  async unblockSubscriber(id: string, token: string): Promise<Subscriber> {
+    return this.request<Subscriber>(`/newsletter/subscribers/${id}/unblock`, {
+      method: 'PATCH',
       headers: this.authHeaders(token),
     });
   }

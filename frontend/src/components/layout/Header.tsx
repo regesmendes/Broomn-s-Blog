@@ -25,17 +25,17 @@ export default function Header() {
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-6 md:flex">
-          <Link href="/" className="text-emerald-800 hover:text-emerald-600 dark:text-emerald-200 dark:hover:text-emerald-400">
+          <Link href="/" className="text-emerald-800 hover:text-emerald-600 visited:text-emerald-800 dark:text-emerald-200 dark:hover:text-emerald-400 dark:visited:text-emerald-200">
             {t('home')}
           </Link>
-          <Link href="/newsletter" className="text-emerald-800 hover:text-emerald-600 dark:text-emerald-200 dark:hover:text-emerald-400">
+          <Link href="/newsletter" className="text-emerald-800 hover:text-emerald-600 visited:text-emerald-800 dark:text-emerald-200 dark:hover:text-emerald-400 dark:visited:text-emerald-200">
             {t('newsletter')}
           </Link>
-          <Link href="/about" className="text-emerald-800 hover:text-emerald-600 dark:text-emerald-200 dark:hover:text-emerald-400">
+          <Link href="/about" className="text-emerald-800 hover:text-emerald-600 visited:text-emerald-800 dark:text-emerald-200 dark:hover:text-emerald-400 dark:visited:text-emerald-200">
             {t('about')}
           </Link>
           {isAdmin && (
-            <Link href="/admin/posts" className="text-emerald-800 hover:text-emerald-600 dark:text-emerald-200 dark:hover:text-emerald-400">
+            <Link href="/admin/posts" className="text-emerald-800 hover:text-emerald-600 visited:text-emerald-800 dark:text-emerald-200 dark:hover:text-emerald-400 dark:visited:text-emerald-200">
               {t('admin')}
             </Link>
           )}
@@ -86,11 +86,11 @@ export default function Header() {
       {menuOpen && (
         <nav className="border-t border-emerald-200/50 px-4 py-4 dark:border-emerald-900/50 md:hidden">
           <div className="flex flex-col gap-4">
-            <Link href="/" className="text-emerald-800 dark:text-emerald-200" onClick={() => setMenuOpen(false)}>{t('home')}</Link>
-            <Link href="/newsletter" className="text-emerald-800 dark:text-emerald-200" onClick={() => setMenuOpen(false)}>{t('newsletter')}</Link>
-            <Link href="/about" className="text-emerald-800 dark:text-emerald-200" onClick={() => setMenuOpen(false)}>{t('about')}</Link>
+            <Link href="/" className="text-emerald-800 visited:text-emerald-800 dark:text-emerald-200 dark:visited:text-emerald-200" onClick={() => setMenuOpen(false)}>{t('home')}</Link>
+            <Link href="/newsletter" className="text-emerald-800 visited:text-emerald-800 dark:text-emerald-200 dark:visited:text-emerald-200" onClick={() => setMenuOpen(false)}>{t('newsletter')}</Link>
+            <Link href="/about" className="text-emerald-800 visited:text-emerald-800 dark:text-emerald-200 dark:visited:text-emerald-200" onClick={() => setMenuOpen(false)}>{t('about')}</Link>
             {isAdmin && (
-              <Link href="/admin/posts" className="text-emerald-800 dark:text-emerald-200" onClick={() => setMenuOpen(false)}>{t('admin')}</Link>
+              <Link href="/admin/posts" className="text-emerald-800 visited:text-emerald-800 dark:text-emerald-200 dark:visited:text-emerald-200" onClick={() => setMenuOpen(false)}>{t('admin')}</Link>
             )}
             <div className="flex items-center gap-3">
               <LocaleSwitcher />
@@ -101,7 +101,7 @@ export default function Header() {
                 {t('logout')} ({user?.name})
               </button>
             ) : (
-              <Link href="/auth/login" className="text-emerald-800 dark:text-emerald-200" onClick={() => setMenuOpen(false)}>{t('signIn')}</Link>
+              <Link href="/auth/login" className="text-emerald-800 visited:text-emerald-800 dark:text-emerald-200 dark:visited:text-emerald-200" onClick={() => setMenuOpen(false)}>{t('signIn')}</Link>
             )}
           </div>
         </nav>

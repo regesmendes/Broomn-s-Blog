@@ -25,6 +25,27 @@ export async function newsletterRoutes(app: FastifyInstance) {
   // GET /newsletter/subscribers
   app.get('/subscribers', { preHandler: [authenticate, authorize('admin')] }, newsletterController.listSubscribers)
 
+  // POST /newsletter/subscribers/:id/unsubscribe — admin manually unsubscribes someone
+  app.post(
+    '/subscribers/:id/unsubscribe',
+    { preHandler: [authenticate, authorize('admin')] },
+    newsletterController.adminUnsubscribe
+  )
+
+  // PATCH /newsletter/subscribers/:id/block
+  app.patch(
+    '/subscribers/:id/block',
+    { preHandler: [authenticate, authorize('admin')] },
+    newsletterController.block
+  )
+
+  // PATCH /newsletter/subscribers/:id/unblock
+  app.patch(
+    '/subscribers/:id/unblock',
+    { preHandler: [authenticate, authorize('admin')] },
+    newsletterController.unblock
+  )
+
   // POST /newsletter/send
   app.post('/send', { preHandler: [authenticate, authorize('admin')] }, newsletterController.send)
 }
