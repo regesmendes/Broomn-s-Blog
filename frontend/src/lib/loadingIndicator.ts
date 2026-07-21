@@ -56,9 +56,19 @@ const ROUTE_TRANSITION_SAFETY_NET_MS = 10_000;
  * True if a click event is heading to a same-origin, same-tab, real page
  * change — i.e. it's about to trigger a client-side navigation, whether or
  * not Next's own router internals expose that fact to us directly.
+ *
+ * Deliberately does NOT bail out on event.defaultPrevented: Next's <Link>
+ * (and next-intl's wrapper around it) always calls preventDefault() in its
+ * own onClick handler before doing a client-side router.push — that's how
+ * every Link click actually looks by the time any listener sees it. An
+ * earlier version of this check bailed on that flag, which meant it silently
+ * rejected 100% of real Link clicks (confirmed with a Playwright probe — see
+ * docs/architecture.md). watchForNavigationClicks (below) also listens in
+ * the capture phase specifically so we see the event before React's
+ * delegated bubble-phase listener has a chance to call preventDefault, but
+ * this function no longer depends on that ordering to be correct.
  */
 export function isInternalNavigationClick(event: MouseEvent): boolean {
-  if (event.defaultPrevented) return false;
   if (event.button !== 0) return false; // left-click only
   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false; // opening in a new tab etc. — leave alone
 
@@ -90,19 +100,29 @@ let clickListenerAttached = false;
 
 /**
  * Starts a route transition the moment a real click on an internal link is
- * observed — standard DOM event bubbling, which fires unconditionally
- * before any router-specific handling, so it doesn't depend on Next's
- * internals the way patching history.pushState did (which never actually
- * fired — see docs/architecture.md). Safe to call more than once; only
- * attaches the listener once.
+ * observed. Registered with { capture: true } so it fires during the
+ * capture phase, before React's own delegated click listener — which for
+ * the App Router is attached directly on `document` too, since the root
+ * layout renders <html>/<body> and React hydrates from `document` itself.
+ * Both listeners being on the same node means plain bubble-phase order
+ * would depend on registration order (React's is attached during initial
+ * hydration, ours during a component effect that runs later — so React's
+ * Link onClick, which calls preventDefault() and then router.push, would
+ * always run first). Capture fires before any bubble-phase listener on the
+ * same target, regardless of registration order, which is what actually
+ * makes this reliable. Safe to call more than once; only attaches once.
  */
 export function watchForNavigationClicks() {
   if (clickListenerAttached || typeof document === 'undefined') return;
   clickListenerAttached = true;
 
-  document.addEventListener('click', (event) => {
-    if (!isInternalNavigationClick(event)) return;
-    startRouteTransition();
-    setTimeout(stopRouteTransition, ROUTE_TRANSITION_SAFETY_NET_MS);
-  });
+  document.addEventListener(
+    'click',
+    (event) => {
+      if (!isInternalNavigationClick(event)) return;
+      startRouteTransition();
+      setTimeout(stopRouteTransition, ROUTE_TRANSITION_SAFETY_NET_MS);
+    },
+    { capture: true },
+  );
 }

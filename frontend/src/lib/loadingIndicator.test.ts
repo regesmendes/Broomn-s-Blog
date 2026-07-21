@@ -187,6 +187,30 @@ describe('isInternalNavigationClick', () => {
     document.body.appendChild(div);
     expect(isInternalNavigationClick(clickOn(div))).toBe(false);
   });
+
+  // Regression test for the real bug: this app's four earlier attempts at a
+  // favicon spinner all shipped a version of this function that bailed out
+  // via `if (event.defaultPrevented) return false`. That check passed all
+  // 54 unit tests (because clickOn()/dispatchEvent() here never has
+  // anything call preventDefault() unless a test explicitly does it) but
+  // failed 100% of the time in the real app, because Next.js's <Link> (and
+  // next-intl's wrapper around it) always calls preventDefault() in its own
+  // onClick handler before doing a client-side router.push — confirmed with
+  // a Playwright probe against the real dev server (see
+  // docs/architecture.md). By the time ANY listener downstream of that
+  // click handler saw the event, defaultPrevented was already true, so the
+  // old check rejected every single real navigation click.
+  it('is true even if event.defaultPrevented is already true — Next.js Link always calls preventDefault before any other listener sees the click', () => {
+    const a = document.createElement('a');
+    a.href = '/admin/posts';
+    // Simulates Next.js's <Link> onClick handler running before our own.
+    a.addEventListener('click', (e) => e.preventDefault());
+    document.body.appendChild(a);
+
+    const event = clickOn(a);
+    expect(event.defaultPrevented).toBe(true); // sanity-check the simulated scenario
+    expect(isInternalNavigationClick(event)).toBe(true);
+  });
 });
 
 describe('watchForNavigationClicks', () => {
@@ -225,6 +249,35 @@ describe('watchForNavigationClicks', () => {
     // A double-attached listener would call startRouteTransition() (and
     // therefore notify()) twice for this one click.
     expect(listener).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+  });
+
+  // Regression test for the real bug (see the matching test on
+  // isInternalNavigationClick above for the full story). This one exercises
+  // the actual document-level listener installed by watchForNavigationClicks,
+  // not just the predicate function, so it also guards against reintroducing
+  // a bubble-phase `document.addEventListener('click', ...)` — which would
+  // fail this test even with the defaultPrevented check removed from
+  // isInternalNavigationClick, since a bubble-phase listener on the same
+  // node (document) that reacts to Next's Link click always runs after the
+  // Link's own bubble-phase onClick handler.
+  it('still flags a route transition when a click has already been preventDefault()-ed by something upstream (e.g. Next.js Link) — this is what actually broke in production', () => {
+    watchForNavigationClicks();
+
+    const listener = vi.fn();
+    const unsubscribe = subscribeLoading(listener);
+
+    const a = document.createElement('a');
+    a.href = '/admin/posts';
+    // Simulates Next.js's <Link> onClick handler, which always calls
+    // preventDefault() before doing its own client-side navigation.
+    a.addEventListener('click', (e) => e.preventDefault());
+    document.body.appendChild(a);
+
+    a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+
+    expect(listener).toHaveBeenLastCalledWith(true);
 
     unsubscribe();
   });
