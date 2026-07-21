@@ -8,7 +8,7 @@ See the root [README](../README.md) for setup, the [API reference](./api.md) for
 - **Post**: title, slug (auto-generated), excerpt, content (HTML), cover image, status (DRAFT/PUBLISHED), publishedAt (enables scheduling)
 - **Tag**: name, slug — many-to-many with posts
 - **Comment**: content, approved flag, belongs to user and post; optional self-relation `parentId` (one level of threading — a reply can't itself be replied to) and `isOwnerReply` flag (masked to the "Broomn" persona in public responses, see "Reply as Broomn" below)
-- **Newsletter**: email, status (PENDING/CONFIRMED/UNSUBSCRIBED), optional user link
+- **Newsletter**: email, status (PENDING/CONFIRMED/UNSUBSCRIBED), optional user link, `blockedAt` (nullable — admin block, orthogonal to `status`; see "Blocking a newsletter subscriber" below)
 - **Media**: filename (S3 key), original name, mime type, size, public URL — many-to-many with posts via `MediaOnPosts` and with the About page via `MediaOnAboutPage`, kept in sync automatically whenever a post's or the About page's content is saved (see `syncMediaUsage` in `post.service.ts` / `about.service.ts`)
 - **AboutPage**: content (HTML) — a singleton, exactly one row (seeded by migration), no title/tags/scheduling; many-to-many with media via `MediaOnAboutPage`
 
@@ -44,6 +44,17 @@ Rather than a simple boolean "published" flag, we use a `publishedAt` datetime c
 ### HMAC tokens for newsletter
 
 Instead of storing confirmation tokens in the database, we generate HMAC tokens: `base64url(subscriberId + ":" + hmac(subscriberId, secret))`. The token can be verified without a database lookup, and there's nothing to expire or clean up.
+
+### Blocking a newsletter subscriber
+
+`NewsletterSubscriber.blockedAt` is a single nullable timestamp — `null` = not blocked, set = blocked — rather than a separate `blocked Boolean` (which could disagree with `blockedAt` if one write updates one and not the other) or a 4th `status` enum value (which would conflate "blocked" with "current lifecycle status"; a blocked address is still meaningfully "unsubscribed" from the reader's perspective, but "blocked" needs to survive independently of whatever `status` does next).
+
+- **Admin block** (`PATCH /newsletter/subscribers/:id/block`): sets `blockedAt` and `status: 'UNSUBSCRIBED'` in one write — stops delivery immediately.
+- **Admin unblock**: clears `blockedAt` only — `status` is left as `UNSUBSCRIBED`; re-subscribing afterward is a separate, explicit action, not implied by unblocking.
+- **Self-service unsubscribe** (the existing HMAC token-link flow) only ever touches `status`, never `blockedAt` — this is what makes "unsubscribe but stay blocked" work for free with zero special-casing: a self-unsubscribe on an already-blocked row leaves `blockedAt` in place.
+- **`subscribe()`** checks `blockedAt` before its usual upsert and rejects instead — without this, resubmitting the subscribe form would silently reset a blocked row's `status` back to `PENDING`, undoing the block.
+- **`getConfirmedSubscribers()`** (used by `send()`) filters `blockedAt: null` too, as defense-in-depth alongside the `status` filter — a send should never depend on a blocked address also being `UNSUBSCRIBED` elsewhere holding true forever.
+- No block-reason/audit-log table — the single timestamp covers everything above.
 
 ### Comment moderation
 

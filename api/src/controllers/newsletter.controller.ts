@@ -6,6 +6,7 @@ import {
   unsubscribeSchema,
   sendNewsletterSchema,
   listSubscribersQuerySchema,
+  subscriberIdParamSchema,
 } from '../schemas/newsletter.schema'
 
 export const newsletterController = {
@@ -13,6 +14,11 @@ export const newsletterController = {
   async subscribe(request: FastifyRequest, reply: FastifyReply) {
     const { email } = subscribeSchema.parse(request.body)
     const result = await newsletterService.subscribe(email)
+
+    if (result === 'blocked') {
+      return reply.status(403).send({ error: 'This email address cannot subscribe.' })
+    }
+
     return reply.status(201).send({
       message: 'Subscription pending. Check your email to confirm.',
       subscriber: result.subscriber,
@@ -48,6 +54,42 @@ export const newsletterController = {
     const query = listSubscribersQuerySchema.parse(request.query)
     const result = await newsletterService.list(query)
     return reply.send(result)
+  },
+
+  // ── POST /newsletter/subscribers/:id/unsubscribe (admin) ─────────────────────
+  async adminUnsubscribe(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = subscriberIdParamSchema.parse(request.params)
+    const subscriber = await newsletterService.adminUnsubscribe(id)
+
+    if (!subscriber) {
+      return reply.status(404).send({ error: 'Subscriber not found' })
+    }
+
+    return reply.send(subscriber)
+  },
+
+  // ── PATCH /newsletter/subscribers/:id/block (admin) ──────────────────────────
+  async block(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = subscriberIdParamSchema.parse(request.params)
+    const subscriber = await newsletterService.block(id)
+
+    if (!subscriber) {
+      return reply.status(404).send({ error: 'Subscriber not found' })
+    }
+
+    return reply.send(subscriber)
+  },
+
+  // ── PATCH /newsletter/subscribers/:id/unblock (admin) ────────────────────────
+  async unblock(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = subscriberIdParamSchema.parse(request.params)
+    const subscriber = await newsletterService.unblock(id)
+
+    if (!subscriber) {
+      return reply.status(404).send({ error: 'Subscriber not found' })
+    }
+
+    return reply.send(subscriber)
   },
 
   // ── POST /newsletter/send (admin) ────────────────────────────────────────────
