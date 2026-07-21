@@ -7,7 +7,7 @@ See the root [README](../README.md) for setup, the [API reference](./api.md) for
 - **User**: email, name, avatar, role (ADMIN/USER), Google/Cognito IDs
 - **Post**: title, slug (auto-generated), excerpt, content (HTML), cover image, status (DRAFT/PUBLISHED), publishedAt (enables scheduling)
 - **Tag**: name, slug — many-to-many with posts
-- **Comment**: content, approved flag, belongs to user and post
+- **Comment**: content, approved flag, belongs to user and post; optional self-relation `parentId` (one level of threading — a reply can't itself be replied to) and `isOwnerReply` flag (masked to the "Broomn" persona in public responses, see "Reply as Broomn" below)
 - **Newsletter**: email, status (PENDING/CONFIRMED/UNSUBSCRIBED), optional user link
 - **Media**: filename (S3 key), original name, mime type, size, public URL — many-to-many with posts via `MediaOnPosts` and with the About page via `MediaOnAboutPage`, kept in sync automatically whenever a post's or the About page's content is saved (see `syncMediaUsage` in `post.service.ts` / `about.service.ts`)
 - **AboutPage**: content (HTML) — a singleton, exactly one row (seeded by migration), no title/tags/scheduling; many-to-many with media via `MediaOnAboutPage`
@@ -50,6 +50,16 @@ Instead of storing confirmation tokens in the database, we generate HMAC tokens:
 Comments are created with `approved = false` by default. They only appear publicly after an admin approves them. Comment owners can delete their own comments; admins can delete any comment.
 
 A user can have at most `MAX_PENDING_COMMENTS_PER_USER` (default 15, `api/.env.example`) comments awaiting moderation at once — `commentService.create` counts the user's unapproved comments and returns a 429 once the cap is hit, with a translated message on the frontend telling them to wait for existing comments to be reviewed. This is a second layer on top of the per-user rate limit (10/min) below: the rate limit caps posting *speed*, this caps standing *volume* — without it, a user could stay just under the rate limit and still flood the moderation queue with hundreds of pending comments over time.
+
+### Reply as Broomn (identity-masked admin replies)
+
+The admin replies to comments under the "Broomn" persona while staying logged in with their real Google account — no second "Broomn" `User` row exists, since that would just relocate the identity problem rather than solve it.
+
+- `Comment.parentId` (self-relation, nullable) gives one level of threading — a reply can't itself be replied to (`commentService.replyAsBroomn` rejects with `invalid_parent` if the target already has a `parentId`).
+- `Comment.isOwnerReply` is set only by `commentRepository.createReply`, called from the admin-only `POST /comments/:id/reply` route.
+- **Masking happens server-side, in the repository** (`maskOwnerReply` in `comment.repository.ts`), applied to every row (and nested reply) returned by the public `GET /posts/:postId/comments` endpoint — not just hidden in the UI. If `isOwnerReply` is true, the real `user` relation is swapped for a fixed `BROOMN_PERSONA` object (`{ id: null, name: 'Broomn', avatarUrl: '/images/logo.png' }`) before the response is ever serialized, so a direct API client can't see the real name/avatar either. Admin-only endpoints (`/comments/admin`, `/posts/:postId/comments/all`) skip masking — moderation needs the real identity.
+- Owner replies are auto-approved (`approved: true` at creation) — the moderation queue exists to filter random visitor spam, not the trusted site owner's own replies.
+- **Notifying the original commenter** reuses the existing SES `sendEmail` client directly — a one-off transactional email linking back to the post. This does *not* reuse the newsletter's HMAC-token link pattern: that pattern exists so a public link can *verify and mutate* state (confirm/unsubscribe) without a database lookup, but a reply notification just links to an already-public post page — there's no state-mutating action to protect, so the extra token would be complexity without a purpose. Best-effort: a failed send doesn't undo the reply, which is already persisted.
 
 ### On-the-fly translation chunking respects MyMemory's per-request limit
 

@@ -38,6 +38,7 @@ See the root [README](../README.md) for setup and the [architecture doc](./archi
 | GET | `/posts/admin/:id` | Get any post (including drafts) |
 | GET | `/posts/:postId/comments/all` | List all comments for one post (including unapproved) |
 | GET | `/comments/admin` | List all comments across every post, filterable by approval status |
+| POST | `/comments/:id/reply` | Reply to a top-level comment as "Broomn" — auto-approved, notifies the original commenter by email |
 | PATCH | `/comments/:id/approve` | Approve/reject a comment |
 | GET | `/newsletter/subscribers` | List all subscribers |
 | POST | `/newsletter/send` | Send newsletter to confirmed subscribers |
