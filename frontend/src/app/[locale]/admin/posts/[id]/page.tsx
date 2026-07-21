@@ -18,6 +18,25 @@ interface PostFormData {
   publishedAt: string;
 }
 
+const AUTOSAVE_INTERVAL_MS = 3 * 60 * 1000;
+
+function buildUpdatePayload(form: PostFormData) {
+  const tagsArray = form.tags
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  return {
+    title: form.title,
+    content: form.content,
+    excerpt: form.excerpt || undefined,
+    coverImage: form.coverImage || undefined,
+    tags: tagsArray.length > 0 ? tagsArray : undefined,
+    status: form.status,
+    publishedAt: form.publishedAt ? new Date(form.publishedAt).toISOString() : undefined,
+  };
+}
+
 export default function EditPostPage() {
   const router = useRouter();
   const params = useParams();
@@ -28,6 +47,10 @@ export default function EditPostPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [successFadingOut, setSuccessFadingOut] = useState(false);
+  const [autosavedAt, setAutosavedAt] = useState<Date | null>(null);
+  const [autosaveFadingOut, setAutosaveFadingOut] = useState(false);
+  const [autosaveFailed, setAutosaveFailed] = useState(false);
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const [imagePickerTarget, setImagePickerTarget] = useState<'content' | 'cover'>('content');
   const editorRef = useRef<RichTextEditorHandle>(null);
@@ -41,17 +64,63 @@ export default function EditPostPage() {
     publishedAt: '',
   });
 
+  // Refs mirror the latest form/saving state so the autosave timer (set up
+  // once) always reads current values instead of a stale closure.
+  const formRef = useRef(form);
+  formRef.current = form;
+  const savingRef = useRef(saving);
+  savingRef.current = saving;
+  // Snapshot of what's actually persisted server-side — an autosave tick
+  // skips entirely if the form hasn't changed since this was last updated.
+  const lastSavedFormRef = useRef<PostFormData | null>(null);
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (!authLoading) {
       loadPost();
     }
+    // Autosave only ever targets this one post — stop the timer on unmount
+    // (navigating away) so it doesn't fire against an unmounted page.
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    };
   }, [postId, authLoading]);
+
+  const scheduleAutosave = () => {
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(runAutosave, AUTOSAVE_INTERVAL_MS);
+  };
+
+  const runAutosave = async () => {
+    // Always queue the next tick first, whether or not this one ends up
+    // doing anything — a skipped or failed tick still retries in 3 minutes.
+    scheduleAutosave();
+
+    if (savingRef.current) return;
+
+    const current = formRef.current;
+    const lastSaved = lastSavedFormRef.current;
+    if (lastSaved && JSON.stringify(current) === JSON.stringify(lastSaved)) return;
+
+    setSaving(true);
+    try {
+      const token = getToken() || '';
+      await api.updatePost(postId, buildUpdatePayload(current), token);
+      lastSavedFormRef.current = current;
+      setAutosaveFailed(false);
+      setAutosavedAt(new Date());
+    } catch {
+      setAutosaveFailed(true);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const loadPost = async () => {
     try {
       const token = getToken() || '';
       const post = await api.getPostById(postId, token);
-      setForm({
+      const loadedForm: PostFormData = {
         title: post.title,
         excerpt: post.excerpt || '',
         content: post.content,
@@ -61,13 +130,41 @@ export default function EditPostPage() {
         publishedAt: post.publishedAt
           ? new Date(post.publishedAt).toISOString().slice(0, 16)
           : '',
-      });
+      };
+      setForm(loadedForm);
+      lastSavedFormRef.current = loadedForm;
+      scheduleAutosave();
     } catch {
       setError('Failed to load post.');
     } finally {
       setLoading(false);
     }
   };
+
+  // Auto-fade the manual-save success message: fully visible for a beat,
+  // then a short CSS opacity fade, gone well within the requested 3-5s.
+  useEffect(() => {
+    if (!success) return;
+    setSuccessFadingOut(false);
+    const fadeTimer = setTimeout(() => setSuccessFadingOut(true), 3200);
+    const hideTimer = setTimeout(() => setSuccess(false), 3700);
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(hideTimer);
+    };
+  }, [success]);
+
+  // Same fade treatment for the "Auto-saved at..." indicator.
+  useEffect(() => {
+    if (!autosavedAt) return;
+    setAutosaveFadingOut(false);
+    const fadeTimer = setTimeout(() => setAutosaveFadingOut(true), 3200);
+    const hideTimer = setTimeout(() => setAutosavedAt(null), 3700);
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(hideTimer);
+    };
+  }, [autosavedAt]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -83,25 +180,11 @@ export default function EditPostPage() {
     setSuccess(false);
 
     const token = getToken() || '';
-    const tagsArray = form.tags
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
 
     try {
-      await api.updatePost(
-        postId,
-        {
-          title: form.title,
-          content: form.content,
-          excerpt: form.excerpt || undefined,
-          coverImage: form.coverImage || undefined,
-          tags: tagsArray.length > 0 ? tagsArray : undefined,
-          status: form.status,
-          publishedAt: form.publishedAt ? new Date(form.publishedAt).toISOString() : undefined,
-        },
-        token
-      );
+      await api.updatePost(postId, buildUpdatePayload(form), token);
+      lastSavedFormRef.current = form;
+      setAutosaveFailed(false);
       // Posts are typically edited several times before publishing — stay
       // here instead of redirecting to the list, so drafting isn't
       // interrupted by a trip back and forth. "Cancel" below is the
@@ -115,6 +198,9 @@ export default function EditPostPage() {
       }
     } finally {
       setSaving(false);
+      // A manual save (successful or not) means recent activity — push the
+      // next autosave tick out a full 3 minutes from now.
+      scheduleAutosave();
     }
   };
 
@@ -260,7 +346,29 @@ export default function EditPostPage() {
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
-        {success && <p className="text-sm text-green-600 dark:text-green-400">Saved.</p>}
+        {success && (
+          <p
+            className={`text-sm text-green-600 transition-opacity duration-500 dark:text-green-400 ${
+              successFadingOut ? 'opacity-0' : 'opacity-100'
+            }`}
+          >
+            Saved.
+          </p>
+        )}
+        {autosavedAt && (
+          <p
+            className={`text-xs text-gray-500 transition-opacity duration-500 dark:text-gray-400 ${
+              autosaveFadingOut ? 'opacity-0' : 'opacity-100'
+            }`}
+          >
+            Auto-saved at {autosavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </p>
+        )}
+        {autosaveFailed && (
+          <p className="text-xs text-red-600 dark:text-red-400">
+            Auto-save failed — will retry in a few minutes.
+          </p>
+        )}
 
         <div className="flex gap-3">
           <button
