@@ -182,24 +182,16 @@ export const commentRepository = {
 
   /**
    * Get all top-level comments across all posts (admin), each with its
-   * replies nested underneath. Filterable by approval status — a top-level
-   * comment matches if it *or any of its replies* has that approval status,
-   * not just itself. Without the "or a reply matches" half, an approved
-   * Broomn reply would vanish from view the moment its parent's own status
-   * didn't match the selected tab (e.g. parent still pending, or parent
-   * approved but viewing the "Pending" tab) — the reply is real, approved
-   * content and shouldn't disappear because of its parent's unrelated state.
-   * Also returns a total count of top-level comments — a single indexed
-   * COUNT() for a dashboard stat, not the per-page cost cursor pagination
-   * replaces.
+   * replies nested underneath. Filterable by approval status — the filter
+   * reflects the top-level comment's own status only; a reply's own status
+   * never affects which tab its parent lands in (a reply is always
+   * auto-approved anyway) — it just rides along nested under whichever
+   * parent the filter selects. Also returns a total count of top-level
+   * comments — a single indexed COUNT() for a dashboard stat, not the
+   * per-page cost cursor pagination replaces.
    */
   async findAll(cursor: string | undefined, limit: number, approved?: boolean) {
-    const where = {
-      parentId: null,
-      ...(approved !== undefined
-        ? { OR: [{ approved }, { replies: { some: { approved } } }] }
-        : {}),
-    }
+    const where = { parentId: null, ...(approved !== undefined ? { approved } : {}) }
 
     const [total, page] = await Promise.all([
       prisma.comment.count({ where }),
