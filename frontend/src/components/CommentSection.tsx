@@ -10,6 +10,60 @@ interface CommentSectionProps {
   postId: string;
 }
 
+function CommentItem({ comment }: { comment: Comment }) {
+  const t = useTranslations('post');
+
+  return (
+    <div className="flex gap-4">
+      {/* Avatar */}
+      <div className="flex-shrink-0">
+        {comment.user.avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={comment.user.avatarUrl}
+            alt={comment.user.name}
+            className="h-10 w-10 rounded-full"
+          />
+        ) : (
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-sm font-medium text-gray-600 dark:bg-gray-600 dark:text-gray-300">
+            {comment.user.name.charAt(0).toUpperCase()}
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-gray-900 dark:text-white">
+            {comment.user.name}
+          </span>
+          {comment.isOwnerReply && (
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
+              {t('authorReplyBadge')}
+            </span>
+          )}
+          <span className="text-sm text-gray-500 dark:text-gray-400">
+            {new Date(comment.createdAt).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </span>
+        </div>
+        <p className="mt-1 text-gray-700 dark:text-gray-300">{comment.content}</p>
+
+        {comment.replies && comment.replies.length > 0 && (
+          <div className="mt-4 space-y-4 border-l-2 border-gray-200 pl-4 dark:border-gray-700">
+            {comment.replies.map((reply) => (
+              <CommentItem key={reply.id} comment={reply} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function CommentSection({ postId }: CommentSectionProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,40 +166,7 @@ export function CommentSection({ postId }: CommentSectionProps) {
       ) : (
         <div className="space-y-6">
           {comments.map((comment) => (
-            <div key={comment.id} className="flex gap-4">
-              {/* Avatar */}
-              <div className="flex-shrink-0">
-                {comment.user.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={comment.user.avatarUrl}
-                    alt={comment.user.name}
-                    className="h-10 w-10 rounded-full"
-                  />
-                ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-sm font-medium text-gray-600 dark:bg-gray-600 dark:text-gray-300">
-                    {comment.user.name.charAt(0).toUpperCase()}
-                  </div>
-                )}
-              </div>
-
-              {/* Content */}
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {comment.user.name}
-                  </span>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    {new Date(comment.createdAt).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </span>
-                </div>
-                <p className="mt-1 text-gray-700 dark:text-gray-300">{comment.content}</p>
-              </div>
-            </div>
+            <CommentItem key={comment.id} comment={comment} />
           ))}
         </div>
       )}

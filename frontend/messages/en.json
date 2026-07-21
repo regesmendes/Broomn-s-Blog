@@ -72,7 +72,8 @@
     "commentingAs": "Commenting as",
     "signInToComment": "Sign in to leave a comment.",
     "awaitingModeration": "Your comment has been submitted and is awaiting moderation.",
-    "commentLimitReached": "You have too many comments awaiting moderation. Please wait until an admin reviews your existing comments before posting more."
+    "commentLimitReached": "You have too many comments awaiting moderation. Please wait until an admin reviews your existing comments before posting more.",
+    "authorReplyBadge": "Author"
   },
   "footer": {
     "rights": "All rights reserved."

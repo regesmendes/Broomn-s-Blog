@@ -12,6 +12,9 @@ export default function AdminCommentsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('pending');
   const [total, setTotal] = useState(0);
+  const [replyingId, setReplyingId] = useState<string | null>(null);
+  const [replyContent, setReplyContent] = useState('');
+  const [submittingReply, setSubmittingReply] = useState(false);
   const { getToken } = useAuth();
 
   useEffect(() => {
@@ -49,6 +52,25 @@ export default function AdminCommentsPage() {
       }
     } catch {
       console.error('Failed to update comment');
+    }
+  }
+
+  async function handleReply(parentId: string) {
+    if (!replyContent.trim()) return;
+    setSubmittingReply(true);
+    try {
+      const token = getToken() || '';
+      await api.replyAsBroomn(parentId, replyContent.trim(), token);
+      setReplyingId(null);
+      setReplyContent('');
+      // The reply is a new row (this view is a flat list, not threaded) —
+      // reload so it shows up alongside the comment it replies to.
+      await loadComments();
+    } catch (err) {
+      console.error('Failed to post reply', err);
+      alert('Failed to post reply: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setSubmittingReply(false);
     }
   }
 
@@ -133,15 +155,22 @@ export default function AdminCommentsPage() {
                     })}
                   </span>
                 </div>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                    comment.approved
-                      ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                      : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
-                  }`}
-                >
-                  {comment.approved ? 'Approved' : 'Pending'}
-                </span>
+                <div className="flex gap-2">
+                  {comment.isOwnerReply && (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
+                      Reply as Broomn
+                    </span>
+                  )}
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      comment.approved
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                        : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
+                    }`}
+                  >
+                    {comment.approved ? 'Approved' : 'Pending'}
+                  </span>
+                </div>
               </div>
 
               {/* Post context */}
@@ -182,7 +211,48 @@ export default function AdminCommentsPage() {
                 >
                   ✕ Delete
                 </button>
+                {!comment.parentId && (
+                  <button
+                    onClick={() => {
+                      setReplyingId(replyingId === comment.id ? null : comment.id);
+                      setReplyContent('');
+                    }}
+                    className="cursor-pointer text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-300"
+                  >
+                    ↩ Reply as Broomn
+                  </button>
+                )}
               </div>
+
+              {replyingId === comment.id && (
+                <div className="mt-3 border-t border-gray-200 pt-3 dark:border-gray-700">
+                  <textarea
+                    value={replyContent}
+                    onChange={(e) => setReplyContent(e.target.value)}
+                    placeholder="Reply as Broomn..."
+                    rows={3}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={() => handleReply(comment.id)}
+                      disabled={submittingReply || !replyContent.trim()}
+                      className="cursor-pointer rounded-md bg-emerald-700 px-3 py-1.5 text-sm text-white hover:bg-emerald-600 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                    >
+                      {submittingReply ? 'Posting...' : 'Post Reply'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setReplyingId(null);
+                        setReplyContent('');
+                      }}
+                      className="cursor-pointer rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

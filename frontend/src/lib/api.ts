@@ -34,12 +34,16 @@ export interface Comment {
   id: string;
   content: string;
   approved: boolean;
+  isOwnerReply: boolean;
+  parentId: string | null;
   createdAt: string;
   user: {
-    id: string;
+    id: string | null;
     name: string;
     avatarUrl: string | null;
   };
+  /** Only present on top-level comments from the public list endpoint. */
+  replies?: Comment[];
 }
 
 export interface AdminComment extends Comment {
@@ -284,6 +288,14 @@ class ApiClient {
 
   async createComment(postId: string, content: string, token: string): Promise<Comment> {
     return this.request<Comment>(`/posts/${postId}/comments`, {
+      method: 'POST',
+      headers: this.authHeaders(token),
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  async replyAsBroomn(id: string, content: string, token: string): Promise<Comment> {
+    return this.request<Comment>(`/comments/${id}/reply`, {
       method: 'POST',
       headers: this.authHeaders(token),
       body: JSON.stringify({ content }),

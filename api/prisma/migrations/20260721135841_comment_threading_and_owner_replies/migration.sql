@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "comments" ADD COLUMN     "isOwnerReply" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "parentId" TEXT;
+
+-- AddForeignKey
+ALTER TABLE "comments" ADD CONSTRAINT "comments_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "comments"("id") ON DELETE CASCADE ON UPDATE CASCADE;

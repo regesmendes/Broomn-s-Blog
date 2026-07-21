@@ -49,6 +49,25 @@ export const commentController = {
     return reply.status(201).send(result)
   },
 
+  // ── POST /comments/:id/reply (admin only — reply as Broomn) ──────────────────
+  async replyAsBroomn(request: FastifyRequest, reply: FastifyReply) {
+    const { id } = commentIdParamSchema.parse(request.params)
+    const { content } = createCommentSchema.parse(request.body)
+    const adminUserId = request.user.sub
+
+    const result = await commentService.replyAsBroomn(id, adminUserId, content)
+
+    if (result === null) {
+      return reply.status(404).send({ error: 'Comment not found' })
+    }
+
+    if (result === 'invalid_parent') {
+      return reply.status(400).send({ error: 'Cannot reply to a reply' })
+    }
+
+    return reply.status(201).send(result)
+  },
+
   // ── PATCH /comments/:id/approve (admin only) ─────────────────────────────────
   async approve(request: FastifyRequest, reply: FastifyReply) {
     const { id } = commentIdParamSchema.parse(request.params)

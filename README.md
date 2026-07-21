@@ -41,6 +41,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 - ✅ Rich text editor (Tiptap) for creating/editing posts
 - ✅ Dark mode with toggle (persists preference)
 - ✅ Comment section on post detail page with moderation, capped per-user pending queue (flood protection)
+- ✅ Admin can reply to comments as "Broomn" — one level of threading, identity masked server-side (never just in the UI), auto-approved, notifies the original commenter by email
 - ✅ SEO metadata (dynamic og:title, description, og:image per post)
 - ✅ Mulgore-inspired visual identity (landscape hero, druidic emblem, vine dividers)
 - ✅ Custom typography (Cinzel headings, Lora body — manuscript/scroll feel)
