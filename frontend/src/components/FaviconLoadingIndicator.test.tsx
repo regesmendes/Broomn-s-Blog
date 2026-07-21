@@ -1,21 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
-import { usePathname } from 'next/navigation';
 import { FaviconLoadingIndicator } from './FaviconLoadingIndicator';
-import { startLoading, stopLoading } from '@/lib/loadingIndicator';
-
-vi.mock('next/navigation', () => ({
-  usePathname: vi.fn(() => '/pt'),
-}));
-
-const mockUsePathname = vi.mocked(usePathname);
+import { startLoading, stopLoading, startRouteTransition, stopRouteTransition } from '@/lib/loadingIndicator';
 
 describe('FaviconLoadingIndicator', () => {
   let link: HTMLLinkElement;
 
   beforeEach(() => {
     vi.useFakeTimers();
-    mockUsePathname.mockReturnValue('/pt');
     link = document.createElement('link');
     link.rel = 'icon';
     link.href = '/favicon.png';
@@ -80,25 +72,20 @@ describe('FaviconLoadingIndicator', () => {
     act(() => stopLoading());
   });
 
-  it('spins on a route transition alone — a click that triggers no API request at all', async () => {
-    const { rerender } = render(<FaviconLoadingIndicator />);
+  it('spins while a route\'s loading.tsx is mounted, even with no API request at all', async () => {
+    render(<FaviconLoadingIndicator />);
     const originalHref = link.href;
 
-    // Exercises the real patched history.pushState — this is what Next's
-    // router calls under the hood for a client-side navigation, before the
-    // new route has even started rendering (let alone fetching anything).
-    act(() => {
-      window.history.pushState({}, '', '/pt/admin/posts');
-    });
+    // This is exactly what RouteLoading (a route's loading.tsx) calls on
+    // mount/unmount — no fetch involved, just the Suspense fallback lifecycle.
+    act(() => startRouteTransition());
     act(() => {
       vi.advanceTimersByTime(200);
     });
 
     expect(link.href).not.toBe(originalHref);
 
-    // The new route "renders" — usePathname's effect firing is the stop signal.
-    mockUsePathname.mockReturnValue('/pt/admin/posts');
-    rerender(<FaviconLoadingIndicator />);
+    act(() => stopRouteTransition());
 
     expect(link.href).toBe(originalHref);
   });

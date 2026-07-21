@@ -1,13 +1,12 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { usePathname } from 'next/navigation';
-import { ensureHistoryPatched, stopRouteTransition, subscribeLoading } from '@/lib/loadingIndicator';
+import { subscribeLoading } from '@/lib/loadingIndicator';
 
 const FRAME_COUNT = 8;
 const FRAME_INTERVAL_MS = 120;
-// Only start spinning if a request is still in flight after this delay —
-// skips the flicker of a flash-then-restore on requests that resolve fast.
+// Only start spinning if loading is still ongoing after this delay — skips
+// the flicker of a flash-then-restore on things that resolve fast.
 const SHOW_DELAY_MS = 200;
 
 function spinnerFrameHref(step: number): string {
@@ -22,25 +21,15 @@ function spinnerFrameHref(step: number): string {
 
 /**
  * Swaps the tab's favicon for a small spinning ring while an API request is
- * in flight OR a route transition is underway (see lib/loadingIndicator.ts),
- * so a click has some visible sign of life beyond the page itself — including
- * during dev-mode route compilation, which happens before any fetch call.
+ * in flight OR a route's loading.tsx is mounted (see lib/loadingIndicator.ts),
+ * so a click has some visible sign of life beyond the page itself.
  */
 export function FaviconLoadingIndicator() {
   const showTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const spinIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const originalHrefsRef = useRef<{ el: HTMLLinkElement; href: string }[] | null>(null);
-  const pathname = usePathname();
-
-  // pushState/replaceState (patched below) flag the start of a navigation;
-  // this effect firing means the new route has actually rendered — the
-  // correct "stop" signal, since it only runs after commit.
-  useEffect(() => {
-    stopRouteTransition();
-  }, [pathname]);
 
   useEffect(() => {
-    ensureHistoryPatched();
     const startSpinning = () => {
       if (spinIntervalRef.current) return;
 
