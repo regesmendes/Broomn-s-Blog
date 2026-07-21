@@ -7,6 +7,7 @@ import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import { useEffect, forwardRef, useImperativeHandle } from 'react';
 import { FigureImage, Caption } from './tiptapFigureImage';
+import { EmDash } from './tiptapEmDash';
 
 // ─── Toolbar Button ────────────────────────────────────────────────────────────
 
@@ -223,6 +224,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
       }),
       FigureImage,
       Caption,
+      EmDash,
       Placeholder.configure({
         // Captions live nested inside a figureImage node (doc > figureImage >
         // caption); includeChildren is required for the placeholder plugin to
