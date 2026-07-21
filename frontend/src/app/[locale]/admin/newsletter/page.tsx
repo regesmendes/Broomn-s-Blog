@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import api, { ApiError, Subscriber } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { RichTextEditor, RichTextEditorHandle } from '@/components/RichTextEditor';
+import { ImagePickerModal } from '@/components/ImagePickerModal';
 
 export default function AdminNewsletterPage() {
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
@@ -13,6 +15,8 @@ export default function AdminNewsletterPage() {
   const [sendError, setSendError] = useState<string | null>(null);
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const editorRef = useRef<RichTextEditorHandle>(null);
 
   const { getToken } = useAuth();
 
@@ -92,17 +96,26 @@ export default function AdminNewsletterPage() {
             />
           </div>
           <div>
-            <label htmlFor="nl-content" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Content
             </label>
-            <textarea
-              id="nl-content"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              required
-              rows={6}
-              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
-            />
+            <div className="mt-1">
+              <RichTextEditor
+                ref={editorRef}
+                content={content}
+                onChange={setContent}
+                placeholder="Write the newsletter content..."
+                onImagePick={() => setImagePickerOpen(true)}
+              />
+              <ImagePickerModal
+                isOpen={imagePickerOpen}
+                onClose={() => setImagePickerOpen(false)}
+                onSelect={(url) => {
+                  editorRef.current?.insertImage(url);
+                  setImagePickerOpen(false);
+                }}
+              />
+            </div>
           </div>
 
           {sendSuccess && <p className="text-sm text-green-600 dark:text-green-400">{sendSuccess}</p>}
