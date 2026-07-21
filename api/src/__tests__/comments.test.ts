@@ -192,7 +192,33 @@ describe('Comments API', () => {
       expect(body.data).toHaveLength(2)
       expect(body.meta.total).toBe(2)
       expect(body.meta.hasMore).toBe(false)
-      expect(mockPrisma.comment.count).toHaveBeenCalledWith({ where: { parentId: null, approved: false } })
+      expect(mockPrisma.comment.count).toHaveBeenCalledWith({
+        where: { parentId: null, OR: [{ approved: false }, { replies: { some: { approved: false } } }] },
+      })
+    })
+
+    it('includes a still-pending parent when filtering "approved", as long as one of its replies is approved', async () => {
+      const token = generateAdminToken(app)
+      mockPrisma.comment.count.mockResolvedValue(1)
+      mockPrisma.comment.findMany.mockResolvedValue([])
+
+      await app.inject({
+        method: 'GET',
+        url: '/comments/admin?approved=true',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      // A Broomn reply is always approved, but its parent might not be yet —
+      // the parent must still surface under the "Approved" tab so the reply
+      // isn't hidden just because of its parent's unrelated status.
+      const expectedWhere = {
+        parentId: null,
+        OR: [{ approved: true }, { replies: { some: { approved: true } } }],
+      }
+      expect(mockPrisma.comment.count).toHaveBeenCalledWith({ where: expectedWhere })
+      expect(mockPrisma.comment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expectedWhere })
+      )
     })
 
     it('only queries top-level comments (parentId: null)', async () => {
