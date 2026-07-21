@@ -52,6 +52,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 - ✅ Image captions in the post editor, tied to that specific image occurrence in that specific post
 - ✅ Editable About page (rich text, media library images) with a top-nav link, admin-editable, no comments
 - ✅ TypeScript compiles clean across all three projects (api, frontend, infrastructure)
+- ✅ Tab favicon spins while any API request is in flight — feedback that a click registered, even before the page itself shows anything
 - ✅ `robots.txt`/`sitemap.xml` (`frontend/src/app/robots.ts`/`sitemap.ts`) — the sitemap is dynamically generated from live published posts, in both locales
 - ✅ Google Analytics (GA4), wired via `next/script` with manual page_view tracking on client-side route changes (App Router navigations don't trigger gtag's automatic one)
 
