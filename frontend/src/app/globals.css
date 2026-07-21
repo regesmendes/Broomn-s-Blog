@@ -122,7 +122,9 @@ h1, h2, h3, h4, h5, h6 {
 .prose img {
   margin-top: 1.5rem;
   margin-bottom: 1.5rem;
-  border-radius: 0.5rem;
+  border-radius: 0.25rem;
+  border: 10px solid #f5f0e6;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(120, 98, 62, 0.12);
 }
 
 .prose figure {
@@ -131,15 +133,27 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .prose figure img {
+  display: block;
   margin: 0 auto;
 }
 
 .prose figcaption {
-  margin-top: 0.5rem;
+  margin-top: 0.75rem;
+  font-family: var(--font-body);
   font-size: 0.875rem;
   font-style: italic;
-  color: #6b7280;
+  letter-spacing: 0.01em;
+  color: #78716c;
   text-align: center;
+}
+
+.prose figcaption:not(:empty)::before {
+  content: '';
+  display: block;
+  width: 3rem;
+  height: 1px;
+  margin: 0 auto 0.5rem;
+  background: #d6cbb3;
 }
 
 /* Images inserted without a caption leave an empty <figcaption> */
@@ -179,8 +193,17 @@ h1, h2, h3, h4, h5, h6 {
   color: #9ca3af;
 }
 
+.dark .prose img {
+  border-color: #4b4535;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(245, 240, 230, 0.06);
+}
+
 .dark .prose figcaption {
-  color: #9ca3af;
+  color: #a8a29e;
+}
+
+.dark .prose figcaption:not(:empty)::before {
+  background: #57503f;
 }
 
 .dark .prose code {
