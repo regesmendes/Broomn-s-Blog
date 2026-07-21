@@ -54,13 +54,23 @@ h1, h2, h3, h4, h5, h6 {
   margin-bottom: 1.25rem;
 }
 
+/* Matches the main nav's emerald palette (Header.tsx) — :visited pinned to
+   the same shade as normal so a clicked link doesn't drift to the browser's
+   default visited color. */
 .prose a {
-  color: #2563eb;
-  text-decoration: underline;
+  color: #065f46;
+  text-decoration: none;
+}
+
+/* :visited must come before :hover (LVHA order) — otherwise, on an
+   already-visited link, :visited wins the specificity tie and silently
+   overrides the hover color. */
+.prose a:visited {
+  color: #065f46;
 }
 
 .prose a:hover {
-  color: #1d4ed8;
+  color: #059669;
 }
 
 .prose strong {
@@ -183,11 +193,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .dark .prose a {
-  color: #60a5fa;
+  color: #a7f3d0;
+}
+
+.dark .prose a:visited {
+  color: #a7f3d0;
 }
 
 .dark .prose a:hover {
-  color: #93c5fd;
+  color: #34d399;
 }
 
 .dark .prose blockquote {
