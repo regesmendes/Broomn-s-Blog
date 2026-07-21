@@ -124,11 +124,14 @@ Both workflows' `actions/setup-node` runners pin Node 24 (bumped from 20 after G
 
 Next.js has known issues with React version resolution when placed in an npm workspace alongside other packages. The frontend manages its own `node_modules` independently to avoid duplicate React instances causing `useContext` errors during build.
 
-### Favicon spinner tracks in-flight API requests, not route transitions
+### Favicon spinner tracks both in-flight API requests and route transitions
 
-`frontend/src/lib/loadingIndicator.ts` is a tiny module-level pub/sub (not React context — it's driven from `api.ts`, outside any component tree) with an in-flight counter. `ApiClient.request()` — the single choke point every API call already goes through — increments it before `fetch` and decrements in a `finally`, so every existing and future API call gets this for free with no per-page wiring. `FaviconLoadingIndicator` (mounted once in the root layout) subscribes and swaps the tab's `<link rel="icon">` href to a small rotating SVG (data URI, no network round-trip) while the count is above zero, restoring the original href when it drops back to zero.
+`frontend/src/lib/loadingIndicator.ts` is a tiny module-level pub/sub (not React context — it's driven from outside any component tree) combining two independent signals into one loading boolean:
 
-This means it reacts to server activity, not to client-side route changes themselves — a pure navigation with no data fetch wouldn't trigger it. In practice nearly every page here fetches on mount, so this covers the "did my click do anything?" gap it was built for. There's also a 200ms delay before the spinner appears, so a fast request doesn't cause a visible flash-then-restore flicker.
+- An in-flight **API request counter**, incremented/decremented by `ApiClient.request()` — the single choke point every API call already goes through, so every existing and future call gets this for free with no per-page wiring.
+- A **route-transition flag**, set by patching `history.pushState`/`replaceState` (`ensureHistoryPatched`) — the App Router has no official "navigation started" event, but every client-side navigation (`Link`, `router.push`/`replace`) goes through these two calls under the hood. It's a boolean, not a counter, since pushState/replaceState can fire more than once per navigation and a counter risks never reaching zero again if a "start" and "stop" don't pair up 1:1. It's cleared by `FaviconLoadingIndicator`'s `usePathname()`-keyed effect, which only fires *after* the new route has actually rendered.
+
+The API-only version of this (no route tracking) missed exactly the case it was built for: in dev mode, navigating to a route not yet compiled can take several seconds *before* the new page's own `useEffect` ever fires a fetch — that whole window had no feedback. `FaviconLoadingIndicator` (mounted once in the root layout) subscribes to the combined signal and swaps the tab's `<link rel="icon">` href to a small rotating SVG (data URI, no network round-trip) while either signal is active, restoring the original href once both clear. There's also a 200ms delay before the spinner appears, so a fast request or transition doesn't cause a visible flash-then-restore flicker.
 
 ### Never conditionally `return null` from a top-level Provider
 

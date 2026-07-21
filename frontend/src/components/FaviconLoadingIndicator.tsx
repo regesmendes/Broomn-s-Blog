@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { subscribeLoading } from '@/lib/loadingIndicator';
+import { usePathname } from 'next/navigation';
+import { ensureHistoryPatched, stopRouteTransition, subscribeLoading } from '@/lib/loadingIndicator';
 
 const FRAME_COUNT = 8;
 const FRAME_INTERVAL_MS = 120;
@@ -20,16 +21,26 @@ function spinnerFrameHref(step: number): string {
 }
 
 /**
- * Swaps the tab's favicon for a small spinning ring while any API request is
- * in flight (see api.ts's request() / lib/loadingIndicator.ts), so a click
- * that's still loading has some visible sign of life beyond the page itself.
+ * Swaps the tab's favicon for a small spinning ring while an API request is
+ * in flight OR a route transition is underway (see lib/loadingIndicator.ts),
+ * so a click has some visible sign of life beyond the page itself — including
+ * during dev-mode route compilation, which happens before any fetch call.
  */
 export function FaviconLoadingIndicator() {
   const showTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const spinIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const originalHrefsRef = useRef<{ el: HTMLLinkElement; href: string }[] | null>(null);
+  const pathname = usePathname();
+
+  // pushState/replaceState (patched below) flag the start of a navigation;
+  // this effect firing means the new route has actually rendered — the
+  // correct "stop" signal, since it only runs after commit.
+  useEffect(() => {
+    stopRouteTransition();
+  }, [pathname]);
 
   useEffect(() => {
+    ensureHistoryPatched();
     const startSpinning = () => {
       if (spinIntervalRef.current) return;
 
@@ -60,8 +71,8 @@ export function FaviconLoadingIndicator() {
       originalHrefsRef.current = null;
     };
 
-    const unsubscribe = subscribeLoading((count) => {
-      if (count > 0) {
+    const unsubscribe = subscribeLoading((loading) => {
+      if (loading) {
         if (showTimeoutRef.current || spinIntervalRef.current) return;
         showTimeoutRef.current = setTimeout(() => {
           showTimeoutRef.current = null;
