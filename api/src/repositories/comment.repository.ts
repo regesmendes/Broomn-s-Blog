@@ -3,12 +3,13 @@ import { paginateWithCursor } from '../lib/pagination'
 
 // The persona substituted for isOwnerReply comments in any public response —
 // the admin's real Google identity (name/avatar) must never reach a public
-// API consumer for these rows. Reuses the site's own logo as the "druid
-// emblem" rather than sourcing a separate asset.
+// API consumer for these rows. Reuses the site's square favicon rather than
+// sourcing a separate asset — the wordmark logo isn't square and stretches
+// when forced into a circular avatar frame.
 export const BROOMN_PERSONA = {
   id:        null,
   name:      'Broomn',
-  avatarUrl: '/images/logo.png',
+  avatarUrl: '/favicon.png',
 } as const
 
 const commentSelect = {

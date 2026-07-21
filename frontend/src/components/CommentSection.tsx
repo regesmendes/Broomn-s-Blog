@@ -22,7 +22,7 @@ function CommentItem({ comment }: { comment: Comment }) {
           <img
             src={comment.user.avatarUrl}
             alt={comment.user.name}
-            className="h-10 w-10 rounded-full"
+            className="h-10 w-10 rounded-full object-cover"
           />
         ) : (
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-sm font-medium text-gray-600 dark:bg-gray-600 dark:text-gray-300">

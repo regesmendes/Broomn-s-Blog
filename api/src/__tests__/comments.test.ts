@@ -111,7 +111,7 @@ describe('Comments API', () => {
       expect(comment.replies[0].user).toEqual({
         id:        null,
         name:      'Broomn',
-        avatarUrl: '/images/logo.png',
+        avatarUrl: '/favicon.png',
       })
       // The real name/avatar must not appear anywhere in the response.
       expect(JSON.stringify(res.json())).not.toContain('Reges')
@@ -363,7 +363,7 @@ describe('Comments API', () => {
       expect(res.statusCode).toBe(201)
       const body = res.json()
       expect(body.approved).toBe(true)
-      expect(body.user).toEqual({ id: null, name: 'Broomn', avatarUrl: '/images/logo.png' })
+      expect(body.user).toEqual({ id: null, name: 'Broomn', avatarUrl: '/favicon.png' })
 
       expect(mockPrisma.comment.create).toHaveBeenCalledWith(
         expect.objectContaining({

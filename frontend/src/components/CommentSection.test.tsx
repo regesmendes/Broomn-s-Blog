@@ -48,7 +48,7 @@ function topLevelWithReply(): Comment {
         isOwnerReply: true,
         parentId: 'c1',
         createdAt: '2026-01-02T00:00:00.000Z',
-        user: { id: null, name: 'Broomn', avatarUrl: '/images/logo.png' },
+        user: { id: null, name: 'Broomn', avatarUrl: '/favicon.png' },
         replies: [],
       },
     ],
