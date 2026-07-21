@@ -149,7 +149,7 @@ export default function AdminCommentsPage() {
                 <span className="text-xs text-gray-500 dark:text-gray-400">on </span>
                 <Link
                   href={`/posts/${comment.post.slug}`}
-                  className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                  className="text-xs text-emerald-800 hover:text-emerald-600 hover:underline visited:text-emerald-800 dark:text-emerald-200 dark:hover:text-emerald-400 dark:visited:text-emerald-200"
                 >
                   {comment.post.title}
                 </Link>

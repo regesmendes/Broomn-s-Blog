@@ -37,7 +37,10 @@ export default async function ConfirmNewsletterPage({
         </div>
       )}
 
-      <Link href="/" className="mt-8 inline-block text-blue-700 hover:underline">
+      <Link
+        href="/"
+        className="mt-8 inline-block text-emerald-800 hover:text-emerald-600 hover:underline visited:text-emerald-800 dark:text-emerald-200 dark:hover:text-emerald-400 dark:visited:text-emerald-200"
+      >
         {t('backHome')}
       </Link>
     </div>
