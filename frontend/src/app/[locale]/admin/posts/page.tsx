@@ -87,8 +87,11 @@ export default function AdminPostsPage() {
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
             {posts.map((post) => (
               <tr key={post.id}>
-                <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
-                  <Link href={`/admin/posts/${post.id}`} className="hover:text-blue-600 dark:hover:text-blue-400">
+                <td className="px-4 py-3 font-medium">
+                  <Link
+                    href={`/admin/posts/${post.id}`}
+                    className="text-emerald-800 hover:text-emerald-600 visited:text-emerald-800 dark:text-emerald-200 dark:hover:text-emerald-400 dark:visited:text-emerald-200"
+                  >
                     {post.title}
                   </Link>
                 </td>
