@@ -112,6 +112,7 @@ model Newsletter {
   status      SubscriptionStatus @default(PENDING)
   confirmedAt DateTime?
   createdAt   DateTime           @default(now())
+  blockedAt   DateTime?
 
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)

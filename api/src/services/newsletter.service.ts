@@ -76,7 +76,10 @@ export const newsletterService = {
    * containing an HMAC token (verifiable without a DB lookup).
    */
   async subscribe(email: string, userId?: string) {
-    const subscriber = await newsletterRepository.subscribe(email, userId)
+    const result = await newsletterRepository.subscribe(email, userId)
+    if (result === 'blocked') return 'blocked' as const
+
+    const subscriber = result
     const confirmToken = generateToken(subscriber.id)
     const confirmUrl = `${getFrontendUrl()}/pt/newsletter/confirm?token=${confirmToken}`
 
@@ -115,11 +118,34 @@ export const newsletterService = {
     return newsletterRepository.unsubscribe(id)
   },
 
-  /** List subscribers — admin view. */
+  /** Admin-triggered manual unsubscribe (distinct from the token-link flow
+   * above) — same repo method, admin acting on someone else's behalf. */
+  async adminUnsubscribe(id: string) {
+    const subscriber = await newsletterRepository.findById(id)
+    if (!subscriber) return null
+    return newsletterRepository.unsubscribe(id)
+  },
+
+  /** Block a subscriber (admin only) — no self-service path exists for this. */
+  async block(id: string) {
+    const subscriber = await newsletterRepository.findById(id)
+    if (!subscriber) return null
+    return newsletterRepository.block(id)
+  },
+
+  /** Unblock a subscriber (admin only). */
+  async unblock(id: string) {
+    const subscriber = await newsletterRepository.findById(id)
+    if (!subscriber) return null
+    return newsletterRepository.unblock(id)
+  },
+
+  /** List subscribers — admin view. Optionally filtered by status and/or a
+   * case-insensitive email search. */
   async list(query: ListSubscribersQuery) {
-    const { cursor, limit, status } = query
+    const { cursor, limit, status, email } = query
     const [page, counts] = await Promise.all([
-      newsletterRepository.listSubscribers(cursor, limit, status as SubscriptionStatus | undefined),
+      newsletterRepository.listSubscribers(cursor, limit, status as SubscriptionStatus | undefined, email),
       newsletterRepository.countByStatus(),
     ])
 

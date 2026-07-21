@@ -70,6 +70,7 @@ export interface Subscriber {
   status: 'PENDING' | 'CONFIRMED' | 'UNSUBSCRIBED';
   confirmedAt: string | null;
   createdAt: string;
+  blockedAt: string | null;
 }
 
 export interface MediaItem {
@@ -357,8 +358,37 @@ class ApiClient {
     return this.request(`/newsletter/unsubscribe?token=${encodeURIComponent(token)}`);
   }
 
-  async getSubscribers(token: string): Promise<SubscribersResponse> {
-    return this.request<SubscribersResponse>('/newsletter/subscribers', {
+  async getSubscribers(
+    token: string,
+    params?: { cursor?: string; status?: string; email?: string }
+  ): Promise<SubscribersResponse> {
+    const searchParams = new URLSearchParams();
+    if (params?.cursor) searchParams.set('cursor', params.cursor);
+    if (params?.status) searchParams.set('status', params.status);
+    if (params?.email) searchParams.set('email', params.email);
+    const query = searchParams.toString();
+    return this.request<SubscribersResponse>(`/newsletter/subscribers${query ? `?${query}` : ''}`, {
+      headers: this.authHeaders(token),
+    });
+  }
+
+  async adminUnsubscribeSubscriber(id: string, token: string): Promise<Subscriber> {
+    return this.request<Subscriber>(`/newsletter/subscribers/${id}/unsubscribe`, {
+      method: 'POST',
+      headers: this.authHeaders(token),
+    });
+  }
+
+  async blockSubscriber(id: string, token: string): Promise<Subscriber> {
+    return this.request<Subscriber>(`/newsletter/subscribers/${id}/block`, {
+      method: 'PATCH',
+      headers: this.authHeaders(token),
+    });
+  }
+
+  async unblockSubscriber(id: string, token: string): Promise<Subscriber> {
+    return this.request<Subscriber>(`/newsletter/subscribers/${id}/unblock`, {
+      method: 'PATCH',
       headers: this.authHeaders(token),
     });
   }

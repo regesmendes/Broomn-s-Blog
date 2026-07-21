@@ -8,6 +8,7 @@ const subscriberSelect = {
   status:      true,
   confirmedAt: true,
   createdAt:   true,
+  blockedAt:   true,
 } as const
 
 export const newsletterRepository = {
@@ -19,7 +20,15 @@ export const newsletterRepository = {
     return prisma.newsletter.findUnique({ where: { id }, select: subscriberSelect })
   },
 
+  /**
+   * Upsert-subscribe by email, except a blocked address stays blocked — the
+   * previous unconditional upsert would silently reset a blocked row back
+   * to PENDING, undoing the block the moment someone resubmitted the form.
+   */
   async subscribe(email: string, userId?: string) {
+    const existing = await prisma.newsletter.findUnique({ where: { email } })
+    if (existing?.blockedAt) return 'blocked' as const
+
     return prisma.newsletter.upsert({
       where:  { email },
       update: { status: 'PENDING', userId },
@@ -36,6 +45,10 @@ export const newsletterRepository = {
     })
   },
 
+  /** Self-service or admin-triggered unsubscribe — only ever touches
+   * `status`, never `blockedAt`. This is what makes "unsubscribe but stay
+   * blocked" work for free: a self-unsubscribe on an already-blocked row
+   * leaves blockedAt untouched, with no special-casing needed. */
   async unsubscribe(id: string) {
     return prisma.newsletter.update({
       where: { id },
@@ -44,8 +57,32 @@ export const newsletterRepository = {
     })
   },
 
-  async listSubscribers(cursor: string | undefined, limit: number, status?: SubscriptionStatus) {
-    const where = status ? { status } : {}
+  /** Block a subscriber — stops delivery immediately and prevents
+   * re-subscribing (see `subscribe` above). Admin only. */
+  async block(id: string) {
+    return prisma.newsletter.update({
+      where: { id },
+      data:  { blockedAt: new Date(), status: 'UNSUBSCRIBED' },
+      select: subscriberSelect,
+    })
+  },
+
+  /** Unblock — falls out of the same single field, no extra state to
+   * reconcile (status is left as UNSUBSCRIBED; re-subscribing is a
+   * separate, explicit action). */
+  async unblock(id: string) {
+    return prisma.newsletter.update({
+      where: { id },
+      data:  { blockedAt: null },
+      select: subscriberSelect,
+    })
+  },
+
+  async listSubscribers(cursor: string | undefined, limit: number, status?: SubscriptionStatus, email?: string) {
+    const where = {
+      ...(status ? { status } : {}),
+      ...(email ? { email: { contains: email, mode: 'insensitive' as const } } : {}),
+    }
 
     return paginateWithCursor(
       (args) =>
@@ -90,8 +127,12 @@ export const newsletterRepository = {
 
   /** Get all confirmed subscribers (id + email, for sending with per-recipient unsubscribe links). */
   async getConfirmedSubscribers(): Promise<{ id: string; email: string }[]> {
+    // blockedAt: null is defense-in-depth alongside the status filter — a
+    // blocked address is always also set to UNSUBSCRIBED (see `block`
+    // above), so this shouldn't ever bite in practice, but a send should
+    // never depend on that invariant holding elsewhere going forward.
     return prisma.newsletter.findMany({
-      where:  { status: 'CONFIRMED' },
+      where:  { status: 'CONFIRMED', blockedAt: null },
       select: { id: true, email: true },
     })
   },
