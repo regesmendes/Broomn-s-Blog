@@ -62,12 +62,15 @@ h1, h2, h3, h4, h5, h6 {
   text-decoration: none;
 }
 
-.prose a:hover {
-  color: #059669;
-}
-
+/* :visited must come before :hover (LVHA order) — otherwise, on an
+   already-visited link, :visited wins the specificity tie and silently
+   overrides the hover color. */
 .prose a:visited {
   color: #065f46;
+}
+
+.prose a:hover {
+  color: #059669;
 }
 
 .prose strong {
@@ -193,12 +196,12 @@ h1, h2, h3, h4, h5, h6 {
   color: #a7f3d0;
 }
 
-.dark .prose a:hover {
-  color: #34d399;
-}
-
 .dark .prose a:visited {
   color: #a7f3d0;
+}
+
+.dark .prose a:hover {
+  color: #34d399;
 }
 
 .dark .prose blockquote {
