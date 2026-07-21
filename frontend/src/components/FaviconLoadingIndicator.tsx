@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { subscribeLoading } from '@/lib/loadingIndicator';
+import { usePathname } from 'next/navigation';
+import { subscribeLoading, stopRouteTransition, watchForNavigationClicks } from '@/lib/loadingIndicator';
 
 const FRAME_COUNT = 8;
 const FRAME_INTERVAL_MS = 120;
@@ -21,15 +22,27 @@ function spinnerFrameHref(step: number): string {
 
 /**
  * Swaps the tab's favicon for a small spinning ring while an API request is
- * in flight OR a route's loading.tsx is mounted (see lib/loadingIndicator.ts),
- * so a click has some visible sign of life beyond the page itself.
+ * in flight, or a route transition is underway — signaled either by a route's
+ * loading.tsx mounting, or by a click on an internal link (see
+ * lib/loadingIndicator.ts) — so a click has some visible sign of life beyond
+ * the page itself.
  */
 export function FaviconLoadingIndicator() {
   const showTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const spinIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const originalHrefsRef = useRef<{ el: HTMLLinkElement; href: string }[] | null>(null);
+  const pathname = usePathname();
+
+  // The click listener (started once, below) flags a route transition the
+  // instant an internal link is clicked; this effect firing means the new
+  // route has actually rendered — the real "stop" signal, since it only
+  // runs after commit.
+  useEffect(() => {
+    stopRouteTransition();
+  }, [pathname]);
 
   useEffect(() => {
+    watchForNavigationClicks();
     const startSpinning = () => {
       if (spinIntervalRef.current) return;
 
