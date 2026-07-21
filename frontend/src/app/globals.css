@@ -123,8 +123,11 @@ h1, h2, h3, h4, h5, h6 {
   margin-top: 1.5rem;
   margin-bottom: 1.5rem;
   border-radius: 0.25rem;
-  border: 10px solid #f5f0e6;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(120, 98, 62, 0.12);
+  /* Same emerald as the header/footer/button brand color (not a separate
+     dark-mode shade) — it reads clearly against both a light and a dark
+     page background, so one color does the job here. */
+  border: 10px solid #059669;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 .prose figure {
@@ -147,12 +150,12 @@ h1, h2, h3, h4, h5, h6 {
   text-align: center;
 }
 
-.prose figcaption:not(:empty)::before {
+.prose figcaption:not(:empty)::after {
   content: '';
   display: block;
   width: 3rem;
   height: 1px;
-  margin: 0 auto 0.5rem;
+  margin: 0.5rem auto 0;
   background: #d6cbb3;
 }
 
@@ -194,15 +197,14 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .dark .prose img {
-  border-color: #4b4535;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(245, 240, 230, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 .dark .prose figcaption {
   color: #a8a29e;
 }
 
-.dark .prose figcaption:not(:empty)::before {
+.dark .prose figcaption:not(:empty)::after {
   background: #57503f;
 }
 
