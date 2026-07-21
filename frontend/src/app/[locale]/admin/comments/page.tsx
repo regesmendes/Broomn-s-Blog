@@ -2,10 +2,184 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from '@/i18n/navigation';
-import api, { AdminComment } from '@/lib/api';
+import api, { AdminComment, Comment } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 
 type Filter = 'pending' | 'approved' | 'all';
+
+interface CommentCardProps {
+  comment: Comment;
+  postSlug?: string;
+  postTitle?: string;
+  nested?: boolean;
+  onApprove: (id: string, approved: boolean) => void;
+  onDelete: (id: string) => void;
+  replyingId: string | null;
+  replyContent: string;
+  submittingReply: boolean;
+  onReplyClick: (id: string) => void;
+  onReplyContentChange: (value: string) => void;
+  onSubmitReply: (parentId: string) => void;
+  onCancelReply: () => void;
+}
+
+function CommentCard({
+  comment,
+  postSlug,
+  postTitle,
+  nested = false,
+  onApprove,
+  onDelete,
+  replyingId,
+  replyContent,
+  submittingReply,
+  onReplyClick,
+  onReplyContentChange,
+  onSubmitReply,
+  onCancelReply,
+}: CommentCardProps) {
+  return (
+    <div
+      className={
+        nested
+          ? 'border-l-2 border-gray-200 pl-4 dark:border-gray-700'
+          : 'rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800'
+      }
+    >
+      {/* Header */}
+      <div className="mb-2 flex items-start justify-between">
+        <div>
+          <span className="font-medium text-gray-900 dark:text-white">
+            {comment.user.name}
+          </span>
+          <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
+            {new Date(comment.createdAt).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+        </div>
+        <div className="flex gap-2">
+          {comment.isOwnerReply && (
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
+              Reply as Broomn
+            </span>
+          )}
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+              comment.approved
+                ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
+            }`}
+          >
+            {comment.approved ? 'Approved' : 'Pending'}
+          </span>
+        </div>
+      </div>
+
+      {/* Post context — only on the top-level card, not on nested replies */}
+      {!nested && postSlug && postTitle && (
+        <div className="mb-2">
+          <span className="text-xs text-gray-500 dark:text-gray-400">on </span>
+          <Link
+            href={`/posts/${postSlug}`}
+            className="text-xs text-emerald-800 hover:text-emerald-600 hover:underline visited:text-emerald-800 dark:text-emerald-200 dark:hover:text-emerald-400 dark:visited:text-emerald-200"
+          >
+            {postTitle}
+          </Link>
+        </div>
+      )}
+
+      {/* Content */}
+      <p className="mb-3 text-gray-700 dark:text-gray-300">{comment.content}</p>
+
+      {/* Actions */}
+      <div className="flex items-center gap-4 text-sm">
+        {!comment.approved && (
+          <button
+            onClick={() => onApprove(comment.id, true)}
+            className="cursor-pointer text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
+          >
+            ✓ Approve
+          </button>
+        )}
+        {comment.approved && (
+          <button
+            onClick={() => onApprove(comment.id, false)}
+            className="cursor-pointer text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-300"
+          >
+            ↩ Reject
+          </button>
+        )}
+        <button
+          onClick={() => onDelete(comment.id)}
+          className="cursor-pointer text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+        >
+          ✕ Delete
+        </button>
+        {!comment.parentId && (
+          <button
+            onClick={() => onReplyClick(comment.id)}
+            className="cursor-pointer text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-300"
+          >
+            ↩ Reply as Broomn
+          </button>
+        )}
+      </div>
+
+      {replyingId === comment.id && (
+        <div className="mt-3 border-t border-gray-200 pt-3 dark:border-gray-700">
+          <textarea
+            value={replyContent}
+            onChange={(e) => onReplyContentChange(e.target.value)}
+            placeholder="Reply as Broomn..."
+            rows={3}
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+          />
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={() => onSubmitReply(comment.id)}
+              disabled={submittingReply || !replyContent.trim()}
+              className="cursor-pointer rounded-md bg-emerald-700 px-3 py-1.5 text-sm text-white hover:bg-emerald-600 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+            >
+              {submittingReply ? 'Posting...' : 'Post Reply'}
+            </button>
+            <button
+              onClick={onCancelReply}
+              className="cursor-pointer rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {comment.replies && comment.replies.length > 0 && (
+        <div className="mt-4 space-y-4">
+          {comment.replies.map((reply) => (
+            <CommentCard
+              key={reply.id}
+              comment={reply}
+              nested
+              onApprove={onApprove}
+              onDelete={onDelete}
+              replyingId={replyingId}
+              replyContent={replyContent}
+              submittingReply={submittingReply}
+              onReplyClick={onReplyClick}
+              onReplyContentChange={onReplyContentChange}
+              onSubmitReply={onSubmitReply}
+              onCancelReply={onCancelReply}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminCommentsPage() {
   const [comments, setComments] = useState<AdminComment[]>([]);
@@ -40,16 +214,10 @@ export default function AdminCommentsPage() {
     try {
       const token = getToken() || '';
       await api.approveComment(id, approved, token);
-      // Remove from list or update status
-      if (filter === 'pending' && approved) {
-        setComments(comments.filter((c) => c.id !== id));
-        setTotal(total - 1);
-      } else if (filter === 'approved' && !approved) {
-        setComments(comments.filter((c) => c.id !== id));
-        setTotal(total - 1);
-      } else {
-        setComments(comments.map((c) => (c.id === id ? { ...c, approved } : c)));
-      }
+      // The list is now nested (top-level comments + their replies), and
+      // either could be the one just approved/rejected — reload rather than
+      // trying to patch a possibly-nested row in place.
+      await loadComments();
     } catch {
       console.error('Failed to update comment');
     }
@@ -63,8 +231,7 @@ export default function AdminCommentsPage() {
       await api.replyAsBroomn(parentId, replyContent.trim(), token);
       setReplyingId(null);
       setReplyContent('');
-      // The reply is a new row (this view is a flat list, not threaded) —
-      // reload so it shows up alongside the comment it replies to.
+      // Reload so the new reply shows up nested under its parent.
       await loadComments();
     } catch (err) {
       console.error('Failed to post reply', err);
@@ -79,8 +246,9 @@ export default function AdminCommentsPage() {
     try {
       const token = getToken() || '';
       await api.deleteComment(id, token);
-      setComments(comments.filter((c) => c.id !== id));
-      setTotal(total - 1);
+      // A deleted top-level comment takes its nested replies with it
+      // (cascade, server-side) — reload rather than filtering just the id.
+      await loadComments();
     } catch (err) {
       console.error('Failed to delete comment', err);
       alert('Failed to delete: ' + (err instanceof Error ? err.message : String(err)));
@@ -135,125 +303,27 @@ export default function AdminCommentsPage() {
       {!loading && comments.length > 0 && (
         <div className="space-y-4">
           {comments.map((comment) => (
-            <div
+            <CommentCard
               key={comment.id}
-              className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
-            >
-              {/* Header */}
-              <div className="mb-2 flex items-start justify-between">
-                <div>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {comment.user.name}
-                  </span>
-                  <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
-                    {new Date(comment.createdAt).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  {comment.isOwnerReply && (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
-                      Reply as Broomn
-                    </span>
-                  )}
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      comment.approved
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                        : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
-                    }`}
-                  >
-                    {comment.approved ? 'Approved' : 'Pending'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Post context */}
-              <div className="mb-2">
-                <span className="text-xs text-gray-500 dark:text-gray-400">on </span>
-                <Link
-                  href={`/posts/${comment.post.slug}`}
-                  className="text-xs text-emerald-800 hover:text-emerald-600 hover:underline visited:text-emerald-800 dark:text-emerald-200 dark:hover:text-emerald-400 dark:visited:text-emerald-200"
-                >
-                  {comment.post.title}
-                </Link>
-              </div>
-
-              {/* Content */}
-              <p className="mb-3 text-gray-700 dark:text-gray-300">{comment.content}</p>
-
-              {/* Actions */}
-              <div className="flex items-center gap-4 text-sm">
-                {!comment.approved && (
-                  <button
-                    onClick={() => handleApprove(comment.id, true)}
-                    className="cursor-pointer text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300"
-                  >
-                    ✓ Approve
-                  </button>
-                )}
-                {comment.approved && (
-                  <button
-                    onClick={() => handleApprove(comment.id, false)}
-                    className="cursor-pointer text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-300"
-                  >
-                    ↩ Reject
-                  </button>
-                )}
-                <button
-                  onClick={() => handleDelete(comment.id)}
-                  className="cursor-pointer text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                >
-                  ✕ Delete
-                </button>
-                {!comment.parentId && (
-                  <button
-                    onClick={() => {
-                      setReplyingId(replyingId === comment.id ? null : comment.id);
-                      setReplyContent('');
-                    }}
-                    className="cursor-pointer text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-300"
-                  >
-                    ↩ Reply as Broomn
-                  </button>
-                )}
-              </div>
-
-              {replyingId === comment.id && (
-                <div className="mt-3 border-t border-gray-200 pt-3 dark:border-gray-700">
-                  <textarea
-                    value={replyContent}
-                    onChange={(e) => setReplyContent(e.target.value)}
-                    placeholder="Reply as Broomn..."
-                    rows={3}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
-                  />
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      onClick={() => handleReply(comment.id)}
-                      disabled={submittingReply || !replyContent.trim()}
-                      className="cursor-pointer rounded-md bg-emerald-700 px-3 py-1.5 text-sm text-white hover:bg-emerald-600 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
-                    >
-                      {submittingReply ? 'Posting...' : 'Post Reply'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setReplyingId(null);
-                        setReplyContent('');
-                      }}
-                      className="cursor-pointer rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+              comment={comment}
+              postSlug={comment.post.slug}
+              postTitle={comment.post.title}
+              onApprove={handleApprove}
+              onDelete={handleDelete}
+              replyingId={replyingId}
+              replyContent={replyContent}
+              submittingReply={submittingReply}
+              onReplyClick={(id) => {
+                setReplyingId(replyingId === id ? null : id);
+                setReplyContent('');
+              }}
+              onReplyContentChange={setReplyContent}
+              onSubmitReply={handleReply}
+              onCancelReply={() => {
+                setReplyingId(null);
+                setReplyContent('');
+              }}
+            />
           ))}
         </div>
       )}

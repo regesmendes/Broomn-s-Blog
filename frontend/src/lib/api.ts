@@ -42,7 +42,8 @@ export interface Comment {
     name: string;
     avatarUrl: string | null;
   };
-  /** Only present on top-level comments from the public list endpoint. */
+  /** Only present on top-level comments — from the public list endpoint
+   * (masked, approved only) or the admin endpoints (real identity, all). */
   replies?: Comment[];
 }
 

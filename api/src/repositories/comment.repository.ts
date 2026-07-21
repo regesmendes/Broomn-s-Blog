@@ -39,8 +39,15 @@ const publicCommentSelect = {
   },
 } as const
 
+// Admin view nests replies too (so the moderation UI can show them under
+// their parent, like the public page does) but — unlike publicCommentSelect —
+// doesn't filter by approved or mask identity: admins need the real state.
 const adminCommentSelect = {
   ...commentSelect,
+  replies: {
+    orderBy: { createdAt: 'asc' as const },
+    select:  commentSelect,
+  },
   post: {
     select: {
       id:    true,
@@ -174,12 +181,16 @@ export const commentRepository = {
   },
 
   /**
-   * Get all comments across all posts (admin). Filterable by approval status.
-   * Also returns a total count — a single indexed COUNT() for a dashboard
-   * stat, not the per-page cost cursor pagination replaces.
+   * Get all top-level comments across all posts (admin), each with its
+   * replies nested underneath. Filterable by approval status — the filter
+   * only applies to the top-level comment; replies are always included
+   * as-is (they're auto-approved on creation, so this never hides one).
+   * Also returns a total count of top-level comments — a single indexed
+   * COUNT() for a dashboard stat, not the per-page cost cursor pagination
+   * replaces.
    */
   async findAll(cursor: string | undefined, limit: number, approved?: boolean) {
-    const where = approved !== undefined ? { approved } : {}
+    const where = { parentId: null, ...(approved !== undefined ? { approved } : {}) }
 
     const [total, page] = await Promise.all([
       prisma.comment.count({ where }),

@@ -192,7 +192,63 @@ describe('Comments API', () => {
       expect(body.data).toHaveLength(2)
       expect(body.meta.total).toBe(2)
       expect(body.meta.hasMore).toBe(false)
-      expect(mockPrisma.comment.count).toHaveBeenCalledWith({ where: { approved: false } })
+      expect(mockPrisma.comment.count).toHaveBeenCalledWith({ where: { parentId: null, approved: false } })
+    })
+
+    it('only queries top-level comments (parentId: null)', async () => {
+      mockPrisma.comment.count.mockResolvedValue(0)
+      mockPrisma.comment.findMany.mockResolvedValue([])
+      const token = generateAdminToken(app)
+
+      await app.inject({
+        method: 'GET',
+        url: '/comments/admin',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(mockPrisma.comment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { parentId: null } })
+      )
+    })
+
+    it('nests replies under their parent, unmasked (admin sees the real identity)', async () => {
+      const token = generateAdminToken(app)
+      mockPrisma.comment.count.mockResolvedValue(1)
+      mockPrisma.comment.findMany.mockResolvedValue([
+        {
+          id: 'c1',
+          content: 'A',
+          approved: true,
+          isOwnerReply: false,
+          parentId: null,
+          createdAt: new Date(),
+          user: { id: 'u1', name: 'A', avatarUrl: null },
+          post: { id: 'p1', title: 'Post', slug: 'post' },
+          replies: [
+            {
+              id: 'r1',
+              content: 'Reply',
+              approved: true,
+              isOwnerReply: true,
+              parentId: 'c1',
+              createdAt: new Date(),
+              user: { id: 'admin-user-id', name: 'Reges', avatarUrl: null },
+            },
+          ],
+        },
+      ])
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/comments/admin',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      const [comment] = res.json().data
+      expect(comment.replies).toHaveLength(1)
+      // Unlike the public endpoint, the admin view shows the real name.
+      expect(comment.replies[0].user.name).toBe('Reges')
     })
   })
 

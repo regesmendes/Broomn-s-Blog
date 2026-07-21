@@ -63,17 +63,34 @@ describe('AdminCommentsPage — reply as Broomn', () => {
     vi.clearAllMocks();
   });
 
-  it('shows the reply action on a top-level comment but not on a reply', async () => {
+  it('renders a reply nested under its parent, without its own reply action', async () => {
     mockGetAdminComments.mockResolvedValue({
       data: [
-        topLevelComment(),
-        { ...topLevelComment(), id: 'r1', parentId: 'c1', isOwnerReply: true },
+        {
+          ...topLevelComment(),
+          replies: [
+            {
+              id: 'r1',
+              content: 'Thanks for reading!',
+              approved: true,
+              isOwnerReply: true,
+              parentId: 'c1',
+              createdAt: '2026-01-02T00:00:00.000Z',
+              user: { id: 'admin-user-id', name: 'Reges', avatarUrl: null },
+            },
+          ],
+        },
       ],
-      meta: { nextCursor: null, hasMore: false, total: 2 },
+      meta: { nextCursor: null, hasMore: false, total: 1 },
     });
 
     await renderAndLoad();
 
+    expect(screen.getByText('Great post!')).toBeInTheDocument();
+    expect(screen.getByText('Thanks for reading!')).toBeInTheDocument();
+    // Admin view shows the real name, not the masked "Broomn" persona.
+    expect(screen.getByText('Reges')).toBeInTheDocument();
+    // Only the top-level comment can be replied to.
     expect(screen.getAllByText('↩ Reply as Broomn')).toHaveLength(1);
   });
 
