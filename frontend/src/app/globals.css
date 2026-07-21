@@ -123,10 +123,9 @@ h1, h2, h3, h4, h5, h6 {
   margin-top: 1.5rem;
   margin-bottom: 1.5rem;
   border-radius: 0.25rem;
-  /* Same emerald as the header/footer/button brand color (not a separate
-     dark-mode shade) — it reads clearly against both a light and a dark
-     page background, so one color does the job here. */
-  border: 10px solid #059669;
+  /* Same tone as the caption text below it (see .prose figcaption) — the
+     dark-mode shade is overridden alongside the caption's own. */
+  border: 10px solid #78716c;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
@@ -197,6 +196,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .dark .prose img {
+  border-color: #a8a29e;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
