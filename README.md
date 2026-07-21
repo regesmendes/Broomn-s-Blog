@@ -35,6 +35,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 - ✅ JWT authentication with access/refresh token flow
 - ✅ Cognito integration with real Google OAuth login, live in production
 - ✅ Newsletter with HMAC-based email confirmation/unsubscribe tokens — real SES sending, graceful confirm/unsubscribe pages (not bare API JSON)
+- ✅ Rich-text newsletter composer (same Tiptap editor as posts, including images) — the HTML goes straight into the styled email template, no more plain-textarea content collapsing into one paragraph
 - ✅ Frontend with all pages (public blog, admin panel, auth flow) — server-rendered via OpenNext/Lambda, not just static
 - ✅ Auth context with token management and auto-refresh
 - ✅ Protected admin routes (redirects to login if unauthenticated)
