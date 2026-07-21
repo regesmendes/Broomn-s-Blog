@@ -1,3 +1,5 @@
+import { startLoading, stopLoading } from './loadingIndicator';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 // Types
@@ -152,28 +154,33 @@ class ApiClient {
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`;
-    const headers: HeadersInit = {
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...options.headers,
-    };
+    startLoading();
+    try {
+      const url = `${this.baseUrl}${endpoint}`;
+      const headers: HeadersInit = {
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...options.headers,
+      };
 
-    const response = await fetch(url, { ...options, headers });
+      const response = await fetch(url, { ...options, headers });
 
-    if (!response.ok) {
-      const body = await response.json().catch(() => null);
-      throw new ApiError(
-        body?.error || `Request failed with status ${response.status}`,
-        response.status,
-        body
-      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new ApiError(
+          body?.error || `Request failed with status ${response.status}`,
+          response.status,
+          body
+        );
+      }
+
+      if (response.status === 204) {
+        return undefined as T;
+      }
+
+      return response.json();
+    } finally {
+      stopLoading();
     }
-
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    return response.json();
   }
 
   private authHeaders(token?: string): HeadersInit {

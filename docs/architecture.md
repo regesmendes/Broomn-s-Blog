@@ -124,6 +124,12 @@ Both workflows' `actions/setup-node` runners pin Node 24 (bumped from 20 after G
 
 Next.js has known issues with React version resolution when placed in an npm workspace alongside other packages. The frontend manages its own `node_modules` independently to avoid duplicate React instances causing `useContext` errors during build.
 
+### Favicon spinner tracks in-flight API requests, not route transitions
+
+`frontend/src/lib/loadingIndicator.ts` is a tiny module-level pub/sub (not React context — it's driven from `api.ts`, outside any component tree) with an in-flight counter. `ApiClient.request()` — the single choke point every API call already goes through — increments it before `fetch` and decrements in a `finally`, so every existing and future API call gets this for free with no per-page wiring. `FaviconLoadingIndicator` (mounted once in the root layout) subscribes and swaps the tab's `<link rel="icon">` href to a small rotating SVG (data URI, no network round-trip) while the count is above zero, restoring the original href when it drops back to zero.
+
+This means it reacts to server activity, not to client-side route changes themselves — a pure navigation with no data fetch wouldn't trigger it. In practice nearly every page here fetches on mount, so this covers the "did my click do anything?" gap it was built for. There's also a 200ms delay before the spinner appears, so a fast request doesn't cause a visible flash-then-restore flicker.
+
 ### Never conditionally `return null` from a top-level Provider
 
 `ThemeProvider` (`frontend/src/lib/theme-context.tsx`) used to `return null` while waiting for a `mounted` flag to avoid a flash of the wrong theme. Since it wraps the *entire app* in the root layout, this silently suppressed the server-rendered output of **every page** — the whole admin panel and auth flow rendered as blank/not-found in production for a while before this was caught, and it was hard to trace because pages using `next-intl` translations still looked fine (next-intl inlines all message JSON into the RSC payload regardless of whether the page's own HTML rendered, which masked the bug on translated pages). Any provider that wraps the root layout must always render its `children` — do the actual flash-prevention with a synchronous pre-hydration `<script>` in `app/layout.tsx` instead (reads `localStorage`/`prefers-color-scheme`, applies `.dark` before first paint).
