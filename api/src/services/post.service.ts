@@ -29,7 +29,13 @@ export const postService = {
   async getPublishedBySlug(slug: string) {
     const post = await postRepository.findPublishedBySlug(slug)
     if (!post) return null
-    return flattenTags(post)
+
+    const { previous, next } = await postRepository.findAdjacent({
+      id:          post.id,
+      publishedAt: post.publishedAt!,
+    })
+
+    return { ...flattenTags(post), previousPost: previous, nextPost: next }
   },
 
   async getById(id: string) {

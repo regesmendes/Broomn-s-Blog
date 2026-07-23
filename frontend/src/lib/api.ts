@@ -17,6 +17,11 @@ export interface TagWithCount {
   postCount: number;
 }
 
+export interface AdjacentPost {
+  slug: string;
+  title: string;
+}
+
 export interface Post {
   id: string;
   title: string;
@@ -30,6 +35,8 @@ export interface Post {
   createdAt: string;
   updatedAt: string;
   authorId: string;
+  previousPost?: AdjacentPost | null;
+  nextPost?: AdjacentPost | null;
 }
 
 export interface Comment {
