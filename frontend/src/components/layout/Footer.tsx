@@ -13,12 +13,20 @@ export default function Footer() {
         <p className="text-sm text-gray-500 dark:text-gray-400">
           &copy; {new Date().getFullYear()} Broomn&apos;s Blog. {t('rights')}
         </p>
-        <Link
-          href="/newsletter"
-          className="text-sm text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-300"
-        >
-          {tHeader('newsletter')}
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/newsletter"
+            className="text-sm text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-300"
+          >
+            {tHeader('newsletter')}
+          </Link>
+          <Link
+            href="/support"
+            className="text-sm text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-300"
+          >
+            {t('sayThanks')}
+          </Link>
+        </div>
       </div>
     </footer>
   );

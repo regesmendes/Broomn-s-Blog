@@ -1,4 +1,4 @@
-import { Stack, StackProps, CfnOutput, SecretValue } from 'aws-cdk-lib';
+import { Stack, StackProps, CfnOutput, SecretValue, RemovalPolicy } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 
@@ -18,6 +18,8 @@ export interface CognitoStackProps extends StackProps {
 export class CognitoStack extends Stack {
   /** The Cognito User Pool ID */
   public readonly userPoolId: string;
+  /** The Cognito User Pool ARN */
+  public readonly userPoolArn: string;
   /** The Cognito App Client ID */
   public readonly userPoolClientId: string;
   /** The Cognito hosted UI domain */
@@ -38,9 +40,13 @@ export class CognitoStack extends Stack {
         fullname: { required: false, mutable: true },
       },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+      // RETAIN in prod — this pool has no user export/backup today (see
+      // docs/disaster-recovery.md), so an accidental stack deletion must not
+      // also delete every Google-linked user. Non-prod stacks fall back to
+      // CDK's default (DESTROY) since they're disposable.
       removalPolicy: Stack.of(this).stackName.includes('prod')
-        ? undefined // RETAIN for production
-        : undefined, // Default behavior
+        ? RemovalPolicy.RETAIN
+        : undefined,
     });
 
     // Google Identity Provider
@@ -94,6 +100,7 @@ export class CognitoStack extends Stack {
 
     // Store references for cross-stack usage
     this.userPoolId = userPool.userPoolId;
+    this.userPoolArn = userPool.userPoolArn;
     this.userPoolClientId = userPoolClient.userPoolClientId;
     this.cognitoDomain = domain.domainName;
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Broomn's Blog — full-stack blog + newsletter app, live at https://blogdobroomn.com. See @README.md for local setup and orientation, and `docs/` for deeper reference — `docs/architecture.md` (data model, auth flow, design decisions), `docs/api.md` (endpoints), `docs/deployment.md` (AWS CDK procedures). Both are kept current and are the source of truth for this repo.
+Broomn's Blog — full-stack blog + newsletter app, live at https://blogdobroomn.com. See @README.md for local setup and orientation, and `docs/` for deeper reference — `docs/architecture.md` (data model, auth flow, design decisions), `docs/api.md` (endpoints), `docs/deployment.md` (AWS CDK procedures), `docs/disaster-recovery.md` (RPO/RTO target, backup posture, recovery runbooks). All are kept current and are the source of truth for this repo.
 
 ## Structure
 
@@ -30,8 +30,8 @@ Both `api` and `frontend` have real ESLint configs. `frontend`'s `next.config.ts
 - Never `return null` (even conditionally) from a Provider that wraps the root layout (e.g. `ThemeProvider`) — it silently blanks SSR output for the whole app. See `docs/architecture.md`'s "Never conditionally return null from a top-level Provider".
 - Local dev sends real newsletter emails via SES if `api/.env` has working AWS credentials — there is no dev/test stub for SES.
 - The `broomns-blog-migrate` Lambda is the only network path into the private-subnet RDS instance — it's used both for `prisma migrate deploy` and one-off admin SQL (e.g. promoting a user to ADMIN). See `docs/deployment.md`'s "Running database migrations / one-off admin SQL".
-- No CI pipeline exists yet — correctness is enforced by convention only (tests must pass locally before merging to `master`).
-- Media uploads go directly to S3 (`api/src/lib/s3.ts`, `S3_BUCKET_NAME` env var) — no dev-mode fallback, local dev hits the real bucket too if AWS credentials are configured (same pattern as SES).
+- CI (`.github/workflows/ci.yml`) runs lint/build/test for `api`/`frontend`/`infrastructure` on every PR/push to `master` or `prod`, and both branches have real GitHub branch protection enforcing it (`enforce_admins: true` — a failing check blocks the merge button for admins too, not just convention). See `docs/architecture.md`'s "CI/CD pipeline" under Architecture Decisions.
+- Media uploads go directly to S3 (`api/src/lib/s3.ts`, `S3_BUCKET_NAME` env var) — no dev-mode fallback, local dev hits the real bucket too if AWS credentials are configured (same pattern as SES). This is about the upload/delete *destination* only — the admin media library (`GET /media`) lists rows from your local Postgres `Media` table, not the S3 bucket's contents, so a fresh/seeded local DB shows none of production's existing images even when pointed at the real bucket. The two only line up if your local DB actually has matching `Media` rows (e.g. restored from a prod snapshot).
 - All list endpoints use cursor pagination (`api/src/lib/pagination.ts`'s `paginateWithCursor`), not `page`/`skip` — new list endpoints should follow the same pattern (`cursor`/`limit` query params, `orderBy: [{field: 'desc'}, {id: 'desc'}]` for a stable tiebreaker). See `docs/architecture.md`'s "Cursor-based pagination" under Architecture Decisions.
 - Rate limiting keys by authenticated user (verified JWT `sub`), falling back to IP — see `docs/architecture.md`'s "Per-user rate limiting". The in-memory store is per-Lambda-instance, not a true distributed limit; a known, accepted tradeoff.
 

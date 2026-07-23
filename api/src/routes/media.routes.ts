@@ -78,7 +78,7 @@ export async function mediaRoutes(app: FastifyInstance) {
           where,
           orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
           include: {
-            _count: { select: { posts: true, aboutPages: true } },
+            _count: { select: { posts: true, aboutPages: true, supportPages: true } },
           },
           ...args,
         }),
@@ -89,7 +89,7 @@ export async function mediaRoutes(app: FastifyInstance) {
       ...result,
       data: result.data.map((m) => ({
         ...m,
-        usageCount: m._count.posts + m._count.aboutPages,
+        usageCount: m._count.posts + m._count.aboutPages + m._count.supportPages,
         _count: undefined,
       })),
     })
@@ -108,6 +108,7 @@ export async function mediaRoutes(app: FastifyInstance) {
           },
         },
         aboutPages: true,
+        supportPages: true,
       },
     })
 
@@ -119,7 +120,9 @@ export async function mediaRoutes(app: FastifyInstance) {
       ...media,
       posts: media.posts.map((mp) => mp.post),
       usedInAboutPage: media.aboutPages.length > 0,
+      usedInSupportPage: media.supportPages.length > 0,
       aboutPages: undefined,
+      supportPages: undefined,
     })
   })
 
@@ -164,6 +167,7 @@ export async function mediaRoutes(app: FastifyInstance) {
       include: {
         posts: { include: { post: true } },
         aboutPages: { include: { aboutPage: true } },
+        supportPages: { include: { supportPage: true } },
       },
     })
 
@@ -195,10 +199,27 @@ export async function mediaRoutes(app: FastifyInstance) {
       })
     })
 
-    await Promise.all([...postUpdates, ...aboutUpdates])
+    // Update the Support page too, if it uses this image
+    const supportUpdates = media.supportPages.map((map) => {
+      const updatedContent = map.supportPage.content.replace(
+        new RegExp(escapeRegex(media.url), 'g'),
+        newUrl
+      )
+      return prisma.supportPage.update({
+        where: { id: map.supportPage.id },
+        data: { content: updatedContent },
+      })
+    })
+
+    await Promise.all([...postUpdates, ...aboutUpdates, ...supportUpdates])
+
+    const extraPages = [
+      aboutUpdates.length > 0 ? 'the About page' : null,
+      supportUpdates.length > 0 ? 'the Support page' : null,
+    ].filter(Boolean)
 
     return reply.send({
-      message: `Replaced in ${postUpdates.length} post(s)${aboutUpdates.length > 0 ? ' and the About page' : ''}`,
+      message: `Replaced in ${postUpdates.length} post(s)${extraPages.length > 0 ? ` and ${extraPages.join(' and ')}` : ''}`,
       postsUpdated: postUpdates.length,
     })
   })

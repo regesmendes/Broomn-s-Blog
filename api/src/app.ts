@@ -13,6 +13,7 @@ import { newsletterRoutes } from './routes/newsletter.routes'
 import { tagRoutes } from './routes/tag.routes'
 import { mediaRoutes } from './routes/media.routes'
 import { aboutRoutes } from './routes/about.routes'
+import { supportRoutes } from './routes/support.routes'
 import { devAuthRoutes } from './routes/dev-auth.routes'
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -104,6 +105,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.register(commentRoutes)
   app.register(newsletterRoutes, { prefix: '/newsletter' })
   app.register(aboutRoutes, { prefix: '/about' })
+  app.register(supportRoutes, { prefix: '/support' })
 
   // Dev-only routes (never available in production)
   if (process.env.NODE_ENV !== 'production') {

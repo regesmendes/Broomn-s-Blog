@@ -1,9 +1,9 @@
 import type { MetadataRoute } from 'next';
 import { routing } from '@/i18n/routing';
+import { SITE_URL } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 
-const SITE_URL = 'https://blogdobroomn.com';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface SitemapPost {
@@ -40,6 +40,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPaths: { path: string; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency'] }[] = [
     { path: '', changeFrequency: 'daily' },
     { path: '/about', changeFrequency: 'monthly' },
+    { path: '/support', changeFrequency: 'monthly' },
     { path: '/newsletter', changeFrequency: 'monthly' },
   ];
 

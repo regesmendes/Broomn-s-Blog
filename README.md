@@ -20,6 +20,7 @@ This README covers local setup and orientation. Deeper reference material lives 
 - **[docs/architecture.md](./docs/architecture.md)** — data model, auth flow, and the reasoning behind every non-obvious design decision (cursor pagination, post scheduling, rate limiting, CI/CD pipeline, etc).
 - **[docs/api.md](./docs/api.md)** — full REST endpoint reference (public / authenticated / admin).
 - **[docs/deployment.md](./docs/deployment.md)** — AWS CDK deployment procedures, known footguns, and key resource identifiers.
+- **[docs/disaster-recovery.md](./docs/disaster-recovery.md)** — RPO/RTO target, current backup posture, and per-resource recovery runbooks (RDS, S3, Cognito, region loss).
 
 ## Current Status
 
@@ -30,7 +31,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 ### What's working
 
 - ✅ REST API with all CRUD endpoints (posts, comments, newsletter, auth)
-- ✅ 80 passing tests covering all API modules
+- ✅ 122 passing tests covering all API modules
 - ✅ Role-based access control (public, authenticated user, admin)
 - ✅ JWT authentication with access/refresh token flow
 - ✅ Cognito integration with real Google OAuth login, live in production
@@ -51,10 +52,12 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 - ✅ On-the-fly post translation via MyMemory API (preserves HTML structure)
 - ✅ Image captions in the post editor, tied to that specific image occurrence in that specific post
 - ✅ Editable About page (rich text, media library images) with a top-nav link, admin-editable, no comments
+- ✅ "Say Thanks" support page (`/support`, footer link) — same singleton/rich-text pattern as About, listing free ways to help plus optional Pix/Buy Me a Coffee/PayPal links entered by the admin
 - ✅ TypeScript compiles clean across all three projects (api, frontend, infrastructure)
 - ✅ Tab favicon spins while any API request is in flight — feedback that a click registered, even before the page itself shows anything
 - ✅ `robots.txt`/`sitemap.xml` (`frontend/src/app/robots.ts`/`sitemap.ts`) — the sitemap is dynamically generated from live published posts, in both locales
 - ✅ Google Analytics (GA4), wired via `next/script` with manual page_view tracking on client-side route changes (App Router navigations don't trigger gtag's automatic one)
+- ✅ Social share buttons on every post (X, Facebook, LinkedIn, WhatsApp, Instagram, copy-link) — pre-filled share-intent links, no OAuth or platform APIs; Instagram falls back to copy-link with a paste-it-yourself hint
 
 ### Known Issues
 
@@ -213,7 +216,7 @@ Node.js 25 introduced a built-in `localStorage` global that requires `--localsto
 
 ```bash
 cd api
-npm test              # Runs all 80 tests
+npm test              # Runs all 122 tests
 ```
 
 ## Contributing
@@ -223,5 +226,5 @@ This is a personal project. If you're reading this as a collaborator or future-m
 1. **API pattern**: routes → controllers → services → repositories. Add new features by following the existing post/comment/newsletter pattern.
 2. **Tests**: Run `npm test` in `api/` before committing. Add tests for new endpoints.
 3. **Frontend**: Run `npm run dev` in `frontend/`. TypeScript errors caught by `npx tsc --noEmit`.
-4. **No commits to master without tests passing.** CI runs automatically on every PR/push to `master`, but only `prod` has branch protection actually enforcing it (see [docs/architecture.md#cicd-pipeline](./docs/architecture.md#cicd-pipeline)) — `master` still relies on this being followed by convention.
-5. **Always update the docs** ([docs/architecture.md](./docs/architecture.md), [docs/api.md](./docs/api.md), [docs/deployment.md](./docs/deployment.md), or this README) when adding features or changing architecture, before raising a PR.
+4. **No commits to master without tests passing.** CI runs automatically on every PR/push to `master`, and GitHub branch protection now actually enforces it on both `master` and `prod` (see [docs/architecture.md#cicd-pipeline](./docs/architecture.md#cicd-pipeline)) — a PR with a failing check can't be merged, not even by an admin.
+5. **Always update the docs** ([docs/architecture.md](./docs/architecture.md), [docs/api.md](./docs/api.md), [docs/deployment.md](./docs/deployment.md), [docs/disaster-recovery.md](./docs/disaster-recovery.md), or this README) when adding features or changing architecture, before raising a PR.

@@ -17,6 +17,11 @@ export interface TagWithCount {
   postCount: number;
 }
 
+export interface AdjacentPost {
+  slug: string;
+  title: string;
+}
+
 export interface Post {
   id: string;
   title: string;
@@ -30,6 +35,8 @@ export interface Post {
   createdAt: string;
   updatedAt: string;
   authorId: string;
+  previousPost?: AdjacentPost | null;
+  nextPost?: AdjacentPost | null;
 }
 
 export interface Comment {
@@ -89,9 +96,16 @@ export interface MediaItem {
 export interface MediaDetail extends MediaItem {
   posts: { id: string; title: string; slug: string }[];
   usedInAboutPage: boolean;
+  usedInSupportPage: boolean;
 }
 
 export interface AboutPage {
+  id: string;
+  content: string;
+  updatedAt: string;
+}
+
+export interface SupportPage {
   id: string;
   content: string;
   updatedAt: string;
@@ -475,6 +489,20 @@ class ApiClient {
 
   async updateAbout(content: string, token: string): Promise<AboutPage> {
     return this.request<AboutPage>('/about', {
+      method: 'PUT',
+      headers: this.authHeaders(token),
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  // Support page
+
+  async getSupport(): Promise<SupportPage> {
+    return this.request<SupportPage>('/support');
+  }
+
+  async updateSupport(content: string, token: string): Promise<SupportPage> {
+    return this.request<SupportPage>('/support', {
       method: 'PUT',
       headers: this.authHeaders(token),
       body: JSON.stringify({ content }),

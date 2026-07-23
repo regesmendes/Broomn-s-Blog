@@ -13,6 +13,11 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+interface Dimensions {
+  width: number;
+  height: number;
+}
+
 export default function MediaLibraryPage() {
   const { getToken } = useAuth();
   const [media, setMedia] = useState<MediaItem[]>([]);
@@ -24,8 +29,20 @@ export default function MediaLibraryPage() {
   const [search, setSearch] = useState('');
   const [hasMore, setHasMore] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  // Read from the <img> itself once it loads — there's no thumbnail
+  // pipeline, images are served at full resolution, so naturalWidth/Height
+  // is the real size at no extra cost (the browser already downloaded the
+  // whole file to display it). Keyed by media id and shared between the
+  // grid and the detail panel, so switching selection doesn't need to wait
+  // for a second load if the thumbnail already reported it.
+  const [dimensions, setDimensions] = useState<Record<string, Dimensions>>({});
   const pagination = useCursorPagination();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageLoad = (id: string) => (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth, naturalHeight } = e.currentTarget;
+    setDimensions((prev) => ({ ...prev, [id]: { width: naturalWidth, height: naturalHeight } }));
+  };
 
   const loadMedia = useCallback(async () => {
     const token = getToken();
@@ -178,6 +195,7 @@ export default function MediaLibraryPage() {
                     <img
                       src={item.url}
                       alt={item.originalName}
+                      onLoad={handleImageLoad(item.id)}
                       className="h-full w-full object-cover"
                     />
                   </div>
@@ -188,6 +206,7 @@ export default function MediaLibraryPage() {
                     <div className="mt-1 flex items-center justify-between">
                       <span className="text-xs text-gray-500 dark:text-gray-400">
                         {formatFileSize(item.size)}
+                        {dimensions[item.id] && ` · ${dimensions[item.id].width}×${dimensions[item.id].height}`}
                       </span>
                       {item.usageCount > 0 && (
                         <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
@@ -228,6 +247,7 @@ export default function MediaLibraryPage() {
               <img
                 src={selectedDetail.url}
                 alt={selectedDetail.originalName}
+                onLoad={handleImageLoad(selectedDetail.id)}
                 className="w-full object-contain"
                 style={{ maxHeight: '240px' }}
               />
@@ -238,6 +258,8 @@ export default function MediaLibraryPage() {
             </h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {formatFileSize(selectedDetail.size)} · {selectedDetail.mimeType}
+              {dimensions[selectedDetail.id] &&
+                ` · ${dimensions[selectedDetail.id].width}×${dimensions[selectedDetail.id].height}`}
             </p>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Uploaded {new Date(selectedDetail.createdAt).toLocaleDateString()}

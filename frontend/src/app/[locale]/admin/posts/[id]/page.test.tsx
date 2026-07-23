@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
-import { forwardRef, useImperativeHandle } from 'react';
+import { forwardRef, useImperativeHandle, useCallback, useState } from 'react';
 import EditPostPage from './page';
 import api from '@/lib/api';
 import type { Post } from '@/lib/api';
@@ -15,8 +15,21 @@ vi.mock('@/i18n/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
+// A real (mini) implementation, not a static mock: getToken must change
+// *identity* on a token refresh, exactly like the real auth-context's
+// `getToken = useCallback(() => state.accessToken, [state.accessToken])` —
+// that's what lets a stale, already-armed autosave closure end up holding an
+// old getToken instead of the current one. setMockToken lets a test drive a
+// "background token refresh" from outside the component tree.
+let setMockToken: ((token: string) => void) | null = null;
+
 vi.mock('@/lib/auth-context', () => ({
-  useAuth: () => ({ getToken: () => 'test-token', isLoading: false }),
+  useAuth: () => {
+    const [token, setToken] = useState('token-1');
+    setMockToken = setToken;
+    const getToken = useCallback(() => token, [token]);
+    return { getToken, isLoading: false };
+  },
 }));
 
 vi.mock('@/components/ImagePickerModal', () => ({
@@ -128,7 +141,7 @@ describe('EditPostPage — save feedback and autosave', () => {
     expect(mockUpdatePost).toHaveBeenCalledWith(
       'post-1',
       expect.objectContaining({ content: '<p>Edited content</p>' }),
-      'test-token'
+      'token-1'
     );
     expect(screen.getByText(/auto-saved at/i)).toBeInTheDocument();
 
@@ -137,6 +150,34 @@ describe('EditPostPage — save feedback and autosave', () => {
     });
 
     expect(screen.queryByText(/auto-saved at/i)).not.toBeInTheDocument();
+  });
+
+  it('picks up a token refreshed in the background instead of the stale one the autosave loop was armed with', async () => {
+    await renderAndLoad();
+
+    // Simulate AuthContext refreshing the access token some time after the
+    // autosave loop was first armed (in loadPost) — the loop itself is
+    // untouched by this, exactly like production: only future ticks should
+    // see the new token, and only if they read it through a ref rather than
+    // the closure captured back when the loop was armed.
+    await act(async () => {
+      setMockToken?.('token-2');
+    });
+
+    fireEvent.change(screen.getByTestId('content-editor'), {
+      target: { value: '<p>Edited after refresh</p>' },
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTOSAVE_INTERVAL_MS);
+    });
+
+    expect(mockUpdatePost).toHaveBeenCalledTimes(1);
+    expect(mockUpdatePost).toHaveBeenCalledWith(
+      'post-1',
+      expect.objectContaining({ content: '<p>Edited after refresh</p>' }),
+      'token-2'
+    );
   });
 
   it('skips the autosave tick when nothing changed since the last save', async () => {

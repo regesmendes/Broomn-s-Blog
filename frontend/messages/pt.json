@@ -73,13 +73,31 @@
     "signInToComment": "Entre para deixar um comentário.",
     "awaitingModeration": "Seu comentário foi enviado e está aguardando moderação.",
     "commentLimitReached": "Você tem muitos comentários aguardando moderação. Aguarde um administrador revisar seus comentários existentes antes de postar mais.",
-    "authorReplyBadge": "Autor"
+    "authorReplyBadge": "Autor",
+    "previousPost": "Anterior",
+    "nextPost": "Próximo"
   },
   "footer": {
-    "rights": "Todos os direitos reservados."
+    "rights": "Todos os direitos reservados.",
+    "sayThanks": "Diga Obrigado"
   },
   "about": {
     "title": "Sobre",
     "backHome": "← Voltar para o início"
+  },
+  "support": {
+    "title": "Diga Obrigado",
+    "backHome": "← Voltar para o início"
+  },
+  "share": {
+    "label": "Compartilhar:",
+    "x": "Compartilhar no X",
+    "facebook": "Compartilhar no Facebook",
+    "linkedin": "Compartilhar no LinkedIn",
+    "whatsapp": "Compartilhar no WhatsApp",
+    "instagram": "Compartilhar no Instagram",
+    "copyLink": "Copiar link",
+    "copied": "Link copiado!",
+    "instagramCopied": "Link copiado — cole no seu Instagram (bio, story ou DM)."
   }
 }

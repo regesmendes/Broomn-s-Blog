@@ -73,13 +73,31 @@
     "signInToComment": "Sign in to leave a comment.",
     "awaitingModeration": "Your comment has been submitted and is awaiting moderation.",
     "commentLimitReached": "You have too many comments awaiting moderation. Please wait until an admin reviews your existing comments before posting more.",
-    "authorReplyBadge": "Author"
+    "authorReplyBadge": "Author",
+    "previousPost": "Previous",
+    "nextPost": "Next"
   },
   "footer": {
-    "rights": "All rights reserved."
+    "rights": "All rights reserved.",
+    "sayThanks": "Say Thanks"
   },
   "about": {
     "title": "About",
     "backHome": "← Back to home"
+  },
+  "support": {
+    "title": "Say Thanks",
+    "backHome": "← Back to home"
+  },
+  "share": {
+    "label": "Share:",
+    "x": "Share on X",
+    "facebook": "Share on Facebook",
+    "linkedin": "Share on LinkedIn",
+    "whatsapp": "Share on WhatsApp",
+    "instagram": "Share on Instagram",
+    "copyLink": "Copy link",
+    "copied": "Link copied!",
+    "instagramCopied": "Link copied — paste it in your Instagram bio, story, or DM."
   }
 }

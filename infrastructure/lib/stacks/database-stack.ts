@@ -91,6 +91,23 @@ export class DatabaseStack extends cdk.Stack {
       publiclyAccessible: false,
     });
 
+    // Automatic credential rotation every 90 days. The rotation Lambda AWS
+    // deploys needs to reach both RDS and the Secrets Manager API — placing
+    // it in PRIVATE_WITH_EGRESS (not the default, which mirrors the
+    // instance's own PRIVATE_ISOLATED placement and has no internet route)
+    // lets it ride the VPC's existing NAT Gateway instead of requiring a new
+    // VPC interface endpoint. Reusing lambdaSecurityGroup (already has an
+    // ingress rule into dbSecurityGroup on 5432) avoids provisioning a new
+    // security group + rule just for this. See docs/disaster-recovery.md —
+    // the app fetches DB credentials from this secret dynamically at cold
+    // start (api/src/lib/dbCredentials.ts) specifically so rotation doesn't
+    // silently break the API/migrate Lambdas until a redeploy.
+    this.dbInstance.addRotationSingleUser({
+      automaticallyAfter: cdk.Duration.days(90),
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      securityGroup: this.lambdaSecurityGroup,
+    });
+
     // ── Outputs ─────────────────────────────────────────────────────────────
 
     new cdk.CfnOutput(this, 'DatabaseEndpoint', {

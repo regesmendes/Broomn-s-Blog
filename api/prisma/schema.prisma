@@ -137,8 +137,9 @@ model Media {
   url          String   // public URL
   createdAt    DateTime @default(now())
 
-  posts      MediaOnPosts[]
-  aboutPages MediaOnAboutPage[]
+  posts        MediaOnPosts[]
+  aboutPages   MediaOnAboutPage[]
+  supportPages MediaOnSupportPage[]
 
   @@map("media")
 }
@@ -177,4 +178,29 @@ model MediaOnAboutPage {
 
   @@id([mediaId, aboutPageId])
   @@map("media_on_about_page")
+}
+
+// ─── Support page ─────────────────────────────────────────────────────────────
+// Singleton — exactly one row, seeded by migration. Enforced at the
+// application layer (support.repository.ts always reads/updates that one row).
+
+model SupportPage {
+  id        String   @id @default(cuid())
+  content   String   // rich text / HTML
+  updatedAt DateTime @updatedAt
+
+  media MediaOnSupportPage[]
+
+  @@map("support_page")
+}
+
+model MediaOnSupportPage {
+  mediaId       String
+  supportPageId String
+
+  media       Media       @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  supportPage SupportPage @relation(fields: [supportPageId], references: [id], onDelete: Cascade)
+
+  @@id([mediaId, supportPageId])
+  @@map("media_on_support_page")
 }
