@@ -6,6 +6,8 @@ import { CommentSection } from '@/components/CommentSection';
 import { PostContent } from '@/components/PostContent';
 import { TranslatableTitle } from '@/components/TranslatableTitle';
 import { Divider } from '@/components/Divider';
+import { ShareButtons } from '@/components/ShareButtons';
+import { SITE_URL } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 
@@ -103,6 +105,14 @@ export default async function PostPage({
       <Divider />
 
       <PostContent content={post.content} />
+
+      <div className="my-8 flex justify-center">
+        <ShareButtons
+          url={`${SITE_URL}/${locale}/posts/${post.slug}`}
+          title={post.title}
+          excerpt={post.excerpt}
+        />
+      </div>
 
       {/* Comments */}
       <CommentSection postId={post.id} />

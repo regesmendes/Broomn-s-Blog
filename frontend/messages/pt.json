@@ -86,5 +86,16 @@
   "support": {
     "title": "Diga Obrigado",
     "backHome": "← Voltar para o início"
+  },
+  "share": {
+    "label": "Compartilhar:",
+    "x": "Compartilhar no X",
+    "facebook": "Compartilhar no Facebook",
+    "linkedin": "Compartilhar no LinkedIn",
+    "whatsapp": "Compartilhar no WhatsApp",
+    "instagram": "Compartilhar no Instagram",
+    "copyLink": "Copiar link",
+    "copied": "Link copiado!",
+    "instagramCopied": "Link copiado — cole no seu Instagram (bio, story ou DM)."
   }
 }
