@@ -13,7 +13,7 @@ export const handler = async (event: any, context: any) => {
     // ./app) is ever loaded. Hence the runtime require() below instead of a
     // static top-level import.
     process.env.DATABASE_URL = await getDatabaseUrl()
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { buildApp } = require('./app')
     const app = await buildApp()
     proxy = awsLambdaFastify(app)
