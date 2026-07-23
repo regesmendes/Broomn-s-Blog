@@ -195,8 +195,8 @@ describe('Posts API', () => {
     })
 
     it('returns both neighbors when the post is in the middle of the list', async () => {
-      const nextPost = { slug: 'older-post', title: 'Older Post' }
-      const previousPost = { slug: 'newer-post', title: 'Newer Post' }
+      const nextPost = { slug: 'newer-post', title: 'Newer Post' }
+      const previousPost = { slug: 'older-post', title: 'Older Post' }
 
       mockPrisma.post.findFirst
         .mockResolvedValueOnce(mockPost)
@@ -212,34 +212,35 @@ describe('Posts API', () => {
       const body = res.json()
       expect(body.nextPost).toEqual(nextPost)
       expect(body.previousPost).toEqual(previousPost)
+      // "next" (newer) is looked up ascending; "previous" (older) descending
       expect(mockPrisma.post.findFirst).toHaveBeenNthCalledWith(2, expect.objectContaining({
-        orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
+        orderBy: [{ publishedAt: 'asc' }, { id: 'asc' }],
       }))
       expect(mockPrisma.post.findFirst).toHaveBeenNthCalledWith(3, expect.objectContaining({
-        orderBy: [{ publishedAt: 'asc' }, { id: 'asc' }],
+        orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
       }))
     })
 
-    it('omits "previous" for the newest post and "next" for the oldest post', async () => {
-      // Newest post in the order: nothing newer, so no "previous"
+    it('omits "next" for the newest post and "previous" for the oldest post', async () => {
+      // Newest post in the order: nothing newer, so no "next"
       mockPrisma.post.findFirst
         .mockResolvedValueOnce(mockPost)
-        .mockResolvedValueOnce({ slug: 'older-post', title: 'Older Post' })
         .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ slug: 'older-post', title: 'Older Post' })
 
       const newestRes = await app.inject({ method: 'GET', url: '/posts/test-post' })
-      expect(newestRes.json().previousPost).toBe(null)
-      expect(newestRes.json().nextPost).not.toBe(null)
+      expect(newestRes.json().nextPost).toBe(null)
+      expect(newestRes.json().previousPost).not.toBe(null)
 
-      // Oldest post in the order: nothing older, so no "next"
+      // Oldest post in the order: nothing older, so no "previous"
       mockPrisma.post.findFirst
         .mockResolvedValueOnce(mockPost)
-        .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({ slug: 'newer-post', title: 'Newer Post' })
+        .mockResolvedValueOnce(null)
 
       const oldestRes = await app.inject({ method: 'GET', url: '/posts/test-post' })
-      expect(oldestRes.json().nextPost).toBe(null)
-      expect(oldestRes.json().previousPost).not.toBe(null)
+      expect(oldestRes.json().previousPost).toBe(null)
+      expect(oldestRes.json().nextPost).not.toBe(null)
     })
   })
 
