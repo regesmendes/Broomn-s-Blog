@@ -160,8 +160,13 @@ export class ApiStack extends Stack {
       memorySize: 512,
       timeout: Duration.minutes(5),
       vpc: props.vpc,
+      // PRIVATE_WITH_EGRESS, not PRIVATE_ISOLATED — same reason as apiFunction
+      // above: this Lambda fetches DB credentials from Secrets Manager at cold
+      // start (api/src/lib/dbCredentials.ts), and Secrets Manager has no VPC
+      // Gateway Endpoint, so PRIVATE_ISOLATED left that call with no route out,
+      // hanging until timeout. RDS is still reachable either way (same-VPC).
       vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
       },
       securityGroups: [props.lambdaSecurityGroup],
       bundling: {
