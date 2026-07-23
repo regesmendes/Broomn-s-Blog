@@ -7,6 +7,7 @@ import { PostContent } from '@/components/PostContent';
 import { TranslatableTitle } from '@/components/TranslatableTitle';
 import { Divider } from '@/components/Divider';
 import { ShareButtons } from '@/components/ShareButtons';
+import { PostNavigation } from '@/components/PostNavigation';
 import { SITE_URL } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
@@ -113,6 +114,8 @@ export default async function PostPage({
           excerpt={post.excerpt}
         />
       </div>
+
+      <PostNavigation previous={post.previousPost ?? null} next={post.nextPost ?? null} />
 
       {/* Comments */}
       <CommentSection postId={post.id} />

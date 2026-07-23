@@ -148,22 +148,28 @@ describe('Posts API', () => {
   // ── GET /posts/:slug ───────────────────────────────────────────────────────
 
   describe('GET /posts/:slug', () => {
-    it('returns a post by slug', async () => {
-      const mockPost = {
-        id: '1',
-        title: 'Test Post',
-        slug: 'test-post',
-        excerpt: 'A test',
-        content: '<p>Hello</p>',
-        coverImage: null,
-        status: 'PUBLISHED',
-        publishedAt: new Date('2024-01-01'),
-        createdAt: new Date('2024-01-01'),
-        updatedAt: new Date('2024-01-01'),
-        tags: [],
-      }
+    const mockPost = {
+      id: '2',
+      title: 'Test Post',
+      slug: 'test-post',
+      excerpt: 'A test',
+      content: '<p>Hello</p>',
+      coverImage: null,
+      status: 'PUBLISHED',
+      publishedAt: new Date('2024-01-15'),
+      createdAt: new Date('2024-01-15'),
+      updatedAt: new Date('2024-01-15'),
+      tags: [],
+    }
 
-      mockPrisma.post.findFirst.mockResolvedValue(mockPost)
+    it('returns a post by slug, with no adjacent posts (only one published)', async () => {
+      // Call order: main post lookup, then next, then previous (Promise.all
+      // preserves array order for when each call is issued, even though they
+      // resolve concurrently)
+      mockPrisma.post.findFirst
+        .mockResolvedValueOnce(mockPost)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null)
 
       const res = await app.inject({
         method: 'GET',
@@ -171,11 +177,14 @@ describe('Posts API', () => {
       })
 
       expect(res.statusCode).toBe(200)
-      expect(res.json().title).toBe('Test Post')
+      const body = res.json()
+      expect(body.title).toBe('Test Post')
+      expect(body.previousPost).toBe(null)
+      expect(body.nextPost).toBe(null)
     })
 
     it('returns 404 for non-existent slug', async () => {
-      mockPrisma.post.findFirst.mockResolvedValue(null)
+      mockPrisma.post.findFirst.mockResolvedValueOnce(null)
 
       const res = await app.inject({
         method: 'GET',
@@ -183,6 +192,55 @@ describe('Posts API', () => {
       })
 
       expect(res.statusCode).toBe(404)
+    })
+
+    it('returns both neighbors when the post is in the middle of the list', async () => {
+      const nextPost = { slug: 'newer-post', title: 'Newer Post' }
+      const previousPost = { slug: 'older-post', title: 'Older Post' }
+
+      mockPrisma.post.findFirst
+        .mockResolvedValueOnce(mockPost)
+        .mockResolvedValueOnce(nextPost)
+        .mockResolvedValueOnce(previousPost)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/posts/test-post',
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.nextPost).toEqual(nextPost)
+      expect(body.previousPost).toEqual(previousPost)
+      // "next" (newer) is looked up ascending; "previous" (older) descending
+      expect(mockPrisma.post.findFirst).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        orderBy: [{ publishedAt: 'asc' }, { id: 'asc' }],
+      }))
+      expect(mockPrisma.post.findFirst).toHaveBeenNthCalledWith(3, expect.objectContaining({
+        orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
+      }))
+    })
+
+    it('omits "next" for the newest post and "previous" for the oldest post', async () => {
+      // Newest post in the order: nothing newer, so no "next"
+      mockPrisma.post.findFirst
+        .mockResolvedValueOnce(mockPost)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ slug: 'older-post', title: 'Older Post' })
+
+      const newestRes = await app.inject({ method: 'GET', url: '/posts/test-post' })
+      expect(newestRes.json().nextPost).toBe(null)
+      expect(newestRes.json().previousPost).not.toBe(null)
+
+      // Oldest post in the order: nothing older, so no "previous"
+      mockPrisma.post.findFirst
+        .mockResolvedValueOnce(mockPost)
+        .mockResolvedValueOnce({ slug: 'newer-post', title: 'Newer Post' })
+        .mockResolvedValueOnce(null)
+
+      const oldestRes = await app.inject({ method: 'GET', url: '/posts/test-post' })
+      expect(oldestRes.json().previousPost).toBe(null)
+      expect(oldestRes.json().nextPost).not.toBe(null)
     })
   })
 

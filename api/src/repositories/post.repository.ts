@@ -113,6 +113,43 @@ export const postRepository = {
     return { ...page, total }
   },
 
+  /**
+   * Find the posts immediately before/after the given one in the default
+   * (reverse-chronological) order — same tie-broken ordering as
+   * findPublished, same visibility rule (published, not future-scheduled).
+   * "Next" is the newer post; "previous" is the older post.
+   */
+  async findAdjacent(current: { id: string; publishedAt: Date }) {
+    const baseWhere = { status: 'PUBLISHED' as const, publishedAt: { lte: new Date() } }
+
+    const [next, previous] = await Promise.all([
+      prisma.post.findFirst({
+        where: {
+          ...baseWhere,
+          OR: [
+            { publishedAt: { gt: current.publishedAt } },
+            { publishedAt: current.publishedAt, id: { gt: current.id } },
+          ],
+        },
+        orderBy: [{ publishedAt: 'asc' }, { id: 'asc' }],
+        select: { slug: true, title: true },
+      }),
+      prisma.post.findFirst({
+        where: {
+          ...baseWhere,
+          OR: [
+            { publishedAt: { lt: current.publishedAt } },
+            { publishedAt: current.publishedAt, id: { lt: current.id } },
+          ],
+        },
+        orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
+        select: { slug: true, title: true },
+      }),
+    ])
+
+    return { previous, next }
+  },
+
   /** Find a single published post by slug. */
   async findPublishedBySlug(slug: string) {
     return prisma.post.findFirst({
