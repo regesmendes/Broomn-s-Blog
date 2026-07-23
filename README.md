@@ -20,6 +20,7 @@ This README covers local setup and orientation. Deeper reference material lives 
 - **[docs/architecture.md](./docs/architecture.md)** — data model, auth flow, and the reasoning behind every non-obvious design decision (cursor pagination, post scheduling, rate limiting, CI/CD pipeline, etc).
 - **[docs/api.md](./docs/api.md)** — full REST endpoint reference (public / authenticated / admin).
 - **[docs/deployment.md](./docs/deployment.md)** — AWS CDK deployment procedures, known footguns, and key resource identifiers.
+- **[docs/disaster-recovery.md](./docs/disaster-recovery.md)** — RPO/RTO target, current backup posture, and per-resource recovery runbooks (RDS, S3, Cognito, region loss).
 
 ## Current Status
 
@@ -226,4 +227,4 @@ This is a personal project. If you're reading this as a collaborator or future-m
 2. **Tests**: Run `npm test` in `api/` before committing. Add tests for new endpoints.
 3. **Frontend**: Run `npm run dev` in `frontend/`. TypeScript errors caught by `npx tsc --noEmit`.
 4. **No commits to master without tests passing.** CI runs automatically on every PR/push to `master`, but only `prod` has branch protection actually enforcing it (see [docs/architecture.md#cicd-pipeline](./docs/architecture.md#cicd-pipeline)) — `master` still relies on this being followed by convention.
-5. **Always update the docs** ([docs/architecture.md](./docs/architecture.md), [docs/api.md](./docs/api.md), [docs/deployment.md](./docs/deployment.md), or this README) when adding features or changing architecture, before raising a PR.
+5. **Always update the docs** ([docs/architecture.md](./docs/architecture.md), [docs/api.md](./docs/api.md), [docs/deployment.md](./docs/deployment.md), [docs/disaster-recovery.md](./docs/disaster-recovery.md), or this README) when adding features or changing architecture, before raising a PR.

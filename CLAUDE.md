@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Broomn's Blog — full-stack blog + newsletter app, live at https://blogdobroomn.com. See @README.md for local setup and orientation, and `docs/` for deeper reference — `docs/architecture.md` (data model, auth flow, design decisions), `docs/api.md` (endpoints), `docs/deployment.md` (AWS CDK procedures). Both are kept current and are the source of truth for this repo.
+Broomn's Blog — full-stack blog + newsletter app, live at https://blogdobroomn.com. See @README.md for local setup and orientation, and `docs/` for deeper reference — `docs/architecture.md` (data model, auth flow, design decisions), `docs/api.md` (endpoints), `docs/deployment.md` (AWS CDK procedures), `docs/disaster-recovery.md` (RPO/RTO target, backup posture, recovery runbooks). All are kept current and are the source of truth for this repo.
 
 ## Structure
 

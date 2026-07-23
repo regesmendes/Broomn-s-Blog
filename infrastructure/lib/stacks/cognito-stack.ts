@@ -1,4 +1,4 @@
-import { Stack, StackProps, CfnOutput, SecretValue } from 'aws-cdk-lib';
+import { Stack, StackProps, CfnOutput, SecretValue, RemovalPolicy } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
 
@@ -38,9 +38,13 @@ export class CognitoStack extends Stack {
         fullname: { required: false, mutable: true },
       },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+      // RETAIN in prod — this pool has no user export/backup today (see
+      // docs/disaster-recovery.md), so an accidental stack deletion must not
+      // also delete every Google-linked user. Non-prod stacks fall back to
+      // CDK's default (DESTROY) since they're disposable.
       removalPolicy: Stack.of(this).stackName.includes('prod')
-        ? undefined // RETAIN for production
-        : undefined, // Default behavior
+        ? RemovalPolicy.RETAIN
+        : undefined,
     });
 
     // Google Identity Provider

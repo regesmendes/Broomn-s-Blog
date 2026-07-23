@@ -1,6 +1,6 @@
 # Deployment (AWS CDK)
 
-See the root [README](../README.md) for local setup and the [architecture doc](./architecture.md#cicd-pipeline) for how the CI/CD pipeline drives this.
+See the root [README](../README.md) for local setup, the [architecture doc](./architecture.md#cicd-pipeline) for how the CI/CD pipeline drives this, and [disaster-recovery.md](./disaster-recovery.md) for backup posture and recovery runbooks if something goes wrong with the deployed data (RDS, S3, Cognito).
 
 The infrastructure is defined in the `infrastructure/` directory using AWS CDK (TypeScript).
 
