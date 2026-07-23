@@ -64,12 +64,18 @@ export default function EditPostPage() {
     publishedAt: '',
   });
 
-  // Refs mirror the latest form/saving state so the autosave timer (set up
-  // once) always reads current values instead of a stale closure.
+  // Refs mirror the latest form/saving state (and getToken) so the autosave
+  // timer (self-perpetuating via setTimeout) always reads current values
+  // instead of the closure it was originally armed with. Without
+  // getTokenRef, the loop keeps calling whichever getToken was live at the
+  // last (re)arm — missing every background token refresh in between — and
+  // starts failing with 401s once that captured access token expires.
   const formRef = useRef(form);
   formRef.current = form;
   const savingRef = useRef(saving);
   savingRef.current = saving;
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
   // Snapshot of what's actually persisted server-side — an autosave tick
   // skips entirely if the form hasn't changed since this was last updated.
   const lastSavedFormRef = useRef<PostFormData | null>(null);
@@ -104,7 +110,7 @@ export default function EditPostPage() {
 
     setSaving(true);
     try {
-      const token = getToken() || '';
+      const token = getTokenRef.current() || '';
       await api.updatePost(postId, buildUpdatePayload(current), token);
       lastSavedFormRef.current = current;
       setAutosaveFailed(false);
