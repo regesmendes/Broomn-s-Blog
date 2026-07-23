@@ -31,7 +31,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 ### What's working
 
 - ✅ REST API with all CRUD endpoints (posts, comments, newsletter, auth)
-- ✅ 80 passing tests covering all API modules
+- ✅ 122 passing tests covering all API modules
 - ✅ Role-based access control (public, authenticated user, admin)
 - ✅ JWT authentication with access/refresh token flow
 - ✅ Cognito integration with real Google OAuth login, live in production
@@ -216,7 +216,7 @@ Node.js 25 introduced a built-in `localStorage` global that requires `--localsto
 
 ```bash
 cd api
-npm test              # Runs all 80 tests
+npm test              # Runs all 122 tests
 ```
 
 ## Contributing
@@ -226,5 +226,5 @@ This is a personal project. If you're reading this as a collaborator or future-m
 1. **API pattern**: routes → controllers → services → repositories. Add new features by following the existing post/comment/newsletter pattern.
 2. **Tests**: Run `npm test` in `api/` before committing. Add tests for new endpoints.
 3. **Frontend**: Run `npm run dev` in `frontend/`. TypeScript errors caught by `npx tsc --noEmit`.
-4. **No commits to master without tests passing.** CI runs automatically on every PR/push to `master`, but only `prod` has branch protection actually enforcing it (see [docs/architecture.md#cicd-pipeline](./docs/architecture.md#cicd-pipeline)) — `master` still relies on this being followed by convention.
+4. **No commits to master without tests passing.** CI runs automatically on every PR/push to `master`, and GitHub branch protection now actually enforces it on both `master` and `prod` (see [docs/architecture.md#cicd-pipeline](./docs/architecture.md#cicd-pipeline)) — a PR with a failing check can't be merged, not even by an admin.
 5. **Always update the docs** ([docs/architecture.md](./docs/architecture.md), [docs/api.md](./docs/api.md), [docs/deployment.md](./docs/deployment.md), [docs/disaster-recovery.md](./docs/disaster-recovery.md), or this README) when adding features or changing architecture, before raising a PR.
