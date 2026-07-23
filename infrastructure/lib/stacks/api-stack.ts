@@ -12,6 +12,8 @@ import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as rds from 'aws-cdk-lib/aws-rds';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
 
 export interface ApiStackProps extends StackProps {
   /** VPC for Lambda to access Aurora */
@@ -22,6 +24,8 @@ export interface ApiStackProps extends StackProps {
   dbInstance: rds.DatabaseInstance;
   /** Cognito User Pool ID */
   userPoolId: string;
+  /** Cognito User Pool ARN */
+  userPoolArn: string;
   /** Cognito App Client ID */
   userPoolClientId: string;
   /** Cognito Domain */
@@ -30,6 +34,10 @@ export interface ApiStackProps extends StackProps {
   mediaBucketName: string;
   /** S3 media bucket ARN */
   mediaBucketArn: string;
+  /** Private backups bucket name */
+  backupBucketName: string;
+  /** Private backups bucket ARN */
+  backupBucketArn: string;
   /** Route53 Hosted Zone ID for the domain */
   hostedZoneId: string;
   /** Root domain name (blogdobroomn.com) */
@@ -50,11 +58,14 @@ export class ApiStack extends Stack {
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
 
-    // Resolve the real DB credentials at deploy time via a CloudFormation
-    // dynamic reference — never bake the password into the CDK app itself.
+    // DB credentials are deliberately NOT resolved/baked in here. The DB
+    // secret rotates automatically every 90 days (database-stack.ts's
+    // addRotationSingleUser) — baking the password into the Lambda's
+    // environment at deploy time would leave it silently stale after the
+    // first rotation. Instead, both Lambdas fetch it live at cold start via
+    // api/src/lib/dbCredentials.ts, given just the secret's ARN plus the
+    // stable host/port/name below (see docs/disaster-recovery.md).
     const dbSecret = props.dbInstance.secret!;
-    const dbUsername = dbSecret.secretValueFromJson('username').unsafeUnwrap();
-    const dbPassword = dbSecret.secretValueFromJson('password').unsafeUnwrap();
 
     // JWT signing secret for app-issued access/refresh tokens (also used for
     // the newsletter confirm/unsubscribe HMAC tokens). This was previously
@@ -117,7 +128,10 @@ export class ApiStack extends Stack {
       },
       environment: {
         NODE_ENV: 'production',
-        DATABASE_URL: `postgresql://${dbUsername}:${dbPassword}@${props.dbInstance.dbInstanceEndpointAddress}:${props.dbInstance.dbInstanceEndpointPort}/broomnsblog`,
+        DB_SECRET_ARN: dbSecret.secretArn,
+        DB_HOST: props.dbInstance.dbInstanceEndpointAddress,
+        DB_PORT: props.dbInstance.dbInstanceEndpointPort,
+        DB_NAME: 'broomnsblog',
         JWT_SECRET: jwtSecretValue,
         CORS_ORIGIN: `https://${props.domainName}`,
         COGNITO_USER_POOL_ID: props.userPoolId,
@@ -168,13 +182,67 @@ export class ApiStack extends Stack {
         },
       },
       environment: {
-        DATABASE_URL: `postgresql://${dbUsername}:${dbPassword}@${props.dbInstance.dbInstanceEndpointAddress}:${props.dbInstance.dbInstanceEndpointPort}/broomnsblog`,
+        DB_SECRET_ARN: dbSecret.secretArn,
+        DB_HOST: props.dbInstance.dbInstanceEndpointAddress,
+        DB_PORT: props.dbInstance.dbInstanceEndpointPort,
+        DB_NAME: 'broomnsblog',
       },
     });
+
+    // Needs the same DB secret read access as apiFunction, for the same
+    // dynamic-fetch-at-cold-start reason (see dbCredentials.ts)
+    migrateFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['secretsmanager:GetSecretValue'],
+        resources: [dbSecret.secretArn],
+      }),
+    );
 
     new CfnOutput(this, 'MigrateFunctionName', {
       value: migrateFunction.functionName,
       description: 'Invoke this Lambda to run prisma migrate deploy against the live DB',
+    });
+
+    // Scheduled Cognito user export — the only piece of state CDK can't
+    // reproduce (see docs/disaster-recovery.md). No VPC needed: it only
+    // calls the Cognito and S3 public APIs, never touches RDS.
+    const cognitoExportFunction = new NodejsFunction(this, 'CognitoExportFn', {
+      functionName: 'broomns-blog-cognito-export',
+      runtime: lambda.Runtime.NODEJS_24_X,
+      entry: path.join(repoRoot, 'api', 'src', 'cognito-export.ts'),
+      handler: 'handler',
+      depsLockFilePath: path.join(repoRoot, 'package-lock.json'),
+      memorySize: 256,
+      timeout: Duration.minutes(2),
+      environment: {
+        COGNITO_USER_POOL_ID: props.userPoolId,
+        BACKUP_BUCKET_NAME: props.backupBucketName,
+      },
+    });
+
+    cognitoExportFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['cognito-idp:ListUsers'],
+        resources: [props.userPoolArn],
+      }),
+    );
+
+    cognitoExportFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['s3:PutObject'],
+        resources: [`${props.backupBucketArn}/cognito-exports/*`],
+      }),
+    );
+
+    // Weekly cadence matches the ~1-week RPO accepted in docs/disaster-recovery.md
+    new events.Rule(this, 'CognitoExportSchedule', {
+      schedule: events.Schedule.rate(Duration.days(7)),
+      targets: [new eventsTargets.LambdaFunction(cognitoExportFunction)],
+    });
+
+    new CfnOutput(this, 'CognitoExportFunctionName', {
+      value: cognitoExportFunction.functionName,
+      description: 'Invoke this Lambda to run an on-demand Cognito user export',
     });
 
     // IAM: Allow Lambda to upload/delete objects in the media bucket

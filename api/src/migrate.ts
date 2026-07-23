@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import * as path from 'node:path'
+import { getDatabaseUrl } from './lib/dbCredentials'
 
 /**
  * On-demand migration Lambda: runs prisma CLI commands against the live
@@ -25,6 +26,11 @@ export const handler = async (event?: { args?: string[]; stdin?: string }) => {
   const taskRoot = process.env.LAMBDA_TASK_ROOT ?? '/var/task'
   const args = event?.args ?? ['migrate', 'deploy']
 
+  // Fetched fresh (not baked in at deploy time) so this Lambda keeps working
+  // across a scheduled DB credential rotation without needing a redeploy —
+  // see api/src/lib/dbCredentials.ts and docs/disaster-recovery.md.
+  const databaseUrl = await getDatabaseUrl()
+
   const output = execFileSync(
     'node',
     [
@@ -39,6 +45,7 @@ export const handler = async (event?: { args?: string[]; stdin?: string }) => {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: {
         ...process.env,
+        DATABASE_URL: databaseUrl,
         // /var/task is read-only; give anything that wants $HOME a writable dir
         HOME: '/tmp',
         // Point the CLI at the bundled Lambda-compatible schema engine so it
