@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, act } from '@testing-library/react';
+import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ShareButtons } from './ShareButtons';
 
@@ -12,6 +12,20 @@ const post = {
   title: 'A Story',
   excerpt: 'An excerpt',
 };
+
+// `userEvent.setup()` installs its own `navigator.clipboard` stub as a
+// getter-only accessor (see @testing-library/user-event's Clipboard.js), so
+// a plain `Object.assign(navigator, { clipboard: ... })` throws ("has only
+// a getter"). Redefining the property outright (configurable, so it can be
+// redefined again) works regardless of the existing descriptor — but it
+// must run AFTER `userEvent.setup()`, otherwise `setup()` runs next and
+// silently replaces our stub with its own, and our mock is never called.
+function stubClipboard(writeText: ReturnType<typeof vi.fn>) {
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText },
+    configurable: true,
+  });
+}
 
 afterEach(() => {
   cleanup();
@@ -49,29 +63,25 @@ describe('ShareButtons', () => {
 
   it('copies the link and shows the generic copied message', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.assign(navigator, { clipboard: { writeText } });
     const user = userEvent.setup();
+    stubClipboard(writeText);
 
     render(<ShareButtons {...post} />);
-    await act(async () => {
-      await user.click(screen.getByRole('button', { name: 'copyLink' }));
-    });
+    await user.click(screen.getByRole('button', { name: 'copyLink' }));
 
     expect(writeText).toHaveBeenCalledWith(post.url);
-    expect(screen.getByRole('status')).toHaveTextContent('copied');
+    expect(await screen.findByRole('status')).toHaveTextContent('copied');
   });
 
   it('copies the link and shows the Instagram-specific hint', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.assign(navigator, { clipboard: { writeText } });
     const user = userEvent.setup();
+    stubClipboard(writeText);
 
     render(<ShareButtons {...post} />);
-    await act(async () => {
-      await user.click(screen.getByRole('button', { name: 'instagram' }));
-    });
+    await user.click(screen.getByRole('button', { name: 'instagram' }));
 
     expect(writeText).toHaveBeenCalledWith(post.url);
-    expect(screen.getByRole('status')).toHaveTextContent('instagramCopied');
+    expect(await screen.findByRole('status')).toHaveTextContent('instagramCopied');
   });
 });
