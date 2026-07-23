@@ -7,6 +7,14 @@ import { useAuth } from '@/lib/auth-context';
 
 type StatusFilter = 'ALL' | 'DRAFT' | 'PUBLISHED';
 
+// MM/DD/YYYY HH:MM, 24h, no comma — matches the rest of this (English)
+// admin UI rather than toLocaleString's locale-dependent separator/format.
+function formatDateTime(dateString: string): string {
+  const d = new Date(dateString);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export default function AdminPostsPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,7 +88,8 @@ export default function AdminPostsPage() {
             <tr>
               <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Title</th>
               <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Status</th>
-              <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Date</th>
+              <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Created At</th>
+              <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Published At</th>
               <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Actions</th>
             </tr>
           </thead>
@@ -107,7 +116,10 @@ export default function AdminPostsPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
-                  {new Date(post.createdAt).toLocaleDateString('pt-BR')}
+                  {formatDateTime(post.createdAt)}
+                </td>
+                <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                  {post.publishedAt ? formatDateTime(post.publishedAt) : 'N/A'}
                 </td>
                 <td className="px-4 py-3">
                   <button
