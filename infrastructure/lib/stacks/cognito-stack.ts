@@ -18,6 +18,8 @@ export interface CognitoStackProps extends StackProps {
 export class CognitoStack extends Stack {
   /** The Cognito User Pool ID */
   public readonly userPoolId: string;
+  /** The Cognito User Pool ARN */
+  public readonly userPoolArn: string;
   /** The Cognito App Client ID */
   public readonly userPoolClientId: string;
   /** The Cognito hosted UI domain */
@@ -98,6 +100,7 @@ export class CognitoStack extends Stack {
 
     // Store references for cross-stack usage
     this.userPoolId = userPool.userPoolId;
+    this.userPoolArn = userPool.userPoolArn;
     this.userPoolClientId = userPoolClient.userPoolClientId;
     this.cognitoDomain = domain.domainName;
 

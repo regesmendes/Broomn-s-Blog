@@ -116,6 +116,18 @@ aws lambda invoke --function-name broomns-blog-migrate --region us-east-1 \
 
 Note: `prisma db execute` runs the statement but doesn't print `SELECT` results — it's designed for DDL/DML, not querying. If the local `@prisma/engines` package is missing the `rhel-openssl-3.0.x` schema engine binary needed to rebuild this Lambda, fetch it with `PRISMA_CLI_BINARY_TARGETS=native,rhel-openssl-3.0.x npm rebuild @prisma/engines` before redeploying `BromnBlog-Api`.
 
+Note: neither this Lambda nor `BromnBlog-Api`'s main function gets a `DATABASE_URL` baked in at deploy time anymore — both fetch DB credentials live from Secrets Manager at cold start (`api/src/lib/dbCredentials.ts`), since the DB secret now rotates automatically every 90 days. See [disaster-recovery.md](./disaster-recovery.md#secrets-rotation) for details.
+
+## Running an on-demand Cognito user export
+
+A weekly export already runs automatically (EventBridge rule, `broomns-blog-cognito-export` Lambda) and lands in the private backups bucket. To trigger one manually (e.g. right before a risky Cognito change):
+
+```bash
+aws lambda invoke --function-name broomns-blog-cognito-export --region us-east-1 /dev/stdout
+```
+
+See [disaster-recovery.md](./disaster-recovery.md#scenario-cognito-user-pool-lost-or-deleted) for what this export is for and how to use it during an actual recovery.
+
 ## Key AWS Resources
 
 | Resource | Identifier |
@@ -128,9 +140,11 @@ Note: `prisma db execute` runs the statement but doesn't print `SELECT` results 
 | Cognito Domain | `broomns-blog.auth.us-east-1.amazoncognito.com` |
 | CloudFront Distribution | `EKN0G1CK1QQC` |
 | S3 Frontend Bucket | `broomns-blog-frontend-099710233970` |
+| S3 Backups Bucket (private) | `broomns-blog-backups-099710233970` |
 | API Lambda | `broomns-blog-api` |
 | API Gateway | `58m9fzd8lj` |
 | Migration/admin-SQL Lambda | `broomns-blog-migrate` |
+| Cognito Export Lambda | `broomns-blog-cognito-export` (weekly, also invocable on demand) |
 | Frontend SSR Lambda | `broomns-blog-frontend-server` |
 | CDK Bootstrap Assets Bucket | `cdk-hnb659fds-assets-099710233970-us-east-1` |
 | GitHub Actions deploy role | `broomns-blog-github-deploy` (OIDC, trust-scoped to this repo's `prod` branch only) |
