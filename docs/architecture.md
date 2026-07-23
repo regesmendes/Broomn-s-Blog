@@ -9,8 +9,9 @@ See the root [README](../README.md) for setup, the [API reference](./api.md) for
 - **Tag**: name, slug — many-to-many with posts
 - **Comment**: content, approved flag, belongs to user and post; optional self-relation `parentId` (one level of threading — a reply can't itself be replied to) and `isOwnerReply` flag (masked to the "Broomn" persona in public responses, see "Reply as Broomn" below)
 - **Newsletter**: email, status (PENDING/CONFIRMED/UNSUBSCRIBED), optional user link, `blockedAt` (nullable — admin block, orthogonal to `status`; see "Blocking a newsletter subscriber" below)
-- **Media**: filename (S3 key), original name, mime type, size, public URL — many-to-many with posts via `MediaOnPosts` and with the About page via `MediaOnAboutPage`, kept in sync automatically whenever a post's or the About page's content is saved (see `syncMediaUsage` in `post.service.ts` / `about.service.ts`)
+- **Media**: filename (S3 key), original name, mime type, size, public URL — many-to-many with posts via `MediaOnPosts`, with the About page via `MediaOnAboutPage`, and with the Support page via `MediaOnSupportPage`, kept in sync automatically whenever a post's, the About page's, or the Support page's content is saved (see `syncMediaUsage` in `post.service.ts` / `about.service.ts` / `support.service.ts`)
 - **AboutPage**: content (HTML) — a singleton, exactly one row (seeded by migration), no title/tags/scheduling; many-to-many with media via `MediaOnAboutPage`
+- **SupportPage**: content (HTML) — a singleton, exactly one row (seeded by migration), no title/tags/scheduling; many-to-many with media via `MediaOnSupportPage`
 
 ## Authentication Flow
 
@@ -87,6 +88,10 @@ Authored via two custom Tiptap node types (`frontend/src/components/tiptapFigure
 ### About page is a singleton, not a Post
 
 The About page (`/about`, admin editor at `/admin/about`) is deliberately its own model rather than a `Post` with a reserved slug — it doesn't need tags, a publish/schedule workflow, or listing/search, and reusing `Post` would mean filtering it out of every place that lists or searches posts. `AboutPage` has exactly one row, seeded by its migration so `/about` never 404s waiting for an admin to save content the first time; the API only ever finds-or-updates that row, there's no create/delete. It reuses the same editor UI (`RichTextEditor` + `ImagePickerModal`) and public rendering (`PostContent`, with the same on-the-fly Portuguese→English translation) as posts, and has its own `MediaOnAboutPage` join table — mirroring `MediaOnPosts` — so the media library's usage counts, the media detail panel, and "replace this image everywhere" all correctly account for images used on the About page too.
+
+### Support page mirrors the About page pattern
+
+The Support page (`/support`, admin editor at `/admin/support`, linked from the footer as "Diga Obrigado"/"Say Thanks") is the same singleton pattern as the About page, model-for-model: `SupportPage` + its own `MediaOnSupportPage` join table, `support.repository.ts`/`support.service.ts`/`support.controller.ts`/`support.routes.ts`/`support.schema.ts` mirroring the `about.*` files exactly (including a private `syncMediaUsage` copy in `support.service.ts` — kept separate rather than shared, same reasoning as About's own copy). It lists free ways to support the blog (sharing, commenting, subscribing) plus optional Pix/Buy Me a Coffee/PayPal links, entered by the admin through the editor — none of that content, or any payment credentials, lives in source control. `media.routes.ts`'s usage-count, media-detail, and "replace this image everywhere" logic accounts for `MediaOnSupportPage` alongside `MediaOnPosts`/`MediaOnAboutPage`.
 
 ### Per-user rate limiting
 

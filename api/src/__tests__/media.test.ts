@@ -8,6 +8,7 @@ const mockPrisma = prisma as unknown as {
   media: { [k: string]: ReturnType<typeof vi.fn> }
   post: { [k: string]: ReturnType<typeof vi.fn> }
   aboutPage: { [k: string]: ReturnType<typeof vi.fn> }
+  supportPage: { [k: string]: ReturnType<typeof vi.fn> }
   $transaction: ReturnType<typeof vi.fn>
 }
 
@@ -131,10 +132,10 @@ describe('Media API', () => {
   // ── GET /media ───────────────────────────────────────────────────────────────
 
   describe('GET /media', () => {
-    it('returns paginated media with usage counts including the About page', async () => {
+    it('returns paginated media with usage counts including the About and Support pages', async () => {
       const token = generateAdminToken(app)
       mockPrisma.media.findMany.mockResolvedValue([
-        { ...mockMedia, _count: { posts: 2, aboutPages: 1 } },
+        { ...mockMedia, _count: { posts: 2, aboutPages: 1, supportPages: 1 } },
       ])
 
       const res = await app.inject({
@@ -144,7 +145,7 @@ describe('Media API', () => {
       })
 
       expect(res.statusCode).toBe(200)
-      expect(res.json().data[0].usageCount).toBe(3)
+      expect(res.json().data[0].usageCount).toBe(4)
       expect(res.json().meta.hasMore).toBe(false)
     })
   })
@@ -165,12 +166,13 @@ describe('Media API', () => {
       expect(res.statusCode).toBe(404)
     })
 
-    it('returns media details with posts and About-page usage', async () => {
+    it('returns media details with posts and About/Support-page usage', async () => {
       const token = generateAdminToken(app)
       mockPrisma.media.findUnique.mockResolvedValue({
         ...mockMedia,
         posts: [{ post: { id: 'post-1', title: 'A Post', slug: 'a-post' } }],
         aboutPages: [{ mediaId: mockMedia.id, aboutPageId: 'about-page-singleton' }],
+        supportPages: [{ mediaId: mockMedia.id, supportPageId: 'support-page-singleton' }],
       })
 
       const res = await app.inject({
@@ -183,15 +185,18 @@ describe('Media API', () => {
       const body = res.json()
       expect(body.posts).toEqual([{ id: 'post-1', title: 'A Post', slug: 'a-post' }])
       expect(body.usedInAboutPage).toBe(true)
+      expect(body.usedInSupportPage).toBe(true)
       expect(body.aboutPages).toBeUndefined()
+      expect(body.supportPages).toBeUndefined()
     })
 
-    it('reports usedInAboutPage: false when not used there', async () => {
+    it('reports usedInAboutPage/usedInSupportPage: false when not used there', async () => {
       const token = generateAdminToken(app)
       mockPrisma.media.findUnique.mockResolvedValue({
         ...mockMedia,
         posts: [],
         aboutPages: [],
+        supportPages: [],
       })
 
       const res = await app.inject({
@@ -202,6 +207,7 @@ describe('Media API', () => {
 
       expect(res.statusCode).toBe(200)
       expect(res.json().usedInAboutPage).toBe(false)
+      expect(res.json().usedInSupportPage).toBe(false)
     })
   })
 
@@ -251,6 +257,7 @@ describe('Media API', () => {
         ...mockMedia,
         posts: [{ post }],
         aboutPages: [],
+        supportPages: [],
       })
       mockPrisma.post.update.mockResolvedValue(post)
 
@@ -264,6 +271,7 @@ describe('Media API', () => {
       expect(res.statusCode).toBe(200)
       expect(res.json().postsUpdated).toBe(1)
       expect(res.json().message).not.toMatch(/About page/)
+      expect(res.json().message).not.toMatch(/Support page/)
       expect(mockPrisma.post.update).toHaveBeenCalledWith({
         where: { id: 'post-1' },
         data: { content: '<img src="https://broomns-blog-media.s3.us-east-1.amazonaws.com/new.png">' },
@@ -277,6 +285,7 @@ describe('Media API', () => {
         ...mockMedia,
         posts: [],
         aboutPages: [{ aboutPage }],
+        supportPages: [],
       })
       mockPrisma.aboutPage.update.mockResolvedValue(aboutPage)
 
@@ -292,6 +301,32 @@ describe('Media API', () => {
       expect(mockPrisma.aboutPage.update).toHaveBeenCalledWith({
         where: { id: 'about-page-singleton' },
         data: { content: '<p>Us</p><img src="https://broomns-blog-media.s3.us-east-1.amazonaws.com/new.png">' },
+      })
+    })
+
+    it('also replaces the image URL in the Support page when used there', async () => {
+      const token = generateAdminToken(app)
+      const supportPage = { id: 'support-page-singleton', content: `<p>Thanks</p><img src="${mockMedia.url}">` }
+      mockPrisma.media.findUnique.mockResolvedValue({
+        ...mockMedia,
+        posts: [],
+        aboutPages: [],
+        supportPages: [{ supportPage }],
+      })
+      mockPrisma.supportPage.update.mockResolvedValue(supportPage)
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: `/media/${mockMedia.id}/replace`,
+        headers: { authorization: `Bearer ${token}` },
+        payload: { newUrl: 'https://broomns-blog-media.s3.us-east-1.amazonaws.com/new.png' },
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.json().message).toMatch(/Support page/)
+      expect(mockPrisma.supportPage.update).toHaveBeenCalledWith({
+        where: { id: 'support-page-singleton' },
+        data: { content: '<p>Thanks</p><img src="https://broomns-blog-media.s3.us-east-1.amazonaws.com/new.png">' },
       })
     })
   })

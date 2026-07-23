@@ -76,10 +76,15 @@
     "authorReplyBadge": "Author"
   },
   "footer": {
-    "rights": "All rights reserved."
+    "rights": "All rights reserved.",
+    "sayThanks": "Say Thanks"
   },
   "about": {
     "title": "About",
+    "backHome": "← Back to home"
+  },
+  "support": {
+    "title": "Say Thanks",
     "backHome": "← Back to home"
   }
 }

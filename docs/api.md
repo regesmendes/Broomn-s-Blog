@@ -15,6 +15,7 @@ See the root [README](../README.md) for setup and the [architecture doc](./archi
 | GET | `/newsletter/confirm?token=` | Confirm subscription |
 | GET | `/newsletter/unsubscribe?token=` | Unsubscribe |
 | GET | `/about` | Get the About page content |
+| GET | `/support` | Get the Support ("Say Thanks") page content |
 
 ## Authenticated (any logged-in user)
 
@@ -47,7 +48,8 @@ See the root [README](../README.md) for setup and the [architecture doc](./archi
 | POST | `/newsletter/send` | Send newsletter to confirmed subscribers |
 | POST | `/media/upload` | Upload an image (multipart, 5MB max) |
 | GET | `/media` | List all media with usage count |
-| GET | `/media/:id` | Get media details with posts (and whether the About page) uses it |
+| GET | `/media/:id` | Get media details with posts (and whether the About/Support pages) uses it |
 | DELETE | `/media/:id` | Delete a media file |
-| PATCH | `/media/:id/replace` | Replace image URL across all posts and the About page |
+| PATCH | `/media/:id/replace` | Replace image URL across all posts, the About page, and the Support page |
 | PUT | `/about` | Update the About page content |
+| PUT | `/support` | Update the Support page content |
