@@ -44,6 +44,12 @@ export default function AdminLayout({
             >
               About Page
             </Link>
+            <Link
+              href="/admin/support"
+              className="rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              Support Page
+            </Link>
           </nav>
         </aside>
         <div className="flex-1 p-8">{children}</div>

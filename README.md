@@ -51,6 +51,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 - ✅ On-the-fly post translation via MyMemory API (preserves HTML structure)
 - ✅ Image captions in the post editor, tied to that specific image occurrence in that specific post
 - ✅ Editable About page (rich text, media library images) with a top-nav link, admin-editable, no comments
+- ✅ "Say Thanks" support page (`/support`, footer link) — same singleton/rich-text pattern as About, listing free ways to help plus optional Pix/Buy Me a Coffee/PayPal links entered by the admin
 - ✅ TypeScript compiles clean across all three projects (api, frontend, infrastructure)
 - ✅ Tab favicon spins while any API request is in flight — feedback that a click registered, even before the page itself shows anything
 - ✅ `robots.txt`/`sitemap.xml` (`frontend/src/app/robots.ts`/`sitemap.ts`) — the sitemap is dynamically generated from live published posts, in both locales

@@ -76,10 +76,15 @@
     "authorReplyBadge": "Autor"
   },
   "footer": {
-    "rights": "Todos os direitos reservados."
+    "rights": "Todos os direitos reservados.",
+    "sayThanks": "Diga Obrigado"
   },
   "about": {
     "title": "Sobre",
+    "backHome": "← Voltar para o início"
+  },
+  "support": {
+    "title": "Diga Obrigado",
     "backHome": "← Voltar para o início"
   }
 }

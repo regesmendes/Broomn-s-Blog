@@ -65,6 +65,14 @@ vi.mock('../lib/prisma', () => ({
       deleteMany: vi.fn(),
       create: vi.fn(),
     },
+    supportPage: {
+      findFirst: vi.fn(),
+      update: vi.fn(),
+    },
+    mediaOnSupportPage: {
+      deleteMany: vi.fn(),
+      create: vi.fn(),
+    },
     $transaction: vi.fn(),
   },
 }))
