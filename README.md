@@ -56,6 +56,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 - ✅ Tab favicon spins while any API request is in flight — feedback that a click registered, even before the page itself shows anything
 - ✅ `robots.txt`/`sitemap.xml` (`frontend/src/app/robots.ts`/`sitemap.ts`) — the sitemap is dynamically generated from live published posts, in both locales
 - ✅ Google Analytics (GA4), wired via `next/script` with manual page_view tracking on client-side route changes (App Router navigations don't trigger gtag's automatic one)
+- ✅ Social share buttons on every post (X, Facebook, LinkedIn, WhatsApp, Instagram, copy-link) — pre-filled share-intent links, no OAuth or platform APIs; Instagram falls back to copy-link with a paste-it-yourself hint
 
 ### Known Issues
 

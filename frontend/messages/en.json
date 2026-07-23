@@ -86,5 +86,16 @@
   "support": {
     "title": "Say Thanks",
     "backHome": "← Back to home"
+  },
+  "share": {
+    "label": "Share:",
+    "x": "Share on X",
+    "facebook": "Share on Facebook",
+    "linkedin": "Share on LinkedIn",
+    "whatsapp": "Share on WhatsApp",
+    "instagram": "Share on Instagram",
+    "copyLink": "Copy link",
+    "copied": "Link copied!",
+    "instagramCopied": "Link copied — paste it in your Instagram bio, story, or DM."
   }
 }
