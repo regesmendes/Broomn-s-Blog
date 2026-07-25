@@ -26,6 +26,7 @@ See the root [README](../README.md) for setup and the [architecture doc](./archi
 | GET | `/auth/me` | Get current user profile |
 | POST | `/posts/:postId/comments` | Create a comment (pending approval) |
 | DELETE | `/comments/:id` | Delete own comment |
+| POST | `/analytics/pageview` | Record a page view (fired by the frontend tracker; `userId` always from the token, 60/min rate limit) |
 
 ## Admin only
 
@@ -53,3 +54,7 @@ See the root [README](../README.md) for setup and the [architecture doc](./archi
 | PATCH | `/media/:id/replace` | Replace image URL across all posts, the About page, and the Support page |
 | PUT | `/about` | Update the About page content |
 | PUT | `/support` | Update the Support page content |
+| GET | `/analytics/summary?from=&to=` | User/request/newsletter counts for a period (defaults to last 30 days) |
+| GET | `/analytics/requests/by-user?from=&to=&limit=` | Requests per user in a period, busiest first (capped list, limit 1–200, default 50) |
+| GET | `/analytics/users/:userId/sessions?from=&to=&limit=` | One user's browsing sessions (capped list, limit 1–100, default 20); 404 if user unknown |
+| GET | `/analytics/users/:userId/sessions/:sessionId` | Full page-view journey of one session, in visit order |

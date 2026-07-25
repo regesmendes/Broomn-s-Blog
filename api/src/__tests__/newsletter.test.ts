@@ -487,3 +487,32 @@ describe('Newsletter API', () => {
     })
   })
 })
+
+// ── newsletterRepository.countForAnalytics ───────────────────────────────────
+
+describe('newsletterRepository.countForAnalytics', () => {
+  it('splits counts into subscribed / unsubscribed / blocked', async () => {
+    const { newsletterRepository } = await import('../repositories/newsletter.repository')
+    const countMock = prisma.newsletter.count as unknown as ReturnType<typeof vi.fn>
+    countMock
+      .mockResolvedValueOnce(30) // subscribed
+      .mockResolvedValueOnce(8)  // unsubscribed
+      .mockResolvedValueOnce(2)  // blocked
+
+    const result = await newsletterRepository.countForAnalytics()
+
+    expect(result).toEqual({ subscribed: 30, unsubscribed: 8, blocked: 2 })
+  })
+
+  it('excludes blocked rows from the subscribed and unsubscribed buckets', async () => {
+    const { newsletterRepository } = await import('../repositories/newsletter.repository')
+    const countMock = prisma.newsletter.count as unknown as ReturnType<typeof vi.fn>
+    countMock.mockResolvedValue(0)
+
+    await newsletterRepository.countForAnalytics()
+
+    expect(countMock).toHaveBeenCalledWith({ where: { status: 'CONFIRMED', blockedAt: null } })
+    expect(countMock).toHaveBeenCalledWith({ where: { status: 'UNSUBSCRIBED', blockedAt: null } })
+    expect(countMock).toHaveBeenCalledWith({ where: { blockedAt: { not: null } } })
+  })
+})

@@ -125,6 +125,25 @@ export const newsletterRepository = {
     }
   },
 
+  /**
+   * Subscriber split for the analytics dashboard. `blocked` cuts across the
+   * UNSUBSCRIBED status (block() sets both), so it needs its own bucket with
+   * the other two excluding blocked rows. PENDING/unconfirmed rows are in no
+   * bucket — the three numbers won't sum to total rows (UI carries a footnote).
+   */
+  async countForAnalytics(): Promise<{
+    subscribed: number
+    unsubscribed: number
+    blocked: number
+  }> {
+    const [subscribed, unsubscribed, blocked] = await Promise.all([
+      prisma.newsletter.count({ where: { status: 'CONFIRMED', blockedAt: null } }),
+      prisma.newsletter.count({ where: { status: 'UNSUBSCRIBED', blockedAt: null } }),
+      prisma.newsletter.count({ where: { blockedAt: { not: null } } }),
+    ])
+    return { subscribed, unsubscribed, blocked }
+  },
+
   /** Get all confirmed subscribers (id + email, for sending with per-recipient unsubscribe links). */
   async getConfirmedSubscribers(): Promise<{ id: string; email: string }[]> {
     // blockedAt: null is defense-in-depth alongside the status filter — a

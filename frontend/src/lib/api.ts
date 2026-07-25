@@ -144,6 +144,56 @@ export interface AuthResponse {
   user: User;
 }
 
+export interface AnalyticsPeriod {
+  from: string;
+  to: string;
+}
+
+export interface AnalyticsSummary {
+  period: AnalyticsPeriod;
+  users: { totalAllTime: number; newInPeriod: number };
+  requests: { totalInPeriod: number };
+  newsletter: { subscribed: number; unsubscribed: number; blocked: number };
+}
+
+export interface RequestsByUserRow {
+  userId: string;
+  email: string;
+  name: string;
+  requests: number;
+}
+
+export interface RequestsByUserResponse {
+  period: AnalyticsPeriod;
+  data: RequestsByUserRow[];
+}
+
+export interface UserSessionRow {
+  sessionId: string;
+  pages: number;
+  firstSeen: string;
+  lastSeen: string;
+}
+
+export interface UserSessionsResponse {
+  period: AnalyticsPeriod;
+  user: { id: string; email: string; name: string };
+  data: UserSessionRow[];
+}
+
+export interface SessionPageView {
+  id: string;
+  path: string;
+  durationMs: number;
+  enteredAt: string;
+  leftAt: string;
+}
+
+export interface SessionJourney {
+  sessionId: string;
+  pageViews: SessionPageView[];
+}
+
 // Error class
 
 export class ApiError extends Error {
@@ -492,6 +542,41 @@ class ApiClient {
       method: 'PUT',
       headers: this.authHeaders(token),
       body: JSON.stringify({ content }),
+    });
+  }
+
+  // Analytics (admin)
+
+  private analyticsQuery(params?: { from?: string; to?: string; limit?: number }): string {
+    const searchParams = new URLSearchParams();
+    if (params?.from) searchParams.set('from', params.from);
+    if (params?.to) searchParams.set('to', params.to);
+    if (params?.limit) searchParams.set('limit', String(params.limit));
+    const query = searchParams.toString();
+    return query ? `?${query}` : '';
+  }
+
+  async getAnalyticsSummary(token: string, params?: { from?: string; to?: string }): Promise<AnalyticsSummary> {
+    return this.request<AnalyticsSummary>(`/analytics/summary${this.analyticsQuery(params)}`, {
+      headers: this.authHeaders(token),
+    });
+  }
+
+  async getAnalyticsRequestsByUser(token: string, params?: { from?: string; to?: string; limit?: number }): Promise<RequestsByUserResponse> {
+    return this.request<RequestsByUserResponse>(`/analytics/requests/by-user${this.analyticsQuery(params)}`, {
+      headers: this.authHeaders(token),
+    });
+  }
+
+  async getAnalyticsUserSessions(userId: string, token: string, params?: { from?: string; to?: string; limit?: number }): Promise<UserSessionsResponse> {
+    return this.request<UserSessionsResponse>(`/analytics/users/${userId}/sessions${this.analyticsQuery(params)}`, {
+      headers: this.authHeaders(token),
+    });
+  }
+
+  async getAnalyticsSessionJourney(userId: string, sessionId: string, token: string): Promise<SessionJourney> {
+    return this.request<SessionJourney>(`/analytics/users/${userId}/sessions/${sessionId}`, {
+      headers: this.authHeaders(token),
     });
   }
 

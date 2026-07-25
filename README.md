@@ -31,7 +31,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 ### What's working
 
 - ✅ REST API with all CRUD endpoints (posts, comments, newsletter, auth)
-- ✅ 122 passing tests covering all API modules
+- ✅ 143 passing tests covering all API modules
 - ✅ Role-based access control (public, authenticated user, admin)
 - ✅ JWT authentication with access/refresh token flow
 - ✅ Cognito integration with real Google OAuth login, live in production
@@ -58,6 +58,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 - ✅ `robots.txt`/`sitemap.xml` (`frontend/src/app/robots.ts`/`sitemap.ts`) — the sitemap is dynamically generated from live published posts, in both locales
 - ✅ Google Analytics (GA4), wired via `next/script` with manual page_view tracking on client-side route changes (App Router navigations don't trigger gtag's automatic one)
 - ✅ Social share buttons on every post (X, Facebook, LinkedIn, WhatsApp, Instagram, copy-link) — pre-filled share-intent links, no OAuth or platform APIs; Instagram falls back to copy-link with a paste-it-yourself hint
+- ✅ Internal analytics dashboard (`/admin/analytics`) — registered-user request logging, page-view tracking with per-session journey reconstruction, newsletter subscriber stats; raw rows auto-pruned after 180 days by a daily Lambda (covers what GA's aggregate/anonymous data can't)
 
 ### Known Issues
 
@@ -216,7 +217,7 @@ Node.js 25 introduced a built-in `localStorage` global that requires `--localsto
 
 ```bash
 cd api
-npm test              # Runs all 122 tests
+npm test              # Runs all 143 tests
 ```
 
 ## Contributing

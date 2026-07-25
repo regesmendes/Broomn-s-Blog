@@ -7,6 +7,8 @@ import swagger from '@fastify/swagger'
 import swaggerUi from '@fastify/swagger-ui'
 import multipart from '@fastify/multipart'
 import { postRoutes } from './routes/post.routes'
+import { analyticsRoutes } from './routes/analytics.routes'
+import { analyticsRepository } from './repositories/analytics.repository'
 import { authRoutes } from './routes/auth.routes'
 import { commentRoutes } from './routes/comment.routes'
 import { newsletterRoutes } from './routes/newsletter.routes'
@@ -63,6 +65,32 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
   })
 
+  // Request logging for the internal analytics dashboard. Must be onSend, not
+  // onResponse: under Lambda, light-my-request's 'finish' listener can resolve
+  // the invocation before an async onResponse hook finishes, silently dropping
+  // rows — Fastify awaits onSend before the reply goes out. request.user is set
+  // by the rate limiter's keyGenerator (jwtVerify on every request), so any
+  // request carrying a valid token gets logged, whatever the route.
+  app.addHook('onSend', async (request, reply, payload) => {
+    if (!request.user?.sub) return payload
+    // Don't let page-view tracking log itself as a request
+    if (request.routeOptions.url === '/analytics/pageview') return payload
+
+    try {
+      await analyticsRepository.createRequestLog({
+        userId:     request.user.sub,
+        method:     request.method,
+        path:       request.routeOptions.url ?? request.url,
+        statusCode: reply.statusCode,
+        durationMs: Math.round(reply.elapsedTime),
+      })
+    } catch (err) {
+      // Analytics must never break the request it's observing
+      app.log.error(err, 'Failed to write RequestLog')
+    }
+    return payload
+  })
+
   // File uploads
   app.register(multipart, {
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
@@ -106,6 +134,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.register(newsletterRoutes, { prefix: '/newsletter' })
   app.register(aboutRoutes, { prefix: '/about' })
   app.register(supportRoutes, { prefix: '/support' })
+  app.register(analyticsRoutes, { prefix: '/analytics' })
 
   // Dev-only routes (never available in production)
   if (process.env.NODE_ENV !== 'production') {

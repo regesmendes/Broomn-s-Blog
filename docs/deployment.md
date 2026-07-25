@@ -145,6 +145,7 @@ See [disaster-recovery.md](./disaster-recovery.md#scenario-cognito-user-pool-los
 | API Gateway | `58m9fzd8lj` |
 | Migration/admin-SQL Lambda | `broomns-blog-migrate` |
 | Cognito Export Lambda | `broomns-blog-cognito-export` (weekly, also invocable on demand) |
+| Analytics Prune Lambda | `broomns-blog-analytics-prune` (daily, deletes RequestLog/PageView rows past 180-day retention; `PRIVATE_WITH_EGRESS` like the other DB-touching Lambdas) |
 | Frontend SSR Lambda | `broomns-blog-frontend-server` |
 | CDK Bootstrap Assets Bucket | `cdk-hnb659fds-assets-099710233970-us-east-1` |
 | GitHub Actions deploy role | `broomns-blog-github-deploy` (OIDC, trust-scoped to this repo's `prod` branch only) |

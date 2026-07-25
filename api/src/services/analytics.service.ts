@@ -1,0 +1,100 @@
+import { analyticsRepository, CreatePageViewData } from '../repositories/analytics.repository'
+import { userRepository } from '../repositories/user.repository'
+import { newsletterRepository } from '../repositories/newsletter.repository'
+
+const DEFAULT_PERIOD_DAYS = 30
+
+/** Missing bounds default to the last 30 days ending now. */
+function resolvePeriod(from?: Date, to?: Date) {
+  const resolvedTo = to ?? new Date()
+  const resolvedFrom =
+    from ?? new Date(resolvedTo.getTime() - DEFAULT_PERIOD_DAYS * 24 * 60 * 60 * 1000)
+  return { from: resolvedFrom, to: resolvedTo }
+}
+
+export const analyticsService = {
+  async trackPageView(data: CreatePageViewData) {
+    await analyticsRepository.createPageView(data)
+  },
+
+  async getSummary(fromQuery?: Date, toQuery?: Date) {
+    const { from, to } = resolvePeriod(fromQuery, toQuery)
+
+    const [totalAllTime, newInPeriod, totalInPeriod, newsletter] = await Promise.all([
+      userRepository.countAll(),
+      userRepository.countCreatedBetween(from, to),
+      analyticsRepository.countRequestsBetween(from, to),
+      newsletterRepository.countForAnalytics(),
+    ])
+
+    return {
+      period:     { from: from.toISOString(), to: to.toISOString() },
+      users:      { totalAllTime, newInPeriod },
+      requests:   { totalInPeriod },
+      newsletter,
+    }
+  },
+
+  async getRequestsByUser(fromQuery: Date | undefined, toQuery: Date | undefined, limit: number) {
+    const { from, to } = resolvePeriod(fromQuery, toQuery)
+
+    const grouped = await analyticsRepository.countRequestsByUser(from, to, limit)
+    const users = await userRepository.findManyByIds(grouped.map((g) => g.userId))
+    const byId = new Map(users.map((u) => [u.id, u]))
+
+    return {
+      period: { from: from.toISOString(), to: to.toISOString() },
+      data: grouped.map((g) => ({
+        userId:   g.userId,
+        // Cascade-deleted users can't appear here (their logs go with them),
+        // but don't crash the dashboard if a row races a deletion
+        email:    byId.get(g.userId)?.email ?? '(deleted user)',
+        name:     byId.get(g.userId)?.name ?? '(deleted user)',
+        requests: g._count._all,
+      })),
+    }
+  },
+
+  /** Returns null when the user doesn't exist (controller maps to 404). */
+  async getSessionsForUser(
+    userId: string,
+    fromQuery: Date | undefined,
+    toQuery: Date | undefined,
+    limit: number
+  ) {
+    const user = await userRepository.findById(userId)
+    if (!user) return null
+
+    const { from, to } = resolvePeriod(fromQuery, toQuery)
+    const grouped = await analyticsRepository.listSessionsForUser(userId, from, to, limit)
+
+    return {
+      period: { from: from.toISOString(), to: to.toISOString() },
+      user:   { id: user.id, email: user.email, name: user.name },
+      data: grouped.map((g) => ({
+        sessionId: g.sessionId,
+        pages:     g._count._all,
+        firstSeen: g._min.createdAt,
+        lastSeen:  g._max.createdAt,
+      })),
+    }
+  },
+
+  /** Returns null when the session has no rows for that user (controller maps to 404). */
+  async getSessionJourney(userId: string, sessionId: string) {
+    const rows = await analyticsRepository.listPageViewsForSession(userId, sessionId)
+    if (rows.length === 0) return null
+
+    return {
+      sessionId,
+      pageViews: rows.map((row) => ({
+        id:         row.id,
+        path:       row.path,
+        durationMs: row.durationMs,
+        // createdAt is written at page-LEAVE; enteredAt is display-only
+        enteredAt:  new Date(row.createdAt.getTime() - row.durationMs),
+        leftAt:     row.createdAt,
+      })),
+    }
+  },
+}
