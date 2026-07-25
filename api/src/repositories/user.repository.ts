@@ -43,6 +43,21 @@ export const userRepository = {
     })
   },
 
+  /** User ids whose name or email contains the search term (case-insensitive) —
+   * used to filter the analytics "requests by user" list by user/email. */
+  async searchIds(search: string): Promise<string[]> {
+    const users = await prisma.user.findMany({
+      where: {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+        ],
+      },
+      select: { id: true },
+    })
+    return users.map((u) => u.id)
+  },
+
   async countAll() {
     return prisma.user.count()
   },

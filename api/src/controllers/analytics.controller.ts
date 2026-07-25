@@ -26,8 +26,8 @@ export const analyticsController = {
 
   // ── GET /analytics/requests/by-user (admin) ──────────────────────────────────
   async getRequestsByUser(request: FastifyRequest, reply: FastifyReply) {
-    const { from, to, limit } = requestsByUserQuerySchema.parse(request.query)
-    return reply.send(await analyticsService.getRequestsByUser(from, to, limit))
+    const { from, to, limit, offset, search } = requestsByUserQuerySchema.parse(request.query)
+    return reply.send(await analyticsService.getRequestsByUser(from, to, limit, offset, search))
   },
 
   // ── GET /analytics/users/:userId/sessions (admin) ────────────────────────────

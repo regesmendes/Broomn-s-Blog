@@ -59,16 +59,41 @@ export const analyticsService = {
     }
   },
 
-  async getRequestsByUser(fromQuery: Date | undefined, toQuery: Date | undefined, limit: number) {
+  async getRequestsByUser(
+    fromQuery: Date | undefined,
+    toQuery: Date | undefined,
+    limit: number,
+    offset: number,
+    search?: string
+  ) {
     const { from, to } = resolvePeriod(fromQuery, toQuery)
 
-    const grouped = await analyticsRepository.countRequestsByUser(from, to, limit)
-    const users = await userRepository.findManyByIds(grouped.map((g) => g.userId))
+    let userIdFilter: string[] | undefined
+    if (search) {
+      userIdFilter = await userRepository.searchIds(search)
+      // No matching user at all — skip the groupBy entirely rather than
+      // asking Prisma to filter by an empty `in: []` list
+      if (userIdFilter.length === 0) {
+        return {
+          period: { from: from.toISOString(), to: to.toISOString() },
+          data:   [],
+          meta:   { offset, limit, total: 0, hasMore: false },
+        }
+      }
+    }
+
+    // Full matching list, sliced in memory for offset pagination — see the
+    // doc comment on analyticsRepository.countRequestsByUser for why
+    const all = await analyticsRepository.countRequestsByUser(from, to, userIdFilter)
+    const total = all.length
+    const page = all.slice(offset, offset + limit)
+
+    const users = await userRepository.findManyByIds(page.map((g) => g.userId))
     const byId = new Map(users.map((u) => [u.id, u]))
 
     return {
       period: { from: from.toISOString(), to: to.toISOString() },
-      data: grouped.map((g) => ({
+      data: page.map((g) => ({
         userId:   g.userId,
         // Cascade-deleted users can't appear here (their logs go with them),
         // but don't crash the dashboard if a row races a deletion
@@ -76,6 +101,7 @@ export const analyticsService = {
         name:     byId.get(g.userId)?.name ?? '(deleted user)',
         requests: g._count._all,
       })),
+      meta: { offset, limit, total, hasMore: offset + limit < total },
     }
   },
 

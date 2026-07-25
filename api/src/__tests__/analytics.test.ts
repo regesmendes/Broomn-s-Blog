@@ -196,7 +196,7 @@ describe('Analytics API', () => {
       expect(res.statusCode).toBe(403)
     })
 
-    it('returns per-user counts joined with user info', async () => {
+    it('returns per-user counts joined with user info, plus pagination meta', async () => {
       mockPrisma.requestLog.groupBy.mockResolvedValue([
         { userId: 'user-1', _count: { _all: 100 } },
         { userId: 'user-2', _count: { _all: 60 } },
@@ -214,10 +214,12 @@ describe('Analytics API', () => {
       })
 
       expect(res.statusCode).toBe(200)
-      expect(res.json().data).toEqual([
+      const body = res.json()
+      expect(body.data).toEqual([
         { userId: 'user-1', email: 'a@example.com', name: 'Alice', requests: 100 },
         { userId: 'user-2', email: 'b@example.com', name: 'Bob', requests: 60 },
       ])
+      expect(body.meta).toEqual({ offset: 0, limit: 50, total: 2, hasMore: false })
     })
 
     it('clamps limit to the 1–200 range', async () => {
@@ -230,6 +232,68 @@ describe('Analytics API', () => {
       })
 
       expect(res.statusCode).toBe(400)
+    })
+
+    it('paginates the full matching list in memory by offset/limit', async () => {
+      mockPrisma.requestLog.groupBy.mockResolvedValue([
+        { userId: 'user-1', _count: { _all: 100 } },
+        { userId: 'user-2', _count: { _all: 60 } },
+        { userId: 'user-3', _count: { _all: 40 } },
+      ])
+      mockPrisma.user.findMany.mockResolvedValue([
+        { id: 'user-2', email: 'b@example.com', name: 'Bob' },
+      ])
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/analytics/requests/by-user?limit=1&offset=1',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.data).toEqual([{ userId: 'user-2', email: 'b@example.com', name: 'Bob', requests: 60 }])
+      expect(body.meta).toEqual({ offset: 1, limit: 1, total: 3, hasMore: true })
+    })
+
+    it('filters by search term, resolving matching user ids before the groupBy', async () => {
+      mockPrisma.user.findMany
+        .mockResolvedValueOnce([{ id: 'user-1' }]) // userRepository.searchIds
+        .mockResolvedValueOnce([{ id: 'user-1', email: 'alice@example.com', name: 'Alice' }]) // findManyByIds
+      mockPrisma.requestLog.groupBy.mockResolvedValue([{ userId: 'user-1', _count: { _all: 100 } }])
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/analytics/requests/by-user?search=alice',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.json().data).toEqual([
+        { userId: 'user-1', email: 'alice@example.com', name: 'Alice', requests: 100 },
+      ])
+      expect(mockPrisma.requestLog.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ userId: { in: ['user-1'] } }) })
+      )
+    })
+
+    it('returns an empty result without querying requestLog when the search matches no user', async () => {
+      mockPrisma.user.findMany.mockResolvedValueOnce([]) // userRepository.searchIds
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/analytics/requests/by-user?search=nobody',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.data).toEqual([])
+      expect(body.meta).toEqual({ offset: 0, limit: 50, total: 0, hasMore: false })
+      expect(mockPrisma.requestLog.groupBy).not.toHaveBeenCalled()
     })
   })
 

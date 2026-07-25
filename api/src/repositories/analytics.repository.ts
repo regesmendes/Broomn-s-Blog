@@ -45,17 +45,25 @@ export const analyticsRepository = {
   },
 
   /**
-   * Requests grouped per user in a period, busiest first. A capped list, not
-   * cursor-paginated — the result set is bounded by registered-user count,
-   * not an ever-growing content list (see docs/architecture.md).
+   * Requests grouped per user in a period, busiest first — every matching
+   * group, unpaginated at the DB level. Prisma's groupBy doesn't support
+   * cursor pagination (there's no natural unique field to cursor on mid-
+   * aggregation), so analyticsService.getRequestsByUser fetches the full
+   * list and slices it in memory for offset pagination and search. That's
+   * fine here specifically because the result set is bounded by
+   * registered-user count, not an ever-growing content list (see
+   * docs/architecture.md) — this would be the wrong call for post/comment
+   * lists, which don't have that bound.
    */
-  async countRequestsByUser(from: Date, to: Date, limit: number) {
+  async countRequestsByUser(from: Date, to: Date, userIds?: string[]) {
     return prisma.requestLog.groupBy({
       by: ['userId'],
-      where: { createdAt: { gte: from, lte: to } },
+      where: {
+        createdAt: { gte: from, lte: to },
+        ...(userIds ? { userId: { in: userIds } } : {}),
+      },
       _count: { _all: true },
       orderBy: { _count: { userId: 'desc' } },
-      take: limit,
     })
   },
 

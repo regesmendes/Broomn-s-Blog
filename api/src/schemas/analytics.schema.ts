@@ -16,7 +16,9 @@ export const summaryQuerySchema = z.object(dateRangeFields)
 
 export const requestsByUserQuerySchema = z.object({
   ...dateRangeFields,
-  limit: z.coerce.number().int().min(1).max(200).default(50),
+  limit:  z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+  search: z.string().trim().min(1).max(200).optional(),
 })
 
 export const userSessionsQuerySchema = z.object({
