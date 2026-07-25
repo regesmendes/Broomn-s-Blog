@@ -180,6 +180,12 @@ export const commentRepository = {
     return prisma.comment.delete({ where: { id } })
   },
 
+  /** Count comments (top-level and replies) submitted in a period — for the
+   * analytics dashboard. */
+  async countCreatedBetween(from: Date, to: Date) {
+    return prisma.comment.count({ where: { createdAt: { gte: from, lte: to } } })
+  },
+
   /**
    * Get all top-level comments across all posts (admin), each with its
    * replies nested underneath. Filterable by approval status — the filter

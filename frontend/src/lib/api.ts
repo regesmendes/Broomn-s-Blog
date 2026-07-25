@@ -1,4 +1,5 @@
 import { startLoading, stopLoading } from './loadingIndicator';
+import { getSessionId } from './analyticsSession';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -80,6 +81,7 @@ export interface Subscriber {
   confirmedAt: string | null;
   createdAt: string;
   blockedAt: string | null;
+  unsubscribedAt: string | null;
 }
 
 export interface MediaItem {
@@ -144,6 +146,78 @@ export interface AuthResponse {
   user: User;
 }
 
+export interface AnalyticsPeriod {
+  from: string;
+  to: string;
+}
+
+export interface AnalyticsSummary {
+  period: AnalyticsPeriod;
+  users: { totalAllTime: number; newInPeriod: number };
+  posts: { newInPeriod: number; readsInPeriod: number; commentsInPeriod: number };
+  newsletter: {
+    subscribed: number;
+    unsubscribed: number;
+    blocked: number;
+    pending: number;
+    subscribedInPeriod: number;
+    unsubscribedInPeriod: number;
+  };
+  backend: { requestsInPeriod: number };
+}
+
+export interface RequestsByUserRow {
+  userId: string;
+  email: string;
+  name: string;
+  requests: number;
+}
+
+export interface RequestsByUserResponse {
+  period: AnalyticsPeriod;
+  data: RequestsByUserRow[];
+  meta: { offset: number; limit: number; total: number; hasMore: boolean };
+}
+
+export interface UserSessionRow {
+  sessionId: string;
+  pages: number;
+  firstSeen: string;
+  lastSeen: string;
+}
+
+export interface UserSessionsResponse {
+  period: AnalyticsPeriod;
+  user: { id: string; email: string; name: string };
+  data: UserSessionRow[];
+}
+
+export interface SessionPageViewStep {
+  type: 'pageview';
+  id: string;
+  path: string;
+  durationMs: number;
+  enteredAt: string;
+  leftAt: string;
+}
+
+export interface SessionActionStep {
+  type: 'action';
+  id: string;
+  method: string;
+  path: string;
+  statusCode: number;
+  durationMs: number;
+  createdAt: string;
+}
+
+export type SessionJourneyStep = SessionPageViewStep | SessionActionStep;
+
+export interface SessionJourney {
+  sessionId: string;
+  steps: SessionJourneyStep[];
+}
+
 // Error class
 
 export class ApiError extends Error {
@@ -173,6 +247,10 @@ class ApiClient {
       const url = `${this.baseUrl}${endpoint}`;
       const headers: HeadersInit = {
         ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        // Ties API actions to the page-view tracker's per-tab session, so the
+        // admin analytics journey can interleave them. Browser only —
+        // sessionStorage doesn't exist during SSR data fetching.
+        ...(typeof window !== 'undefined' ? { 'X-Session-Id': getSessionId() } : {}),
         ...options.headers,
       };
 
@@ -433,7 +511,7 @@ class ApiClient {
 
     const response = await fetch(`${this.baseUrl}/media/upload`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}`, 'X-Session-Id': getSessionId() },
       body: formData,
     });
 
@@ -492,6 +570,49 @@ class ApiClient {
       method: 'PUT',
       headers: this.authHeaders(token),
       body: JSON.stringify({ content }),
+    });
+  }
+
+  // Analytics (admin)
+
+  private analyticsQuery(params?: {
+    from?: string;
+    to?: string;
+    limit?: number;
+    offset?: number;
+    search?: string;
+  }): string {
+    const searchParams = new URLSearchParams();
+    if (params?.from) searchParams.set('from', params.from);
+    if (params?.to) searchParams.set('to', params.to);
+    if (params?.limit) searchParams.set('limit', String(params.limit));
+    if (params?.offset) searchParams.set('offset', String(params.offset));
+    if (params?.search) searchParams.set('search', params.search);
+    const query = searchParams.toString();
+    return query ? `?${query}` : '';
+  }
+
+  async getAnalyticsSummary(token: string, params?: { from?: string; to?: string }): Promise<AnalyticsSummary> {
+    return this.request<AnalyticsSummary>(`/analytics/summary${this.analyticsQuery(params)}`, {
+      headers: this.authHeaders(token),
+    });
+  }
+
+  async getAnalyticsRequestsByUser(token: string, params?: { from?: string; to?: string; limit?: number; offset?: number; search?: string }): Promise<RequestsByUserResponse> {
+    return this.request<RequestsByUserResponse>(`/analytics/requests/by-user${this.analyticsQuery(params)}`, {
+      headers: this.authHeaders(token),
+    });
+  }
+
+  async getAnalyticsUserSessions(userId: string, token: string, params?: { from?: string; to?: string; limit?: number }): Promise<UserSessionsResponse> {
+    return this.request<UserSessionsResponse>(`/analytics/users/${userId}/sessions${this.analyticsQuery(params)}`, {
+      headers: this.authHeaders(token),
+    });
+  }
+
+  async getAnalyticsSessionJourney(userId: string, sessionId: string, token: string): Promise<SessionJourney> {
+    return this.request<SessionJourney>(`/analytics/users/${userId}/sessions/${sessionId}`, {
+      headers: this.authHeaders(token),
     });
   }
 

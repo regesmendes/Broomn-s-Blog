@@ -36,6 +36,36 @@ export const userRepository = {
    * Find by cognitoId, create if not found.
    * On subsequent logins updates name and avatarUrl in case they changed on Google.
    */
+  async findManyByIds(ids: string[]) {
+    return prisma.user.findMany({
+      where:  { id: { in: ids } },
+      select: { id: true, email: true, name: true },
+    })
+  },
+
+  /** User ids whose name or email contains the search term (case-insensitive) —
+   * used to filter the analytics "requests by user" list by user/email. */
+  async searchIds(search: string): Promise<string[]> {
+    const users = await prisma.user.findMany({
+      where: {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+        ],
+      },
+      select: { id: true },
+    })
+    return users.map((u) => u.id)
+  },
+
+  async countAll() {
+    return prisma.user.count()
+  },
+
+  async countCreatedBetween(from: Date, to: Date) {
+    return prisma.user.count({ where: { createdAt: { gte: from, lte: to } } })
+  },
+
   async upsertByCognitoId(cognitoId: string, data: UpsertUserData) {
     return prisma.user.upsert({
       where:  { cognitoId },

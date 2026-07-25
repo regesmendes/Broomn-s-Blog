@@ -1,0 +1,595 @@
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
+import { createTestApp, generateAdminToken, generateTestToken } from './helpers'
+import { prisma } from '../lib/prisma'
+import { FastifyInstance } from 'fastify'
+
+const mockPrisma = prisma as unknown as {
+  user: { [k: string]: ReturnType<typeof vi.fn> }
+  newsletter: { [k: string]: ReturnType<typeof vi.fn> }
+  requestLog: { [k: string]: ReturnType<typeof vi.fn> }
+  pageView: { [k: string]: ReturnType<typeof vi.fn> }
+}
+
+const SESSION_ID = 'c56a4180-65aa-42ec-a945-5fd21dec0538'
+
+describe('Analytics API', () => {
+  let app: FastifyInstance
+
+  beforeAll(async () => {
+    app = await createTestApp()
+  })
+
+  afterAll(async () => {
+    await app.close()
+  })
+
+  // ── POST /analytics/pageview ───────────────────────────────────────────────
+
+  describe('POST /analytics/pageview', () => {
+    const validPayload = { path: '/posts/some-slug', sessionId: SESSION_ID, durationMs: 12000 }
+
+    it('requires authentication', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/analytics/pageview',
+        payload: validPayload,
+      })
+
+      expect(res.statusCode).toBe(401)
+      expect(mockPrisma.pageView.create).not.toHaveBeenCalled()
+    })
+
+    it('records a page view for the token user, ignoring any userId in the body', async () => {
+      mockPrisma.pageView.create.mockResolvedValue({})
+      const token = generateTestToken(app, { sub: 'user-1' })
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/analytics/pageview',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { ...validPayload, userId: 'someone-else' },
+      })
+
+      expect(res.statusCode).toBe(204)
+      expect(mockPrisma.pageView.create).toHaveBeenCalledWith({
+        data: {
+          userId: 'user-1',
+          path: '/posts/some-slug',
+          sessionId: SESSION_ID,
+          durationMs: 12000,
+        },
+      })
+    })
+
+    it('silently drops analytics-dashboard paths instead of recording them', async () => {
+      const token = generateTestToken(app, { sub: 'user-1' })
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/analytics/pageview',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { ...validPayload, path: '/admin/analytics/users/user-2' },
+      })
+
+      expect(res.statusCode).toBe(204)
+      expect(mockPrisma.pageView.create).not.toHaveBeenCalled()
+    })
+
+    it('rejects a non-uuid sessionId', async () => {
+      const token = generateTestToken(app)
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/analytics/pageview',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { ...validPayload, sessionId: 'not-a-uuid' },
+      })
+
+      expect(res.statusCode).toBe(400)
+    })
+
+    it('rejects a durationMs above the 6h cap', async () => {
+      const token = generateTestToken(app)
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/analytics/pageview',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { ...validPayload, durationMs: 7 * 60 * 60 * 1000 },
+      })
+
+      expect(res.statusCode).toBe(400)
+    })
+  })
+
+  // ── GET /analytics/summary ─────────────────────────────────────────────────
+
+  describe('GET /analytics/summary', () => {
+    it('rejects non-admin users', async () => {
+      const token = generateTestToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/analytics/summary',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(403)
+    })
+
+    it('returns user, post, newsletter, and backend counts, grouped', async () => {
+      mockPrisma.user.count
+        .mockResolvedValueOnce(42) // countAll
+        .mockResolvedValueOnce(5)  // countCreatedBetween
+      mockPrisma.post.count.mockResolvedValue(3) // new posts in period
+      mockPrisma.pageView.count.mockResolvedValue(120) // post reads in period
+      mockPrisma.comment.count.mockResolvedValue(17) // comments submitted in period
+      mockPrisma.newsletter.count
+        .mockResolvedValueOnce(30) // subscribed
+        .mockResolvedValueOnce(8)  // unsubscribed
+        .mockResolvedValueOnce(2)  // blocked
+        .mockResolvedValueOnce(6)  // pending
+        .mockResolvedValueOnce(4)  // subscribedInPeriod (countSubscribedBetween)
+        .mockResolvedValueOnce(1)  // unsubscribedInPeriod (countUnsubscribedBetween)
+      mockPrisma.requestLog.count.mockResolvedValue(1234)
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/analytics/summary?from=2026-06-01&to=2026-07-01',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.users).toEqual({ totalAllTime: 42, newInPeriod: 5 })
+      expect(body.posts).toEqual({ newInPeriod: 3, readsInPeriod: 120, commentsInPeriod: 17 })
+      expect(body.newsletter).toEqual({
+        subscribed: 30,
+        unsubscribed: 8,
+        blocked: 2,
+        pending: 6,
+        subscribedInPeriod: 4,
+        unsubscribedInPeriod: 1,
+      })
+      expect(body.backend).toEqual({ requestsInPeriod: 1234 })
+      expect(body.period.from).toBe(new Date('2026-06-01').toISOString())
+      expect(body.period.to).toBe(new Date('2026-07-01').toISOString())
+    })
+
+    it('scopes post reads to the /posts/ path prefix only', async () => {
+      mockPrisma.user.count.mockResolvedValue(0)
+      mockPrisma.post.count.mockResolvedValue(0)
+      mockPrisma.pageView.count.mockResolvedValue(0)
+      mockPrisma.comment.count.mockResolvedValue(0)
+      mockPrisma.newsletter.count.mockResolvedValue(0)
+      mockPrisma.requestLog.count.mockResolvedValue(0)
+      const token = generateAdminToken(app)
+
+      await app.inject({
+        method: 'GET',
+        url: '/analytics/summary',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(mockPrisma.pageView.count).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ path: { startsWith: '/posts/' } }) })
+      )
+    })
+
+    it('rejects an invalid date', async () => {
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/analytics/summary?from=banana',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(400)
+    })
+  })
+
+  // ── GET /analytics/requests/by-user ────────────────────────────────────────
+
+  describe('GET /analytics/requests/by-user', () => {
+    it('rejects non-admin users', async () => {
+      const token = generateTestToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/analytics/requests/by-user',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(403)
+    })
+
+    it('returns per-user counts joined with user info, plus pagination meta', async () => {
+      mockPrisma.requestLog.groupBy.mockResolvedValue([
+        { userId: 'user-1', _count: { _all: 100 } },
+        { userId: 'user-2', _count: { _all: 60 } },
+      ])
+      mockPrisma.user.findMany.mockResolvedValue([
+        { id: 'user-1', email: 'a@example.com', name: 'Alice' },
+        { id: 'user-2', email: 'b@example.com', name: 'Bob' },
+      ])
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/analytics/requests/by-user',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.data).toEqual([
+        { userId: 'user-1', email: 'a@example.com', name: 'Alice', requests: 100 },
+        { userId: 'user-2', email: 'b@example.com', name: 'Bob', requests: 60 },
+      ])
+      expect(body.meta).toEqual({ offset: 0, limit: 50, total: 2, hasMore: false })
+    })
+
+    it('clamps limit to the 1–200 range', async () => {
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/analytics/requests/by-user?limit=500',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(400)
+    })
+
+    it('paginates the full matching list in memory by offset/limit', async () => {
+      mockPrisma.requestLog.groupBy.mockResolvedValue([
+        { userId: 'user-1', _count: { _all: 100 } },
+        { userId: 'user-2', _count: { _all: 60 } },
+        { userId: 'user-3', _count: { _all: 40 } },
+      ])
+      mockPrisma.user.findMany.mockResolvedValue([
+        { id: 'user-2', email: 'b@example.com', name: 'Bob' },
+      ])
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/analytics/requests/by-user?limit=1&offset=1',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.data).toEqual([{ userId: 'user-2', email: 'b@example.com', name: 'Bob', requests: 60 }])
+      expect(body.meta).toEqual({ offset: 1, limit: 1, total: 3, hasMore: true })
+    })
+
+    it('filters by search term, resolving matching user ids before the groupBy', async () => {
+      mockPrisma.user.findMany
+        .mockResolvedValueOnce([{ id: 'user-1' }]) // userRepository.searchIds
+        .mockResolvedValueOnce([{ id: 'user-1', email: 'alice@example.com', name: 'Alice' }]) // findManyByIds
+      mockPrisma.requestLog.groupBy.mockResolvedValue([{ userId: 'user-1', _count: { _all: 100 } }])
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/analytics/requests/by-user?search=alice',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.json().data).toEqual([
+        { userId: 'user-1', email: 'alice@example.com', name: 'Alice', requests: 100 },
+      ])
+      expect(mockPrisma.requestLog.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ userId: { in: ['user-1'] } }) })
+      )
+    })
+
+    it('returns an empty result without querying requestLog when the search matches no user', async () => {
+      mockPrisma.user.findMany.mockResolvedValueOnce([]) // userRepository.searchIds
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/analytics/requests/by-user?search=nobody',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.data).toEqual([])
+      expect(body.meta).toEqual({ offset: 0, limit: 50, total: 0, hasMore: false })
+      expect(mockPrisma.requestLog.groupBy).not.toHaveBeenCalled()
+    })
+  })
+
+  // ── GET /analytics/users/:userId/sessions ──────────────────────────────────
+
+  describe('GET /analytics/users/:userId/sessions', () => {
+    it('404s for an unknown user', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null)
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/analytics/users/nope/sessions',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(404)
+    })
+
+    it('lists sessions with page counts and first/last seen', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'a@example.com',
+        name: 'Alice',
+      })
+      const first = new Date('2026-07-01T10:00:00Z')
+      const last = new Date('2026-07-01T10:30:00Z')
+      mockPrisma.pageView.groupBy.mockResolvedValue([
+        { sessionId: SESSION_ID, _count: { _all: 7 }, _min: { createdAt: first }, _max: { createdAt: last } },
+      ])
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/analytics/users/user-1/sessions',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.user).toEqual({ id: 'user-1', email: 'a@example.com', name: 'Alice' })
+      expect(body.data).toEqual([
+        {
+          sessionId: SESSION_ID,
+          pages: 7,
+          firstSeen: first.toISOString(),
+          lastSeen: last.toISOString(),
+        },
+      ])
+    })
+  })
+
+  // ── GET /analytics/users/:userId/sessions/:sessionId ───────────────────────
+
+  describe('GET /analytics/users/:userId/sessions/:sessionId', () => {
+    it('404s when the session has neither page views nor logged actions', async () => {
+      mockPrisma.pageView.findMany.mockResolvedValue([])
+      mockPrisma.requestLog.findMany.mockResolvedValue([])
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/analytics/users/user-1/sessions/${SESSION_ID}`,
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(404)
+    })
+
+    it('returns page views with computed enteredAt', async () => {
+      const leftAt = new Date('2026-07-01T10:05:00Z')
+      mockPrisma.pageView.findMany.mockResolvedValue([
+        {
+          id: 'pv-1',
+          userId: 'user-1',
+          sessionId: SESSION_ID,
+          path: '/posts/hello',
+          durationMs: 60_000,
+          createdAt: leftAt,
+        },
+      ])
+      mockPrisma.requestLog.findMany.mockResolvedValue([])
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/analytics/users/user-1/sessions/${SESSION_ID}`,
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.sessionId).toBe(SESSION_ID)
+      expect(body.steps).toEqual([
+        {
+          type: 'pageview',
+          id: 'pv-1',
+          path: '/posts/hello',
+          durationMs: 60_000,
+          enteredAt: new Date(leftAt.getTime() - 60_000).toISOString(),
+          leftAt: leftAt.toISOString(),
+        },
+      ])
+      expect(mockPrisma.pageView.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', sessionId: SESSION_ID },
+        orderBy: { createdAt: 'asc' },
+      })
+    })
+
+    it('interleaves a mid-visit action between the page views around it', async () => {
+      // Reading a post (10:00–10:05), commenting at 10:02, then reading the
+      // next post (10:05 onward) — the comment must land between the two
+      // page steps, not before or after both of them.
+      const firstPageLeftAt = new Date('2026-07-01T10:05:00Z') // entered 10:00
+      const commentAt = new Date('2026-07-01T10:02:00Z')
+      const secondPageLeftAt = new Date('2026-07-01T10:10:00Z') // entered 10:05
+
+      mockPrisma.pageView.findMany.mockResolvedValue([
+        {
+          id: 'pv-1',
+          userId: 'user-1',
+          sessionId: SESSION_ID,
+          path: '/posts/hello',
+          durationMs: 5 * 60_000,
+          createdAt: firstPageLeftAt,
+        },
+        {
+          id: 'pv-2',
+          userId: 'user-1',
+          sessionId: SESSION_ID,
+          path: '/posts/next',
+          durationMs: 5 * 60_000,
+          createdAt: secondPageLeftAt,
+        },
+      ])
+      mockPrisma.requestLog.findMany.mockResolvedValue([
+        {
+          id: 'req-1',
+          userId: 'user-1',
+          sessionId: SESSION_ID,
+          method: 'POST',
+          path: '/posts/:postId/comments',
+          statusCode: 201,
+          durationMs: 42,
+          createdAt: commentAt,
+        },
+      ])
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/analytics/users/user-1/sessions/${SESSION_ID}`,
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.steps.map((s: { type: string; path: string }) => `${s.type}:${s.path}`)).toEqual([
+        'pageview:/posts/hello',
+        'action:/posts/:postId/comments',
+        'pageview:/posts/next',
+      ])
+      expect(body.steps[1]).toEqual({
+        type: 'action',
+        id: 'req-1',
+        method: 'POST',
+        path: '/posts/:postId/comments',
+        statusCode: 201,
+        durationMs: 42,
+        createdAt: commentAt.toISOString(),
+      })
+      expect(mockPrisma.requestLog.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', sessionId: SESSION_ID },
+        orderBy: { createdAt: 'asc' },
+      })
+    })
+
+    it('merges consecutive same-path page views into one step, summing durations', async () => {
+      // The tracking hook's 'hidden' trigger flushes early (a safety net for
+      // a tab that might get killed while backgrounded) whenever the user
+      // switches away and back without navigating — e.g. alt-tabbing away
+      // for 18s produces two PageView rows for the same "/" visit instead of
+      // one. The journey should present that as a single entry.
+      const firstFlush = new Date('2026-07-01T10:00:01Z') // entered 10:00:00, 1s in
+      const secondFlush = new Date('2026-07-01T10:00:19Z') // entered ~10:00:09.8, 9.2s more
+
+      mockPrisma.pageView.findMany.mockResolvedValue([
+        {
+          id: 'pv-1',
+          userId: 'user-1',
+          sessionId: SESSION_ID,
+          path: '/',
+          durationMs: 1025,
+          createdAt: firstFlush,
+        },
+        {
+          id: 'pv-2',
+          userId: 'user-1',
+          sessionId: SESSION_ID,
+          path: '/',
+          durationMs: 9196,
+          createdAt: secondFlush,
+        },
+        {
+          id: 'pv-3',
+          userId: 'user-1',
+          sessionId: SESSION_ID,
+          path: '/posts/hello-world',
+          durationMs: 1676,
+          createdAt: new Date('2026-07-01T10:00:21Z'),
+        },
+      ])
+      mockPrisma.requestLog.findMany.mockResolvedValue([])
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/analytics/users/user-1/sessions/${SESSION_ID}`,
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.steps).toHaveLength(2)
+      expect(body.steps[0]).toEqual({
+        type: 'pageview',
+        id: 'pv-1',
+        path: '/',
+        durationMs: 1025 + 9196,
+        enteredAt: new Date(firstFlush.getTime() - 1025).toISOString(),
+        leftAt: secondFlush.toISOString(),
+      })
+      expect(body.steps[1].path).toBe('/posts/hello-world')
+    })
+
+    it('does not merge two same-path page views separated by a logged action', async () => {
+      // If something real happened in between (e.g. a comment posted while
+      // still on the same page), that's a genuine break worth keeping visible
+      // — only a *consecutive* run with nothing between them is safety-flush
+      // noise.
+      mockPrisma.pageView.findMany.mockResolvedValue([
+        {
+          id: 'pv-1',
+          userId: 'user-1',
+          sessionId: SESSION_ID,
+          path: '/posts/hello',
+          durationMs: 60_000,
+          createdAt: new Date('2026-07-01T10:01:00Z'),
+        },
+        {
+          id: 'pv-2',
+          userId: 'user-1',
+          sessionId: SESSION_ID,
+          path: '/posts/hello',
+          durationMs: 30_000,
+          createdAt: new Date('2026-07-01T10:03:00Z'),
+        },
+      ])
+      mockPrisma.requestLog.findMany.mockResolvedValue([
+        {
+          id: 'req-1',
+          userId: 'user-1',
+          sessionId: SESSION_ID,
+          method: 'POST',
+          path: '/posts/:postId/comments',
+          statusCode: 201,
+          durationMs: 42,
+          createdAt: new Date('2026-07-01T10:01:30Z'),
+        },
+      ])
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/analytics/users/user-1/sessions/${SESSION_ID}`,
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.steps.map((s: { type: string }) => s.type)).toEqual([
+        'pageview',
+        'action',
+        'pageview',
+      ])
+      expect(body.steps[0].durationMs).toBe(60_000)
+      expect(body.steps[2].durationMs).toBe(30_000)
+    })
+  })
+})

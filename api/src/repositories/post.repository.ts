@@ -220,6 +220,11 @@ export const postRepository = {
     return prisma.post.delete({ where: { id } })
   },
 
+  /** Count posts created in a period, any status — for the analytics dashboard. */
+  async countCreatedBetween(from: Date, to: Date) {
+    return prisma.post.count({ where: { createdAt: { gte: from, lte: to } } })
+  },
+
   /** Update only status and publishedAt. */
   async updatePublishState(
     id: string,
