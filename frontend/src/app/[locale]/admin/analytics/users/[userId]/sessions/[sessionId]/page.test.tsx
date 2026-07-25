@@ -42,8 +42,9 @@ describe('SessionJourneyPage', () => {
   it('renders the page-view timeline in order', async () => {
     mockApi.getAnalyticsSessionJourney.mockResolvedValue({
       sessionId: 'session-a',
-      pageViews: [
+      steps: [
         {
+          type: 'pageview',
           id: 'pv-1',
           path: '/',
           durationMs: 4200,
@@ -51,6 +52,7 @@ describe('SessionJourneyPage', () => {
           leftAt: '2026-07-01T10:00:04.200Z',
         },
         {
+          type: 'pageview',
           id: 'pv-2',
           path: '/posts/hello',
           durationMs: 60_000,
@@ -71,6 +73,48 @@ describe('SessionJourneyPage', () => {
       'session-a',
       'test-token'
     );
+  });
+
+  it('interleaves a logged action between the page views around it', async () => {
+    mockApi.getAnalyticsSessionJourney.mockResolvedValue({
+      sessionId: 'session-a',
+      steps: [
+        {
+          type: 'pageview',
+          id: 'pv-1',
+          path: '/posts/hello',
+          durationMs: 300_000,
+          enteredAt: '2026-07-01T10:00:00.000Z',
+          leftAt: '2026-07-01T10:05:00.000Z',
+        },
+        {
+          type: 'action',
+          id: 'req-1',
+          method: 'POST',
+          path: '/posts/:postId/comments',
+          statusCode: 201,
+          durationMs: 42,
+          createdAt: '2026-07-01T10:02:00.000Z',
+        },
+        {
+          type: 'pageview',
+          id: 'pv-2',
+          path: '/posts/next',
+          durationMs: 300_000,
+          enteredAt: '2026-07-01T10:05:00.000Z',
+          leftAt: '2026-07-01T10:10:00.000Z',
+        },
+      ],
+    });
+
+    renderPage();
+
+    const items = await screen.findAllByRole('listitem');
+    expect(items).toHaveLength(3);
+    expect(items[0]).toHaveTextContent('/posts/hello');
+    expect(items[1]).toHaveTextContent('POST /posts/:postId/comments');
+    expect(items[1]).toHaveTextContent('201');
+    expect(items[2]).toHaveTextContent('/posts/next');
   });
 
   it('surfaces a 404 as an error message', async () => {

@@ -51,15 +51,30 @@ export default function SessionJourneyPage({
 
       {!loading && journey && (
         <ol className="relative border-l border-gray-200 pl-6 dark:border-gray-700">
-          {journey.pageViews.map((view) => (
-            <li key={view.id} className="mb-6">
-              <span className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full bg-emerald-500" />
-              <p className="font-mono text-sm text-gray-900 dark:text-white">{view.path}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {formatDateTime(view.enteredAt)} · {formatDuration(view.durationMs)} on page
-              </p>
-            </li>
-          ))}
+          {journey.steps.map((step) =>
+            step.type === 'pageview' ? (
+              <li key={`pv-${step.id}`} className="mb-6">
+                <span className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full bg-emerald-500" />
+                <p className="font-mono text-sm text-gray-900 dark:text-white">{step.path}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {formatDateTime(step.enteredAt)} · {formatDuration(step.durationMs)} on page
+                </p>
+              </li>
+            ) : (
+              <li key={`req-${step.id}`} className="mb-6">
+                <span className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full bg-sky-500" />
+                <p className="font-mono text-sm text-gray-900 dark:text-white">
+                  {step.method} {step.path}
+                  <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
+                    {step.statusCode}
+                  </span>
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {formatDateTime(step.createdAt)}
+                </p>
+              </li>
+            )
+          )}
         </ol>
       )}
     </div>

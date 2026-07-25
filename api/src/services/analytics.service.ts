@@ -84,21 +84,52 @@ export const analyticsService = {
     }
   },
 
-  /** Returns null when the session has no rows for that user (controller maps to 404). */
+  /**
+   * Returns null when the session has no rows for that user (controller maps
+   * to 404). Interleaves page views and logged API actions (comments, etc)
+   * into one chronological list — the user's actual navigation, not just
+   * which pages they loaded. Page views sort by *entry* time (when the user
+   * arrived), not the write-time leftAt, so an action taken mid-visit (e.g.
+   * a comment posted while reading a post) lands after that page's step and
+   * before the next one, matching what really happened.
+   */
   async getSessionJourney(userId: string, sessionId: string) {
-    const rows = await analyticsRepository.listPageViewsForSession(userId, sessionId)
-    if (rows.length === 0) return null
+    const [pageViews, requests] = await Promise.all([
+      analyticsRepository.listPageViewsForSession(userId, sessionId),
+      analyticsRepository.listRequestLogsForSession(userId, sessionId),
+    ])
+    if (pageViews.length === 0 && requests.length === 0) return null
 
-    return {
-      sessionId,
-      pageViews: rows.map((row) => ({
+    const pageViewSteps = pageViews.map((row) => {
+      // createdAt is written at page-LEAVE; enteredAt is display-only, and
+      // also this step's sort key (see the doc comment above)
+      const enteredAt = new Date(row.createdAt.getTime() - row.durationMs)
+      return {
+        type:       'pageview' as const,
         id:         row.id,
         path:       row.path,
         durationMs: row.durationMs,
-        // createdAt is written at page-LEAVE; enteredAt is display-only
-        enteredAt:  new Date(row.createdAt.getTime() - row.durationMs),
+        enteredAt,
         leftAt:     row.createdAt,
-      })),
-    }
+        sortAt:     enteredAt,
+      }
+    })
+
+    const actionSteps = requests.map((row) => ({
+      type:       'action' as const,
+      id:         row.id,
+      method:     row.method,
+      path:       row.path,
+      statusCode: row.statusCode,
+      durationMs: row.durationMs,
+      createdAt:  row.createdAt,
+      sortAt:     row.createdAt,
+    }))
+
+    const steps = [...pageViewSteps, ...actionSteps]
+      .sort((a, b) => a.sortAt.getTime() - b.sortAt.getTime())
+      .map(({ sortAt: _sortAt, ...step }) => step)
+
+    return { sessionId, steps }
   },
 }

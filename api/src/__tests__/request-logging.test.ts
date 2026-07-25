@@ -53,6 +53,51 @@ describe('Request logging (onSend hook)', () => {
     expect(arg.data.durationMs).toBeTypeOf('number')
   })
 
+  it('captures the X-Session-Id header, ties the action to the same session PageView uses', async () => {
+    mockPrisma.requestLog.create.mockResolvedValue({})
+    const token = generateTestToken(app, { sub: 'user-1' })
+
+    await app.inject({
+      method: 'GET',
+      url: '/auth/me',
+      headers: { authorization: `Bearer ${token}`, 'x-session-id': SESSION_ID },
+    })
+
+    const arg = mockPrisma.requestLog.create.mock.calls[0][0]
+    expect(arg.data.sessionId).toBe(SESSION_ID)
+  })
+
+  it('leaves sessionId unset when the caller sends no X-Session-Id (Swagger/curl/tests)', async () => {
+    mockPrisma.requestLog.create.mockResolvedValue({})
+    const token = generateTestToken(app, { sub: 'user-1' })
+
+    await app.inject({
+      method: 'GET',
+      url: '/auth/me',
+      headers: { authorization: `Bearer ${token}` },
+    })
+
+    const arg = mockPrisma.requestLog.create.mock.calls[0][0]
+    expect(arg.data.sessionId).toBeUndefined()
+  })
+
+  it('never logs /auth/refresh — the silent auto-refresh timer is not a journey step', async () => {
+    mockPrisma.requestLog.create.mockResolvedValue({})
+    // A valid access token attached alongside the refresh call, to prove the
+    // exclusion is a deliberate route check, not just "no token, no log"
+    const token = generateTestToken(app, { sub: 'user-1' })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/auth/refresh',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { refreshToken: 'whatever' },
+    })
+
+    expect(res.statusCode).toBeLessThan(500)
+    expect(mockPrisma.requestLog.create).not.toHaveBeenCalled()
+  })
+
   it('does not log the same request twice for authenticated routes', async () => {
     mockPrisma.requestLog.create.mockResolvedValue({})
     const token = generateTestToken(app, { sub: 'user-1' })

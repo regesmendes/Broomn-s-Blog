@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma'
 
 export interface CreateRequestLogData {
   userId:     string
+  sessionId?: string
   method:     string
   path:       string
   statusCode: number
@@ -64,6 +65,22 @@ export const analyticsRepository = {
   /** Full page-view journey of one session, in visit order. */
   async listPageViewsForSession(userId: string, sessionId: string) {
     return prisma.pageView.findMany({
+      where:   { userId, sessionId },
+      orderBy: { createdAt: 'asc' },
+    })
+  },
+
+  /**
+   * Every logged API action in one session, in call order — merged with
+   * listPageViewsForSession's rows to reconstruct the full journey. Includes
+   * GETs as well as mutations: any request the user's own browsing generated
+   * is a real step in their journey, not just mutations. Hidden background
+   * mechanics (auth token refresh) and analytics's own traffic are excluded
+   * at write time (see the onSend hook in app.ts), so nothing needs
+   * filtering back out here.
+   */
+  async listRequestLogsForSession(userId: string, sessionId: string) {
+    return prisma.requestLog.findMany({
       where:   { userId, sessionId },
       orderBy: { createdAt: 'asc' },
     })

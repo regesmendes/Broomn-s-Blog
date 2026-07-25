@@ -57,4 +57,4 @@ See the root [README](../README.md) for setup and the [architecture doc](./archi
 | GET | `/analytics/summary?from=&to=` | User/request/newsletter counts for a period (defaults to last 30 days) |
 | GET | `/analytics/requests/by-user?from=&to=&limit=` | Requests per user in a period, busiest first (capped list, limit 1–200, default 50) |
 | GET | `/analytics/users/:userId/sessions?from=&to=&limit=` | One user's browsing sessions (capped list, limit 1–100, default 20); 404 if user unknown |
-| GET | `/analytics/users/:userId/sessions/:sessionId` | Full page-view journey of one session, in visit order |
+| GET | `/analytics/users/:userId/sessions/:sessionId` | Full journey of one session — page views and logged actions interleaved, in visit order |

@@ -260,8 +260,9 @@ describe('Analytics API', () => {
   // ── GET /analytics/users/:userId/sessions/:sessionId ───────────────────────
 
   describe('GET /analytics/users/:userId/sessions/:sessionId', () => {
-    it('404s when the session has no page views', async () => {
+    it('404s when the session has neither page views nor logged actions', async () => {
       mockPrisma.pageView.findMany.mockResolvedValue([])
+      mockPrisma.requestLog.findMany.mockResolvedValue([])
       const token = generateAdminToken(app)
 
       const res = await app.inject({
@@ -273,7 +274,7 @@ describe('Analytics API', () => {
       expect(res.statusCode).toBe(404)
     })
 
-    it('returns the journey in visit order with computed enteredAt', async () => {
+    it('returns page views with computed enteredAt', async () => {
       const leftAt = new Date('2026-07-01T10:05:00Z')
       mockPrisma.pageView.findMany.mockResolvedValue([
         {
@@ -283,6 +284,72 @@ describe('Analytics API', () => {
           path: '/posts/hello',
           durationMs: 60_000,
           createdAt: leftAt,
+        },
+      ])
+      mockPrisma.requestLog.findMany.mockResolvedValue([])
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/analytics/users/user-1/sessions/${SESSION_ID}`,
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.sessionId).toBe(SESSION_ID)
+      expect(body.steps).toEqual([
+        {
+          type: 'pageview',
+          id: 'pv-1',
+          path: '/posts/hello',
+          durationMs: 60_000,
+          enteredAt: new Date(leftAt.getTime() - 60_000).toISOString(),
+          leftAt: leftAt.toISOString(),
+        },
+      ])
+      expect(mockPrisma.pageView.findMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', sessionId: SESSION_ID },
+        orderBy: { createdAt: 'asc' },
+      })
+    })
+
+    it('interleaves a mid-visit action between the page views around it', async () => {
+      // Reading a post (10:00–10:05), commenting at 10:02, then reading the
+      // next post (10:05 onward) — the comment must land between the two
+      // page steps, not before or after both of them.
+      const firstPageLeftAt = new Date('2026-07-01T10:05:00Z') // entered 10:00
+      const commentAt = new Date('2026-07-01T10:02:00Z')
+      const secondPageLeftAt = new Date('2026-07-01T10:10:00Z') // entered 10:05
+
+      mockPrisma.pageView.findMany.mockResolvedValue([
+        {
+          id: 'pv-1',
+          userId: 'user-1',
+          sessionId: SESSION_ID,
+          path: '/posts/hello',
+          durationMs: 5 * 60_000,
+          createdAt: firstPageLeftAt,
+        },
+        {
+          id: 'pv-2',
+          userId: 'user-1',
+          sessionId: SESSION_ID,
+          path: '/posts/next',
+          durationMs: 5 * 60_000,
+          createdAt: secondPageLeftAt,
+        },
+      ])
+      mockPrisma.requestLog.findMany.mockResolvedValue([
+        {
+          id: 'req-1',
+          userId: 'user-1',
+          sessionId: SESSION_ID,
+          method: 'POST',
+          path: '/posts/:postId/comments',
+          statusCode: 201,
+          durationMs: 42,
+          createdAt: commentAt,
         },
       ])
       const token = generateAdminToken(app)
@@ -295,17 +362,21 @@ describe('Analytics API', () => {
 
       expect(res.statusCode).toBe(200)
       const body = res.json()
-      expect(body.sessionId).toBe(SESSION_ID)
-      expect(body.pageViews).toEqual([
-        {
-          id: 'pv-1',
-          path: '/posts/hello',
-          durationMs: 60_000,
-          enteredAt: new Date(leftAt.getTime() - 60_000).toISOString(),
-          leftAt: leftAt.toISOString(),
-        },
+      expect(body.steps.map((s: { type: string; path: string }) => `${s.type}:${s.path}`)).toEqual([
+        'pageview:/posts/hello',
+        'action:/posts/:postId/comments',
+        'pageview:/posts/next',
       ])
-      expect(mockPrisma.pageView.findMany).toHaveBeenCalledWith({
+      expect(body.steps[1]).toEqual({
+        type: 'action',
+        id: 'req-1',
+        method: 'POST',
+        path: '/posts/:postId/comments',
+        statusCode: 201,
+        durationMs: 42,
+        createdAt: commentAt.toISOString(),
+      })
+      expect(mockPrisma.requestLog.findMany).toHaveBeenCalledWith({
         where: { userId: 'user-1', sessionId: SESSION_ID },
         orderBy: { createdAt: 'asc' },
       })

@@ -38,7 +38,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Id'],
   })
 
   // Auth (registered before rate limiting so its `jwtVerify` decorator is
@@ -73,15 +73,25 @@ export async function buildApp(): Promise<FastifyInstance> {
   // request carrying a valid token gets logged, whatever the route.
   app.addHook('onSend', async (request, reply, payload) => {
     if (!request.user?.sub) return payload
+    const routePath = request.routeOptions.url
     // Analytics must never observe itself: neither the pageview beacon nor
     // the admin dashboard's own reads belong in the data they produce
-    if (request.routeOptions.url?.startsWith('/analytics')) return payload
+    if (routePath?.startsWith('/analytics')) return payload
+    // The auto-refresh timer in auth-context.tsx fires silently on a
+    // schedule, invisible to the user — not a step in anyone's journey, and
+    // not logged at all (no record, not just hidden from display)
+    if (routePath === '/auth/refresh') return payload
 
     try {
+      const sessionId = request.headers['x-session-id']
       await analyticsRepository.createRequestLog({
         userId:     request.user.sub,
+        // Ties this action to the same per-tab session PageView uses, so the
+        // journey endpoint can interleave them — only ever set by the
+        // frontend's api client, so absent for Swagger/curl/test callers
+        sessionId:  typeof sessionId === 'string' ? sessionId : undefined,
         method:     request.method,
-        path:       request.routeOptions.url ?? request.url,
+        path:       routePath ?? request.url,
         statusCode: reply.statusCode,
         durationMs: Math.round(reply.elapsedTime),
       })

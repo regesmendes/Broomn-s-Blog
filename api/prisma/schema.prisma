@@ -135,6 +135,10 @@ enum SubscriptionStatus {
 model RequestLog {
   id         String   @id @default(cuid())
   userId     String
+  sessionId  String?  // X-Session-Id header, same per-tab id PageView uses —
+                      // nullable because not every caller of the API sends it
+                      // (Swagger, curl, tests); lets the journey endpoint
+                      // interleave real user actions with page views
   method     String
   path       String   // matched route PATTERN (request.routeOptions.url), not the
                       // raw resolved URL — keeps dynamic-id routes aggregable
@@ -146,6 +150,7 @@ model RequestLog {
 
   @@index([createdAt])
   @@index([userId, createdAt])
+  @@index([userId, sessionId, createdAt])
   @@map("request_logs")
 }
 

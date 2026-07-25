@@ -12,18 +12,9 @@
 import { useEffect, useRef } from 'react';
 import { usePathname } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { getSessionId } from '@/lib/analyticsSession';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-const SESSION_ID_KEY = 'analyticsSessionId';
-
-function getSessionId(): string {
-  let id = sessionStorage.getItem(SESSION_ID_KEY);
-  if (!id) {
-    id = crypto.randomUUID();
-    sessionStorage.setItem(SESSION_ID_KEY, id);
-  }
-  return id;
-}
 
 function sendPageView(token: string, path: string, durationMs: number) {
   // The analytics dashboard must never appear in its own reports — time spent

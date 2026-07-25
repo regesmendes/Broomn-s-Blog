@@ -1,4 +1,5 @@
 import { startLoading, stopLoading } from './loadingIndicator';
+import { getSessionId } from './analyticsSession';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -181,7 +182,8 @@ export interface UserSessionsResponse {
   data: UserSessionRow[];
 }
 
-export interface SessionPageView {
+export interface SessionPageViewStep {
+  type: 'pageview';
   id: string;
   path: string;
   durationMs: number;
@@ -189,9 +191,21 @@ export interface SessionPageView {
   leftAt: string;
 }
 
+export interface SessionActionStep {
+  type: 'action';
+  id: string;
+  method: string;
+  path: string;
+  statusCode: number;
+  durationMs: number;
+  createdAt: string;
+}
+
+export type SessionJourneyStep = SessionPageViewStep | SessionActionStep;
+
 export interface SessionJourney {
   sessionId: string;
-  pageViews: SessionPageView[];
+  steps: SessionJourneyStep[];
 }
 
 // Error class
@@ -223,6 +237,10 @@ class ApiClient {
       const url = `${this.baseUrl}${endpoint}`;
       const headers: HeadersInit = {
         ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        // Ties API actions to the page-view tracker's per-tab session, so the
+        // admin analytics journey can interleave them. Browser only —
+        // sessionStorage doesn't exist during SSR data fetching.
+        ...(typeof window !== 'undefined' ? { 'X-Session-Id': getSessionId() } : {}),
         ...options.headers,
       };
 
@@ -483,7 +501,7 @@ class ApiClient {
 
     const response = await fetch(`${this.baseUrl}/media/upload`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}`, 'X-Session-Id': getSessionId() },
       body: formData,
     });
 
