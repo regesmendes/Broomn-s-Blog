@@ -32,7 +32,9 @@ export const analyticsService = {
       newPosts,
       postReads,
       commentsSubmitted,
-      newsletter,
+      newsletterSnapshot,
+      newSubscribers,
+      newUnsubscribes,
       requestsInPeriod,
     ] = await Promise.all([
       userRepository.countAll(),
@@ -43,6 +45,8 @@ export const analyticsService = {
       analyticsRepository.countPageViewsByPathPrefix('/posts/', from, to),
       commentRepository.countCreatedBetween(from, to),
       newsletterRepository.countForAnalytics(),
+      newsletterRepository.countSubscribedBetween(from, to),
+      newsletterRepository.countUnsubscribedBetween(from, to),
       analyticsRepository.countRequestsBetween(from, to),
     ])
 
@@ -54,7 +58,11 @@ export const analyticsService = {
         readsInPeriod:    postReads,
         commentsInPeriod: commentsSubmitted,
       },
-      newsletter,
+      newsletter: {
+        ...newsletterSnapshot,
+        subscribedInPeriod:   newSubscribers,
+        unsubscribedInPeriod: newUnsubscribes,
+      },
       backend: { requestsInPeriod },
     }
   },

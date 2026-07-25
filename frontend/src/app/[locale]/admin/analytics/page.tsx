@@ -146,10 +146,16 @@ export default function AnalyticsPage() {
 
       {!loading && summary && (
         <>
-          <StatGroup title="Users">
-            <StatCard label="Total (all time)" value={summary.users.totalAllTime} />
-            <StatCard label="New" value={summary.users.newInPeriod} note="in period" />
-          </StatGroup>
+          <div className="grid gap-6 md:grid-cols-2">
+            <StatGroup title="Users">
+              <StatCard label="Total (all time)" value={summary.users.totalAllTime} />
+              <StatCard label="New" value={summary.users.newInPeriod} note="in period" />
+            </StatGroup>
+
+            <StatGroup title="Backend">
+              <StatCard label="API requests" value={summary.backend.requestsInPeriod} note="in period" />
+            </StatGroup>
+          </div>
 
           <StatGroup title="Posts">
             <StatCard label="New posts" value={summary.posts.newInPeriod} note="in period" />
@@ -165,10 +171,8 @@ export default function AnalyticsPage() {
             <StatCard label="Unsubscribed" value={summary.newsletter.unsubscribed} />
             <StatCard label="Blocked" value={summary.newsletter.blocked} />
             <StatCard label="Pending" value={summary.newsletter.pending} />
-          </StatGroup>
-
-          <StatGroup title="Backend">
-            <StatCard label="API requests" value={summary.backend.requestsInPeriod} note="in period" />
+            <StatCard label="New subscribers" value={summary.newsletter.subscribedInPeriod} note="in period" />
+            <StatCard label="New unsubscribes" value={summary.newsletter.unsubscribedInPeriod} note="in period" />
           </StatGroup>
 
           <button

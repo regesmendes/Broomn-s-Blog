@@ -81,6 +81,7 @@ export interface Subscriber {
   confirmedAt: string | null;
   createdAt: string;
   blockedAt: string | null;
+  unsubscribedAt: string | null;
 }
 
 export interface MediaItem {
@@ -154,7 +155,14 @@ export interface AnalyticsSummary {
   period: AnalyticsPeriod;
   users: { totalAllTime: number; newInPeriod: number };
   posts: { newInPeriod: number; readsInPeriod: number; commentsInPeriod: number };
-  newsletter: { subscribed: number; unsubscribed: number; blocked: number; pending: number };
+  newsletter: {
+    subscribed: number;
+    unsubscribed: number;
+    blocked: number;
+    pending: number;
+    subscribedInPeriod: number;
+    unsubscribedInPeriod: number;
+  };
   backend: { requestsInPeriod: number };
 }
 

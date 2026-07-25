@@ -129,6 +129,8 @@ describe('Analytics API', () => {
         .mockResolvedValueOnce(8)  // unsubscribed
         .mockResolvedValueOnce(2)  // blocked
         .mockResolvedValueOnce(6)  // pending
+        .mockResolvedValueOnce(4)  // subscribedInPeriod (countSubscribedBetween)
+        .mockResolvedValueOnce(1)  // unsubscribedInPeriod (countUnsubscribedBetween)
       mockPrisma.requestLog.count.mockResolvedValue(1234)
       const token = generateAdminToken(app)
 
@@ -142,7 +144,14 @@ describe('Analytics API', () => {
       const body = res.json()
       expect(body.users).toEqual({ totalAllTime: 42, newInPeriod: 5 })
       expect(body.posts).toEqual({ newInPeriod: 3, readsInPeriod: 120, commentsInPeriod: 17 })
-      expect(body.newsletter).toEqual({ subscribed: 30, unsubscribed: 8, blocked: 2, pending: 6 })
+      expect(body.newsletter).toEqual({
+        subscribed: 30,
+        unsubscribed: 8,
+        blocked: 2,
+        pending: 6,
+        subscribedInPeriod: 4,
+        unsubscribedInPeriod: 1,
+      })
       expect(body.backend).toEqual({ requestsInPeriod: 1234 })
       expect(body.period.from).toBe(new Date('2026-06-01').toISOString())
       expect(body.period.to).toBe(new Date('2026-07-01').toISOString())

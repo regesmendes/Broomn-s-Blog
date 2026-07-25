@@ -32,7 +32,14 @@ const summaryFixture = {
   period: { from: '2026-06-25T00:00:00.000Z', to: '2026-07-25T23:59:59.999Z' },
   users: { totalAllTime: 42, newInPeriod: 5 },
   posts: { newInPeriod: 3, readsInPeriod: 120, commentsInPeriod: 17 },
-  newsletter: { subscribed: 30, unsubscribed: 8, blocked: 2, pending: 6 },
+  newsletter: {
+    subscribed: 30,
+    unsubscribed: 8,
+    blocked: 2,
+    pending: 6,
+    subscribedInPeriod: 9,
+    unsubscribedInPeriod: 4,
+  },
   backend: { requestsInPeriod: 1234 },
 };
 
@@ -66,7 +73,15 @@ describe('AnalyticsPage', () => {
     expect(screen.getByText('120')).toBeInTheDocument();
     expect(screen.getByText('17')).toBeInTheDocument();
     expect(screen.getByText('6')).toBeInTheDocument();
+    expect(screen.getByText('9')).toBeInTheDocument();
+    expect(screen.getByText('4')).toBeInTheDocument();
     expect(screen.getByText('1234')).toBeInTheDocument();
+    expect(screen.getByText('New subscribers')).toBeInTheDocument();
+    expect(screen.getByText('New unsubscribes')).toBeInTheDocument();
+
+    // Users and Backend sit side by side at the top, above Posts and Newsletter
+    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+    expect(headings).toEqual(['Users', 'Backend', 'Posts', 'Newsletter']);
 
     // "Requests by user" starts collapsed — no reason to pay for a query
     // nobody may ever look at on every dashboard load

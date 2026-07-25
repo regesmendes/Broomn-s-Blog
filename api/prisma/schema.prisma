@@ -109,12 +109,17 @@ model Comment {
 // ─── Newsletter ───────────────────────────────────────────────────────────────
 
 model Newsletter {
-  id          String             @id @default(cuid())
-  email       String             @unique
-  status      SubscriptionStatus @default(PENDING)
-  confirmedAt DateTime?
-  createdAt   DateTime           @default(now())
-  blockedAt   DateTime?
+  id             String             @id @default(cuid())
+  email          String             @unique
+  status         SubscriptionStatus @default(PENDING)
+  confirmedAt    DateTime?
+  createdAt      DateTime           @default(now())
+  blockedAt      DateTime?
+  unsubscribedAt DateTime?          // set by unsubscribe() and block() (block also
+                                     // transitions status to UNSUBSCRIBED) — not a
+                                     // generic updatedAt, which would get overwritten
+                                     // by a later resubscribe or block and lose the
+                                     // actual unsubscribe date
 
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)

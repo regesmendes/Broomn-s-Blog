@@ -3,12 +3,13 @@ import { SubscriptionStatus } from '@prisma/client'
 import { paginateWithCursor } from '../lib/pagination'
 
 const subscriberSelect = {
-  id:          true,
-  email:       true,
-  status:      true,
-  confirmedAt: true,
-  createdAt:   true,
-  blockedAt:   true,
+  id:             true,
+  email:          true,
+  status:         true,
+  confirmedAt:    true,
+  createdAt:      true,
+  blockedAt:      true,
+  unsubscribedAt: true,
 } as const
 
 export const newsletterRepository = {
@@ -46,23 +47,27 @@ export const newsletterRepository = {
   },
 
   /** Self-service or admin-triggered unsubscribe — only ever touches
-   * `status`, never `blockedAt`. This is what makes "unsubscribe but stay
-   * blocked" work for free: a self-unsubscribe on an already-blocked row
-   * leaves blockedAt untouched, with no special-casing needed. */
+   * `status`/`unsubscribedAt`, never `blockedAt`. This is what makes
+   * "unsubscribe but stay blocked" work for free: a self-unsubscribe on an
+   * already-blocked row leaves blockedAt untouched, with no special-casing
+   * needed. `unsubscribedAt` is a dedicated per-transition timestamp (like
+   * `confirmedAt`), not a generic updatedAt — see the schema comment. */
   async unsubscribe(id: string) {
     return prisma.newsletter.update({
       where: { id },
-      data:  { status: 'UNSUBSCRIBED' },
+      data:  { status: 'UNSUBSCRIBED', unsubscribedAt: new Date() },
       select: subscriberSelect,
     })
   },
 
   /** Block a subscriber — stops delivery immediately and prevents
-   * re-subscribing (see `subscribe` above). Admin only. */
+   * re-subscribing (see `subscribe` above). Admin only. Also sets
+   * `unsubscribedAt`, since this transitions status to UNSUBSCRIBED too. */
   async block(id: string) {
+    const now = new Date()
     return prisma.newsletter.update({
       where: { id },
-      data:  { blockedAt: new Date(), status: 'UNSUBSCRIBED' },
+      data:  { blockedAt: now, status: 'UNSUBSCRIBED', unsubscribedAt: now },
       select: subscriberSelect,
     })
   },
@@ -149,6 +154,23 @@ export const newsletterRepository = {
       prisma.newsletter.count({ where: { status: 'PENDING', blockedAt: null } }),
     ])
     return { subscribed, unsubscribed, blocked, pending }
+  },
+
+  /** New confirmations in a period — by confirmedAt, not createdAt, so this
+   * reflects when someone actually became a subscriber, not when they first
+   * submitted the form (which may have been confirmed much later, or never). */
+  async countSubscribedBetween(from: Date, to: Date) {
+    return prisma.newsletter.count({ where: { confirmedAt: { gte: from, lte: to } } })
+  },
+
+  /** Unsubscribe events in a period — excludes blocked rows, mirroring
+   * countForAnalytics()'s distinction between organic unsubscribes and
+   * admin blocks (block() also sets unsubscribedAt, but that's a separate,
+   * admin-initiated event, not churn). */
+  async countUnsubscribedBetween(from: Date, to: Date) {
+    return prisma.newsletter.count({
+      where: { unsubscribedAt: { gte: from, lte: to }, blockedAt: null },
+    })
   },
 
   /** Get all confirmed subscribers (id + email, for sending with per-recipient unsubscribe links). */
