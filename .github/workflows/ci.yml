@@ -87,6 +87,19 @@ jobs:
           cache-dependency-path: infrastructure/package-lock.json
 
       - run: npm install -g npm@11
+
+      # infrastructure/test/api-stack.test.ts synths a real ApiStack, which
+      # bundles the real api/src/lambda.ts via esbuild (NodejsFunction) —
+      # the same real bundling cdk deploy does. That needs api's own
+      # dependencies (fastify, @fastify/cors, etc., hoisted to the repo root
+      # since api is part of the root npm workspace) and the generated
+      # Prisma client actually present, matching deploy.yml's install order.
+      - name: Install api deps and generate Prisma client
+        working-directory: .
+        run: |
+          npm ci
+          npx prisma generate --schema=api/prisma/schema.prisma
+
       - run: npm ci
       - run: npm run build
       - run: npm test
