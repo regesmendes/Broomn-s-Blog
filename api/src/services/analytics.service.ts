@@ -126,9 +126,30 @@ export const analyticsService = {
       sortAt:     row.createdAt,
     }))
 
-    const steps = [...pageViewSteps, ...actionSteps]
-      .sort((a, b) => a.sortAt.getTime() - b.sortAt.getTime())
-      .map(({ sortAt: _sortAt, ...step }) => step)
+    const sorted = [...pageViewSteps, ...actionSteps].sort(
+      (a, b) => a.sortAt.getTime() - b.sortAt.getTime()
+    )
+
+    // Collapse consecutive pageview steps for the same path into one. The
+    // tracking hook's 'hidden' trigger (usePageViewTracking.ts) flushes and
+    // resets its clock whenever the tab is backgrounded, as a safety net so
+    // progress isn't lost if the tab gets killed while hidden — but if the
+    // user simply alt-tabs away and back to the *same* page before actually
+    // navigating, that produces two PageView rows for one continuous visit.
+    // That's a write-time safety concern, not a real second visit, so the
+    // journey presents it as a single step with the durations summed.
+    const merged: typeof sorted = []
+    for (const step of sorted) {
+      const prev = merged[merged.length - 1]
+      if (step.type === 'pageview' && prev?.type === 'pageview' && prev.path === step.path) {
+        prev.durationMs += step.durationMs
+        prev.leftAt = step.leftAt
+        continue
+      }
+      merged.push(step)
+    }
+
+    const steps = merged.map(({ sortAt: _sortAt, ...step }) => step)
 
     return { sessionId, steps }
   },

@@ -381,5 +381,117 @@ describe('Analytics API', () => {
         orderBy: { createdAt: 'asc' },
       })
     })
+
+    it('merges consecutive same-path page views into one step, summing durations', async () => {
+      // The tracking hook's 'hidden' trigger flushes early (a safety net for
+      // a tab that might get killed while backgrounded) whenever the user
+      // switches away and back without navigating — e.g. alt-tabbing away
+      // for 18s produces two PageView rows for the same "/" visit instead of
+      // one. The journey should present that as a single entry.
+      const firstFlush = new Date('2026-07-01T10:00:01Z') // entered 10:00:00, 1s in
+      const secondFlush = new Date('2026-07-01T10:00:19Z') // entered ~10:00:09.8, 9.2s more
+
+      mockPrisma.pageView.findMany.mockResolvedValue([
+        {
+          id: 'pv-1',
+          userId: 'user-1',
+          sessionId: SESSION_ID,
+          path: '/',
+          durationMs: 1025,
+          createdAt: firstFlush,
+        },
+        {
+          id: 'pv-2',
+          userId: 'user-1',
+          sessionId: SESSION_ID,
+          path: '/',
+          durationMs: 9196,
+          createdAt: secondFlush,
+        },
+        {
+          id: 'pv-3',
+          userId: 'user-1',
+          sessionId: SESSION_ID,
+          path: '/posts/hello-world',
+          durationMs: 1676,
+          createdAt: new Date('2026-07-01T10:00:21Z'),
+        },
+      ])
+      mockPrisma.requestLog.findMany.mockResolvedValue([])
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/analytics/users/user-1/sessions/${SESSION_ID}`,
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.steps).toHaveLength(2)
+      expect(body.steps[0]).toEqual({
+        type: 'pageview',
+        id: 'pv-1',
+        path: '/',
+        durationMs: 1025 + 9196,
+        enteredAt: new Date(firstFlush.getTime() - 1025).toISOString(),
+        leftAt: secondFlush.toISOString(),
+      })
+      expect(body.steps[1].path).toBe('/posts/hello-world')
+    })
+
+    it('does not merge two same-path page views separated by a logged action', async () => {
+      // If something real happened in between (e.g. a comment posted while
+      // still on the same page), that's a genuine break worth keeping visible
+      // — only a *consecutive* run with nothing between them is safety-flush
+      // noise.
+      mockPrisma.pageView.findMany.mockResolvedValue([
+        {
+          id: 'pv-1',
+          userId: 'user-1',
+          sessionId: SESSION_ID,
+          path: '/posts/hello',
+          durationMs: 60_000,
+          createdAt: new Date('2026-07-01T10:01:00Z'),
+        },
+        {
+          id: 'pv-2',
+          userId: 'user-1',
+          sessionId: SESSION_ID,
+          path: '/posts/hello',
+          durationMs: 30_000,
+          createdAt: new Date('2026-07-01T10:03:00Z'),
+        },
+      ])
+      mockPrisma.requestLog.findMany.mockResolvedValue([
+        {
+          id: 'req-1',
+          userId: 'user-1',
+          sessionId: SESSION_ID,
+          method: 'POST',
+          path: '/posts/:postId/comments',
+          statusCode: 201,
+          durationMs: 42,
+          createdAt: new Date('2026-07-01T10:01:30Z'),
+        },
+      ])
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'GET',
+        url: `/analytics/users/user-1/sessions/${SESSION_ID}`,
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      const body = res.json()
+      expect(body.steps.map((s: { type: string }) => s.type)).toEqual([
+        'pageview',
+        'action',
+        'pageview',
+      ])
+      expect(body.steps[0].durationMs).toBe(60_000)
+      expect(body.steps[2].durationMs).toBe(30_000)
+    })
   })
 })
