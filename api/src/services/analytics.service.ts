@@ -1,6 +1,8 @@
 import { analyticsRepository, CreatePageViewData } from '../repositories/analytics.repository'
 import { userRepository } from '../repositories/user.repository'
 import { newsletterRepository } from '../repositories/newsletter.repository'
+import { postRepository } from '../repositories/post.repository'
+import { commentRepository } from '../repositories/comment.repository'
 
 const DEFAULT_PERIOD_DAYS = 30
 
@@ -24,18 +26,36 @@ export const analyticsService = {
   async getSummary(fromQuery?: Date, toQuery?: Date) {
     const { from, to } = resolvePeriod(fromQuery, toQuery)
 
-    const [totalAllTime, newInPeriod, totalInPeriod, newsletter] = await Promise.all([
+    const [
+      totalUsers,
+      newUsers,
+      newPosts,
+      postReads,
+      commentsSubmitted,
+      newsletter,
+      requestsInPeriod,
+    ] = await Promise.all([
       userRepository.countAll(),
       userRepository.countCreatedBetween(from, to),
-      analyticsRepository.countRequestsBetween(from, to),
+      postRepository.countCreatedBetween(from, to),
+      // Registered users only — same known limitation as the rest of this
+      // dashboard, see docs/architecture.md
+      analyticsRepository.countPageViewsByPathPrefix('/posts/', from, to),
+      commentRepository.countCreatedBetween(from, to),
       newsletterRepository.countForAnalytics(),
+      analyticsRepository.countRequestsBetween(from, to),
     ])
 
     return {
-      period:     { from: from.toISOString(), to: to.toISOString() },
-      users:      { totalAllTime, newInPeriod },
-      requests:   { totalInPeriod },
+      period: { from: from.toISOString(), to: to.toISOString() },
+      users: { totalAllTime: totalUsers, newInPeriod: newUsers },
+      posts: {
+        newInPeriod:      newPosts,
+        readsInPeriod:    postReads,
+        commentsInPeriod: commentsSubmitted,
+      },
       newsletter,
+      backend: { requestsInPeriod },
     }
   },
 

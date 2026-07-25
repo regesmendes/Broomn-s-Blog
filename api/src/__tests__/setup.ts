@@ -84,6 +84,7 @@ vi.mock('../lib/prisma', () => ({
     },
     pageView: {
       create: vi.fn(),
+      count: vi.fn(),
       findMany: vi.fn(),
       groupBy: vi.fn(),
       deleteMany: vi.fn(),

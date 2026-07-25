@@ -117,15 +117,19 @@ describe('Analytics API', () => {
       expect(res.statusCode).toBe(403)
     })
 
-    it('returns user, request, and newsletter counts', async () => {
+    it('returns user, post, newsletter, and backend counts, grouped', async () => {
       mockPrisma.user.count
         .mockResolvedValueOnce(42) // countAll
         .mockResolvedValueOnce(5)  // countCreatedBetween
-      mockPrisma.requestLog.count.mockResolvedValue(1234)
+      mockPrisma.post.count.mockResolvedValue(3) // new posts in period
+      mockPrisma.pageView.count.mockResolvedValue(120) // post reads in period
+      mockPrisma.comment.count.mockResolvedValue(17) // comments submitted in period
       mockPrisma.newsletter.count
         .mockResolvedValueOnce(30) // subscribed
         .mockResolvedValueOnce(8)  // unsubscribed
         .mockResolvedValueOnce(2)  // blocked
+        .mockResolvedValueOnce(6)  // pending
+      mockPrisma.requestLog.count.mockResolvedValue(1234)
       const token = generateAdminToken(app)
 
       const res = await app.inject({
@@ -137,10 +141,31 @@ describe('Analytics API', () => {
       expect(res.statusCode).toBe(200)
       const body = res.json()
       expect(body.users).toEqual({ totalAllTime: 42, newInPeriod: 5 })
-      expect(body.requests).toEqual({ totalInPeriod: 1234 })
-      expect(body.newsletter).toEqual({ subscribed: 30, unsubscribed: 8, blocked: 2 })
+      expect(body.posts).toEqual({ newInPeriod: 3, readsInPeriod: 120, commentsInPeriod: 17 })
+      expect(body.newsletter).toEqual({ subscribed: 30, unsubscribed: 8, blocked: 2, pending: 6 })
+      expect(body.backend).toEqual({ requestsInPeriod: 1234 })
       expect(body.period.from).toBe(new Date('2026-06-01').toISOString())
       expect(body.period.to).toBe(new Date('2026-07-01').toISOString())
+    })
+
+    it('scopes post reads to the /posts/ path prefix only', async () => {
+      mockPrisma.user.count.mockResolvedValue(0)
+      mockPrisma.post.count.mockResolvedValue(0)
+      mockPrisma.pageView.count.mockResolvedValue(0)
+      mockPrisma.comment.count.mockResolvedValue(0)
+      mockPrisma.newsletter.count.mockResolvedValue(0)
+      mockPrisma.requestLog.count.mockResolvedValue(0)
+      const token = generateAdminToken(app)
+
+      await app.inject({
+        method: 'GET',
+        url: '/analytics/summary',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(mockPrisma.pageView.count).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ path: { startsWith: '/posts/' } }) })
+      )
     })
 
     it('rejects an invalid date', async () => {

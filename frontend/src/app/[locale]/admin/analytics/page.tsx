@@ -17,6 +17,17 @@ function StatCard({ label, value, note }: { label: string; value: number; note?:
   );
 }
 
+function StatGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-8">
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        {title}
+      </h2>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">{children}</div>
+    </div>
+  );
+}
+
 export default function AnalyticsPage() {
   const { getToken } = useAuth();
   const [range, setRange] = useState(defaultDateRange());
@@ -91,18 +102,30 @@ export default function AnalyticsPage() {
 
       {!loading && summary && (
         <>
-          <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-            <StatCard label="Users (all time)" value={summary.users.totalAllTime} />
-            <StatCard label="New users" value={summary.users.newInPeriod} note="in period" />
-            <StatCard label="API requests" value={summary.requests.totalInPeriod} note="in period" />
+          <StatGroup title="Users">
+            <StatCard label="Total (all time)" value={summary.users.totalAllTime} />
+            <StatCard label="New" value={summary.users.newInPeriod} note="in period" />
+          </StatGroup>
+
+          <StatGroup title="Posts">
+            <StatCard label="New posts" value={summary.posts.newInPeriod} note="in period" />
+            <StatCard label="Reads" value={summary.posts.readsInPeriod} note="in period" />
+            <StatCard label="Comments submitted" value={summary.posts.commentsInPeriod} note="in period" />
+          </StatGroup>
+          <p className="mb-8 -mt-6 text-xs text-gray-400 dark:text-gray-500">
+            Reads count only logged-in visitors — this dashboard doesn&apos;t track anonymous traffic.
+          </p>
+
+          <StatGroup title="Newsletter">
             <StatCard label="Subscribed" value={summary.newsletter.subscribed} />
             <StatCard label="Unsubscribed" value={summary.newsletter.unsubscribed} />
             <StatCard label="Blocked" value={summary.newsletter.blocked} />
-          </div>
-          <p className="mb-8 -mt-6 text-xs text-gray-400 dark:text-gray-500">
-            Newsletter counts exclude pending (unconfirmed) subscriptions — the three numbers
-            don&apos;t sum to all rows.
-          </p>
+            <StatCard label="Pending" value={summary.newsletter.pending} />
+          </StatGroup>
+
+          <StatGroup title="Backend">
+            <StatCard label="API requests" value={summary.backend.requestsInPeriod} note="in period" />
+          </StatGroup>
 
           <h2 className="mb-3 text-lg font-semibold text-gray-900 dark:text-white">
             Requests by user

@@ -153,8 +153,9 @@ export interface AnalyticsPeriod {
 export interface AnalyticsSummary {
   period: AnalyticsPeriod;
   users: { totalAllTime: number; newInPeriod: number };
-  requests: { totalInPeriod: number };
-  newsletter: { subscribed: number; unsubscribed: number; blocked: number };
+  posts: { newInPeriod: number; readsInPeriod: number; commentsInPeriod: number };
+  newsletter: { subscribed: number; unsubscribed: number; blocked: number; pending: number };
+  backend: { requestsInPeriod: number };
 }
 
 export interface RequestsByUserRow {

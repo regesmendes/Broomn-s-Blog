@@ -491,20 +491,21 @@ describe('Newsletter API', () => {
 // ── newsletterRepository.countForAnalytics ───────────────────────────────────
 
 describe('newsletterRepository.countForAnalytics', () => {
-  it('splits counts into subscribed / unsubscribed / blocked', async () => {
+  it('splits counts into subscribed / unsubscribed / blocked / pending', async () => {
     const { newsletterRepository } = await import('../repositories/newsletter.repository')
     const countMock = prisma.newsletter.count as unknown as ReturnType<typeof vi.fn>
     countMock
       .mockResolvedValueOnce(30) // subscribed
       .mockResolvedValueOnce(8)  // unsubscribed
       .mockResolvedValueOnce(2)  // blocked
+      .mockResolvedValueOnce(6)  // pending
 
     const result = await newsletterRepository.countForAnalytics()
 
-    expect(result).toEqual({ subscribed: 30, unsubscribed: 8, blocked: 2 })
+    expect(result).toEqual({ subscribed: 30, unsubscribed: 8, blocked: 2, pending: 6 })
   })
 
-  it('excludes blocked rows from the subscribed and unsubscribed buckets', async () => {
+  it('excludes blocked rows from the subscribed, unsubscribed, and pending buckets', async () => {
     const { newsletterRepository } = await import('../repositories/newsletter.repository')
     const countMock = prisma.newsletter.count as unknown as ReturnType<typeof vi.fn>
     countMock.mockResolvedValue(0)
@@ -514,5 +515,6 @@ describe('newsletterRepository.countForAnalytics', () => {
     expect(countMock).toHaveBeenCalledWith({ where: { status: 'CONFIRMED', blockedAt: null } })
     expect(countMock).toHaveBeenCalledWith({ where: { status: 'UNSUBSCRIBED', blockedAt: null } })
     expect(countMock).toHaveBeenCalledWith({ where: { blockedAt: { not: null } } })
+    expect(countMock).toHaveBeenCalledWith({ where: { status: 'PENDING', blockedAt: null } })
   })
 })

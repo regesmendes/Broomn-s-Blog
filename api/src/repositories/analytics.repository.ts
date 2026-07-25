@@ -32,6 +32,19 @@ export const analyticsRepository = {
   },
 
   /**
+   * Post reads in a period, from registered users' PageView rows only — same
+   * known limitation as the rest of this dashboard (anonymous visitors
+   * aren't tracked at all, see docs/architecture.md). Public post routes are
+   * the only ones under this prefix (admin post editing lives under
+   * /admin/posts), so a startsWith match is unambiguous.
+   */
+  async countPageViewsByPathPrefix(prefix: string, from: Date, to: Date) {
+    return prisma.pageView.count({
+      where: { path: { startsWith: prefix }, createdAt: { gte: from, lte: to } },
+    })
+  },
+
+  /**
    * Requests grouped per user in a period, busiest first. A capped list, not
    * cursor-paginated — the result set is bounded by registered-user count,
    * not an ever-growing content list (see docs/architecture.md).

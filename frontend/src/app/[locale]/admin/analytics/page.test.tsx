@@ -31,12 +31,13 @@ describe('AnalyticsPage', () => {
 
   afterEach(cleanup);
 
-  it('renders stat cards and the requests-by-user table', async () => {
+  it('renders grouped stat cards and the requests-by-user table', async () => {
     mockApi.getAnalyticsSummary.mockResolvedValue({
       period: { from: '2026-06-25T00:00:00.000Z', to: '2026-07-25T23:59:59.999Z' },
       users: { totalAllTime: 42, newInPeriod: 5 },
-      requests: { totalInPeriod: 1234 },
-      newsletter: { subscribed: 30, unsubscribed: 8, blocked: 2 },
+      posts: { newInPeriod: 3, readsInPeriod: 120, commentsInPeriod: 17 },
+      newsletter: { subscribed: 30, unsubscribed: 8, blocked: 2, pending: 6 },
+      backend: { requestsInPeriod: 1234 },
     });
     mockApi.getAnalyticsRequestsByUser.mockResolvedValue({
       period: { from: '2026-06-25T00:00:00.000Z', to: '2026-07-25T23:59:59.999Z' },
@@ -46,6 +47,10 @@ describe('AnalyticsPage', () => {
     render(<AnalyticsPage />);
 
     expect(await screen.findByText('42')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText('120')).toBeInTheDocument();
+    expect(screen.getByText('17')).toBeInTheDocument();
+    expect(screen.getByText('6')).toBeInTheDocument();
     expect(screen.getByText('1234')).toBeInTheDocument();
     expect(screen.getByText('Alice')).toBeInTheDocument();
     expect(screen.getByText('alice@example.com')).toBeInTheDocument();
@@ -60,8 +65,9 @@ describe('AnalyticsPage', () => {
     mockApi.getAnalyticsSummary.mockResolvedValue({
       period: { from: '2026-06-25T00:00:00.000Z', to: '2026-07-25T23:59:59.999Z' },
       users: { totalAllTime: 0, newInPeriod: 0 },
-      requests: { totalInPeriod: 0 },
-      newsletter: { subscribed: 0, unsubscribed: 0, blocked: 0 },
+      posts: { newInPeriod: 0, readsInPeriod: 0, commentsInPeriod: 0 },
+      newsletter: { subscribed: 0, unsubscribed: 0, blocked: 0, pending: 0 },
+      backend: { requestsInPeriod: 0 },
     });
     mockApi.getAnalyticsRequestsByUser.mockResolvedValue({
       period: { from: '2026-06-25T00:00:00.000Z', to: '2026-07-25T23:59:59.999Z' },
