@@ -25,6 +25,8 @@ vi.mock('../lib/prisma', () => ({
     },
     user: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
+      count: vi.fn(),
       upsert: vi.fn(),
     },
     comment: {
@@ -72,6 +74,20 @@ vi.mock('../lib/prisma', () => ({
     mediaOnSupportPage: {
       deleteMany: vi.fn(),
       create: vi.fn(),
+    },
+    requestLog: {
+      create: vi.fn(),
+      count: vi.fn(),
+      groupBy: vi.fn(),
+      findMany: vi.fn(),
+      deleteMany: vi.fn(),
+    },
+    pageView: {
+      create: vi.fn(),
+      count: vi.fn(),
+      findMany: vi.fn(),
+      groupBy: vi.fn(),
+      deleteMany: vi.fn(),
     },
     $transaction: vi.fn(),
   },

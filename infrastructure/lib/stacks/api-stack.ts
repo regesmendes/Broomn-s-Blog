@@ -160,8 +160,13 @@ export class ApiStack extends Stack {
       memorySize: 512,
       timeout: Duration.minutes(5),
       vpc: props.vpc,
+      // PRIVATE_WITH_EGRESS, not PRIVATE_ISOLATED — same reason as apiFunction
+      // above: this Lambda fetches DB credentials from Secrets Manager at cold
+      // start (api/src/lib/dbCredentials.ts), and Secrets Manager has no VPC
+      // Gateway Endpoint, so PRIVATE_ISOLATED left that call with no route out,
+      // hanging until timeout. RDS is still reachable either way (same-VPC).
       vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
       },
       securityGroups: [props.lambdaSecurityGroup],
       bundling: {
@@ -201,6 +206,63 @@ export class ApiStack extends Stack {
     new CfnOutput(this, 'MigrateFunctionName', {
       value: migrateFunction.functionName,
       description: 'Invoke this Lambda to run prisma migrate deploy against the live DB',
+    });
+
+    // Daily analytics retention prune: deletes RequestLog/PageView rows older
+    // than 180 days (api/src/analytics-prune.ts). Uses Prisma Client directly
+    // (lambda.ts's runtime-require pattern), so bundling mirrors apiFunction,
+    // not migrateFunction's CLI-shell-out approach.
+    const analyticsPruneFunction = new NodejsFunction(this, 'AnalyticsPruneFn', {
+      functionName: 'broomns-blog-analytics-prune',
+      runtime: lambda.Runtime.NODEJS_24_X,
+      entry: path.join(repoRoot, 'api', 'src', 'analytics-prune.ts'),
+      handler: 'handler',
+      depsLockFilePath: path.join(repoRoot, 'package-lock.json'),
+      memorySize: 256,
+      timeout: Duration.minutes(2),
+      vpc: props.vpc,
+      // PRIVATE_WITH_EGRESS, not PRIVATE_ISOLATED — same reason as
+      // migrateFunction above: cold-start Secrets Manager fetch needs a route
+      // out (see the 2026-07-23 incident note in docs/deployment.md).
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+      },
+      securityGroups: [props.lambdaSecurityGroup],
+      bundling: {
+        // Same Prisma bundling story as apiFunction above
+        nodeModules: ['@prisma/client'],
+        commandHooks: {
+          beforeBundling: () => [],
+          beforeInstall: () => [],
+          afterBundling: (inputDir: string, outputDir: string) => [
+            `rm -rf ${outputDir}/node_modules/.prisma`,
+            `cp -r ${inputDir}/node_modules/.prisma ${outputDir}/node_modules/.prisma`,
+          ],
+        },
+      },
+      environment: {
+        DB_SECRET_ARN: dbSecret.secretArn,
+        DB_HOST: props.dbInstance.dbInstanceEndpointAddress,
+        DB_PORT: props.dbInstance.dbInstanceEndpointPort,
+        DB_NAME: 'broomnsblog',
+      },
+    });
+
+    analyticsPruneFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['secretsmanager:GetSecretValue'],
+        resources: [dbSecret.secretArn],
+      }),
+    );
+
+    new events.Rule(this, 'AnalyticsPruneSchedule', {
+      schedule: events.Schedule.rate(Duration.days(1)),
+      targets: [new eventsTargets.LambdaFunction(analyticsPruneFunction)],
+    });
+
+    new CfnOutput(this, 'AnalyticsPruneFunctionName', {
+      value: analyticsPruneFunction.functionName,
+      description: 'Daily Lambda pruning analytics rows past the 180-day retention window',
     });
 
     // Scheduled Cognito user export — the only piece of state CDK can't

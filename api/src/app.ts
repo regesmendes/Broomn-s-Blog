@@ -7,6 +7,8 @@ import swagger from '@fastify/swagger'
 import swaggerUi from '@fastify/swagger-ui'
 import multipart from '@fastify/multipart'
 import { postRoutes } from './routes/post.routes'
+import { analyticsRoutes } from './routes/analytics.routes'
+import { analyticsRepository } from './repositories/analytics.repository'
 import { authRoutes } from './routes/auth.routes'
 import { commentRoutes } from './routes/comment.routes'
 import { newsletterRoutes } from './routes/newsletter.routes'
@@ -36,7 +38,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Id'],
   })
 
   // Auth (registered before rate limiting so its `jwtVerify` decorator is
@@ -61,6 +63,43 @@ export async function buildApp(): Promise<FastifyInstance> {
         return request.ip
       }
     },
+  })
+
+  // Request logging for the internal analytics dashboard. Must be onSend, not
+  // onResponse: under Lambda, light-my-request's 'finish' listener can resolve
+  // the invocation before an async onResponse hook finishes, silently dropping
+  // rows — Fastify awaits onSend before the reply goes out. request.user is set
+  // by the rate limiter's keyGenerator (jwtVerify on every request), so any
+  // request carrying a valid token gets logged, whatever the route.
+  app.addHook('onSend', async (request, reply, payload) => {
+    if (!request.user?.sub) return payload
+    const routePath = request.routeOptions.url
+    // Analytics must never observe itself: neither the pageview beacon nor
+    // the admin dashboard's own reads belong in the data they produce
+    if (routePath?.startsWith('/analytics')) return payload
+    // The auto-refresh timer in auth-context.tsx fires silently on a
+    // schedule, invisible to the user — not a step in anyone's journey, and
+    // not logged at all (no record, not just hidden from display)
+    if (routePath === '/auth/refresh') return payload
+
+    try {
+      const sessionId = request.headers['x-session-id']
+      await analyticsRepository.createRequestLog({
+        userId:     request.user.sub,
+        // Ties this action to the same per-tab session PageView uses, so the
+        // journey endpoint can interleave them — only ever set by the
+        // frontend's api client, so absent for Swagger/curl/test callers
+        sessionId:  typeof sessionId === 'string' ? sessionId : undefined,
+        method:     request.method,
+        path:       routePath ?? request.url,
+        statusCode: reply.statusCode,
+        durationMs: Math.round(reply.elapsedTime),
+      })
+    } catch (err) {
+      // Analytics must never break the request it's observing
+      app.log.error(err, 'Failed to write RequestLog')
+    }
+    return payload
   })
 
   // File uploads
@@ -106,6 +145,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.register(newsletterRoutes, { prefix: '/newsletter' })
   app.register(aboutRoutes, { prefix: '/about' })
   app.register(supportRoutes, { prefix: '/support' })
+  app.register(analyticsRoutes, { prefix: '/analytics' })
 
   // Dev-only routes (never available in production)
   if (process.env.NODE_ENV !== 'production') {

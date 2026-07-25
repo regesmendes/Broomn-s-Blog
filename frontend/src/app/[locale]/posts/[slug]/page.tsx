@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { Metadata } from 'next';
 import api, { ApiError } from '@/lib/api';
@@ -49,6 +50,7 @@ export default async function PostPage({
   params: Promise<{ slug: string; locale: string }>;
 }) {
   const { slug, locale } = await params;
+  const t = await getTranslations('post');
 
   let post;
   try {
@@ -122,7 +124,7 @@ export default async function PostPage({
 
       <div className="mt-8 border-t border-emerald-200/50 pt-8 dark:border-emerald-900/50">
         <Link href="/" className="text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-300">
-          &larr; Back to all posts
+          {t('backToAll')}
         </Link>
       </div>
     </article>

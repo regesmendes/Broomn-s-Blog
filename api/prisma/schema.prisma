@@ -24,6 +24,8 @@ model User {
 
   comments       Comment[]
   subscriptions  Newsletter[]
+  requestLogs    RequestLog[]
+  pageViews      PageView[]
 
   @@map("users")
 }
@@ -107,12 +109,17 @@ model Comment {
 // ─── Newsletter ───────────────────────────────────────────────────────────────
 
 model Newsletter {
-  id          String             @id @default(cuid())
-  email       String             @unique
-  status      SubscriptionStatus @default(PENDING)
-  confirmedAt DateTime?
-  createdAt   DateTime           @default(now())
-  blockedAt   DateTime?
+  id             String             @id @default(cuid())
+  email          String             @unique
+  status         SubscriptionStatus @default(PENDING)
+  confirmedAt    DateTime?
+  createdAt      DateTime           @default(now())
+  blockedAt      DateTime?
+  unsubscribedAt DateTime?          // set by unsubscribe() and block() (block also
+                                     // transitions status to UNSUBSCRIBED) — not a
+                                     // generic updatedAt, which would get overwritten
+                                     // by a later resubscribe or block and lose the
+                                     // actual unsubscribe date
 
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -124,6 +131,49 @@ enum SubscriptionStatus {
   PENDING
   CONFIRMED
   UNSUBSCRIBED
+}
+
+// ─── Analytics ────────────────────────────────────────────────────────────────
+// Raw rows retained 180 days, pruned daily by the broomns-blog-analytics-prune
+// Lambda. Registered users only — no anonymous tracking.
+
+model RequestLog {
+  id         String   @id @default(cuid())
+  userId     String
+  sessionId  String?  // X-Session-Id header, same per-tab id PageView uses —
+                      // nullable because not every caller of the API sends it
+                      // (Swagger, curl, tests); lets the journey endpoint
+                      // interleave real user actions with page views
+  method     String
+  path       String   // matched route PATTERN (request.routeOptions.url), not the
+                      // raw resolved URL — keeps dynamic-id routes aggregable
+  statusCode Int
+  durationMs Int
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([userId, sessionId, createdAt])
+  @@map("request_logs")
+}
+
+model PageView {
+  id         String   @id @default(cuid())
+  userId     String
+  sessionId  String   // crypto.randomUUID(), one per browser tab session (sessionStorage)
+  path       String   // locale-stripped pathname, no query string
+  durationMs Int
+  createdAt  DateTime @default(now()) // written at flush time (page-LEAVE) — ordering by
+                                      // this column reconstructs visit order; "entered at"
+                                      // is a display-only createdAt - durationMs
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([userId, sessionId, createdAt])
+  @@map("page_views")
 }
 
 // ─── Media ────────────────────────────────────────────────────────────────────

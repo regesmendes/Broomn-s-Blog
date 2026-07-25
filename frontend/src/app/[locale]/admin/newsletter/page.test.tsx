@@ -141,6 +141,7 @@ describe('AdminNewsletterPage — subscriber search + block/unblock/unsubscribe'
           confirmedAt: null,
           createdAt: '2026-01-01T00:00:00.000Z',
           blockedAt: '2026-01-02T00:00:00.000Z',
+          unsubscribedAt: null,
         },
       ],
       meta: { nextCursor: null, hasMore: false },
@@ -165,6 +166,7 @@ describe('AdminNewsletterPage — subscriber search + block/unblock/unsubscribe'
           confirmedAt: '2026-01-01T00:00:00.000Z',
           createdAt: '2026-01-01T00:00:00.000Z',
           blockedAt: null,
+          unsubscribedAt: null,
         },
       ],
       meta: { nextCursor: null, hasMore: false },
@@ -177,6 +179,7 @@ describe('AdminNewsletterPage — subscriber search + block/unblock/unsubscribe'
       confirmedAt: '2026-01-01T00:00:00.000Z',
       createdAt: '2026-01-01T00:00:00.000Z',
       blockedAt: '2026-01-03T00:00:00.000Z',
+      unsubscribedAt: null,
     });
     await renderAndLoad();
 
@@ -200,6 +203,7 @@ describe('AdminNewsletterPage — subscriber search + block/unblock/unsubscribe'
           confirmedAt: '2026-01-01T00:00:00.000Z',
           createdAt: '2026-01-01T00:00:00.000Z',
           blockedAt: null,
+          unsubscribedAt: null,
         },
       ],
       meta: { nextCursor: null, hasMore: false },
@@ -212,6 +216,7 @@ describe('AdminNewsletterPage — subscriber search + block/unblock/unsubscribe'
       confirmedAt: '2026-01-01T00:00:00.000Z',
       createdAt: '2026-01-01T00:00:00.000Z',
       blockedAt: null,
+      unsubscribedAt: null,
     });
     await renderAndLoad();
 
@@ -234,6 +239,7 @@ describe('AdminNewsletterPage — subscriber search + block/unblock/unsubscribe'
           confirmedAt: null,
           createdAt: '2026-01-01T00:00:00.000Z',
           blockedAt: '2026-01-02T00:00:00.000Z',
+          unsubscribedAt: null,
         },
       ],
       meta: { nextCursor: null, hasMore: false },
@@ -246,6 +252,7 @@ describe('AdminNewsletterPage — subscriber search + block/unblock/unsubscribe'
       confirmedAt: null,
       createdAt: '2026-01-01T00:00:00.000Z',
       blockedAt: null,
+      unsubscribedAt: null,
     });
     await renderAndLoad();
 
