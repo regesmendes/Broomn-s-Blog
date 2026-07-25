@@ -354,7 +354,17 @@ export class ApiStack extends Stack {
       apiName: 'broomns-blog-api',
       description: "Broomn's Blog REST API",
       corsPreflight: {
-        allowHeaders: ['Content-Type', 'Authorization'],
+        // API Gateway answers the browser's CORS preflight itself, before it
+        // ever reaches the Lambda — so this list (not Fastify's own @fastify/cors
+        // config in app.ts, which only governs local dev hitting the Fastify
+        // server directly) is what actually gates which headers a browser can
+        // send in production. X-Session-Id was added to the frontend api
+        // client without updating this list, which silently broke every
+        // client-side fetch in prod (2026-07-25 incident: the homepage's
+        // post list — and everything else fetched client-side — appeared
+        // empty because the browser blocked the request after a failed
+        // preflight, even though the API and database were completely fine).
+        allowHeaders: ['Content-Type', 'Authorization', 'X-Session-Id'],
         allowMethods: [
           apigatewayv2.CorsHttpMethod.GET,
           apigatewayv2.CorsHttpMethod.POST,
