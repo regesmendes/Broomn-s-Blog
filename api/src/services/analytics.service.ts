@@ -14,6 +14,10 @@ function resolvePeriod(from?: Date, to?: Date) {
 
 export const analyticsService = {
   async trackPageView(data: CreatePageViewData) {
+    // The frontend tracker already skips the analytics dashboard's own pages,
+    // but don't trust that — a stale client must not pollute journeys either
+    if (data.path.startsWith('/admin/analytics')) return
+
     await analyticsRepository.createPageView(data)
   },
 

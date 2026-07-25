@@ -5,6 +5,7 @@ import { FastifyInstance } from 'fastify'
 
 const mockPrisma = prisma as unknown as {
   post: { [k: string]: ReturnType<typeof vi.fn> }
+  user: { [k: string]: ReturnType<typeof vi.fn> }
   pageView: { [k: string]: ReturnType<typeof vi.fn> }
   requestLog: { [k: string]: ReturnType<typeof vi.fn> }
 }
@@ -64,6 +65,22 @@ describe('Request logging (onSend hook)', () => {
 
     expect(res.statusCode).toBeLessThan(500)
     expect(mockPrisma.requestLog.create).toHaveBeenCalledTimes(1)
+  })
+
+  it('never logs the admin analytics reads (analytics must not observe itself)', async () => {
+    mockPrisma.requestLog.create.mockResolvedValue({})
+    mockPrisma.requestLog.groupBy.mockResolvedValue([])
+    mockPrisma.user.findMany.mockResolvedValue([])
+    const token = generateTestToken(app, { sub: 'admin-1', role: 'admin' })
+
+    const res = await app.inject({
+      method: 'GET',
+      url: '/analytics/requests/by-user',
+      headers: { authorization: `Bearer ${token}` },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(mockPrisma.requestLog.create).not.toHaveBeenCalled()
   })
 
   it('never logs /analytics/pageview (tracking must not log itself)', async () => {

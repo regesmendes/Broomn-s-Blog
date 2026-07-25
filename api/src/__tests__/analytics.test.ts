@@ -61,6 +61,20 @@ describe('Analytics API', () => {
       })
     })
 
+    it('silently drops analytics-dashboard paths instead of recording them', async () => {
+      const token = generateTestToken(app, { sub: 'user-1' })
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/analytics/pageview',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { ...validPayload, path: '/admin/analytics/users/user-2' },
+      })
+
+      expect(res.statusCode).toBe(204)
+      expect(mockPrisma.pageView.create).not.toHaveBeenCalled()
+    })
+
     it('rejects a non-uuid sessionId', async () => {
       const token = generateTestToken(app)
 

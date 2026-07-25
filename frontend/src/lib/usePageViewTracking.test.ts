@@ -116,6 +116,24 @@ describe('usePageViewTracking', () => {
     expect(sentBody(0).durationMs).toBe(4000);
   });
 
+  it('never reports the analytics dashboard pages themselves', () => {
+    mockPathname = '/admin/analytics';
+    const { rerender } = renderHook(() => usePageViewTracking());
+
+    // Neither lingering on the dashboard nor navigating away from it flushes…
+    vi.advanceTimersByTime(5000);
+    window.dispatchEvent(new Event('pagehide'));
+    mockPathname = '/';
+    rerender();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    // …but the page navigated to afterwards is tracked normally
+    vi.advanceTimersByTime(3000);
+    setVisibility('hidden');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sentBody(0).path).toBe('/');
+  });
+
   it('skips the near-empty duplicate row when hidden and pagehide fire back to back', () => {
     renderHook(() => usePageViewTracking());
 

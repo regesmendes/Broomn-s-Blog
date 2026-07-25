@@ -73,8 +73,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   // request carrying a valid token gets logged, whatever the route.
   app.addHook('onSend', async (request, reply, payload) => {
     if (!request.user?.sub) return payload
-    // Don't let page-view tracking log itself as a request
-    if (request.routeOptions.url === '/analytics/pageview') return payload
+    // Analytics must never observe itself: neither the pageview beacon nor
+    // the admin dashboard's own reads belong in the data they produce
+    if (request.routeOptions.url?.startsWith('/analytics')) return payload
 
     try {
       await analyticsRepository.createRequestLog({

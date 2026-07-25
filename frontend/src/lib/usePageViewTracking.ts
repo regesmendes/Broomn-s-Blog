@@ -26,6 +26,11 @@ function getSessionId(): string {
 }
 
 function sendPageView(token: string, path: string, durationMs: number) {
+  // The analytics dashboard must never appear in its own reports — time spent
+  // reviewing analytics is not part of anyone's journey (the API drops these
+  // server-side too, this just saves the pointless request)
+  if (path.startsWith('/admin/analytics')) return;
+
   fetch(`${API_URL}/analytics/pageview`, {
     method: 'POST',
     keepalive: true,
