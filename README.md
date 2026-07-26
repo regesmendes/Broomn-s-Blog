@@ -31,7 +31,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 ### What's working
 
 - ✅ REST API with all CRUD endpoints (posts, comments, newsletter, auth)
-- ✅ 157 passing tests covering all API modules
+- ✅ 165 passing tests covering all API modules
 - ✅ Role-based access control (public, authenticated user, admin)
 - ✅ JWT authentication with access/refresh token flow
 - ✅ Cognito integration with real Google OAuth login, live in production
@@ -42,6 +42,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 - ✅ Auth context with token management and auto-refresh
 - ✅ Protected admin routes (redirects to login if unauthenticated)
 - ✅ Rich text editor (Tiptap) for creating/editing posts
+- ✅ Post tag management (`/admin/tags`) — rename a tag (merges into an existing tag if the new name collides, e.g. fixing a typo), or delete one outright; the post editor's tag field autocompletes against existing tags to avoid creating near-duplicates in the first place
 - ✅ Dark mode with toggle (persists preference)
 - ✅ Comment section on post detail page with moderation, capped per-user pending queue (flood protection)
 - ✅ Admin can reply to comments as "Broomn" — one level of threading, identity masked server-side (never just in the UI), auto-approved, notifies the original commenter by email
@@ -217,7 +218,7 @@ Node.js 25 introduced a built-in `localStorage` global that requires `--localsto
 
 ```bash
 cd api
-npm test              # Runs all 157 tests
+npm test              # Runs all 165 tests
 ```
 
 ## Contributing
