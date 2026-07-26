@@ -46,7 +46,16 @@ vi.mock('../lib/prisma', () => ({
       update: vi.fn(),
     },
     tag: {
-      upsert: vi.fn(),
+      findMany:   vi.fn(),
+      findUnique: vi.fn(),
+      findFirst:  vi.fn(),
+      update:     vi.fn(),
+      delete:     vi.fn(),
+      upsert:     vi.fn(),
+    },
+    tagsOnPosts: {
+      findMany:   vi.fn(),
+      createMany: vi.fn(),
     },
     media: {
       create: vi.fn(),

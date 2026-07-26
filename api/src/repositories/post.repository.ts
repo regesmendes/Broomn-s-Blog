@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma'
 import { CreatePostBody, UpdatePostBody } from '../schemas/post.schema'
 import { paginateWithCursor } from '../lib/pagination'
+import { slugify } from '../lib/slugify'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -265,15 +266,4 @@ async function buildTagConnections(tagNames: string[]) {
   )
 
   return tags.map((tag) => ({ tagId: tag.id }))
-}
-
-/** Simple slug generator (used only for tags here; posts use the service). */
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, '-')
 }

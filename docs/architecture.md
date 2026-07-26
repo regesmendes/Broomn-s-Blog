@@ -6,7 +6,7 @@ See the root [README](../README.md) for setup, the [API reference](./api.md) for
 
 - **User**: email, name, avatar, role (ADMIN/USER), Google/Cognito IDs
 - **Post**: title, slug (auto-generated), excerpt, content (HTML), cover image, status (DRAFT/PUBLISHED), publishedAt (enables scheduling)
-- **Tag**: name, slug — many-to-many with posts
+- **Tag**: name, slug — many-to-many with posts via `TagsOnPosts`. Created implicitly on post save (upsert by slug); admin-managed after the fact via `PATCH`/`DELETE /tags/:id` (rename, merge-on-collision, delete) — see "Tag rename merges into an existing tag" below
 - **Comment**: content, approved flag, belongs to user and post; optional self-relation `parentId` (one level of threading — a reply can't itself be replied to) and `isOwnerReply` flag (masked to the "Broomn" persona in public responses, see "Reply as Broomn" below)
 - **Newsletter**: email, status (PENDING/CONFIRMED/UNSUBSCRIBED), optional user link, `blockedAt` (nullable — admin block, orthogonal to `status`; see "Blocking a newsletter subscriber" below)
 - **Media**: filename (S3 key), original name, mime type, size, public URL — many-to-many with posts via `MediaOnPosts`, with the About page via `MediaOnAboutPage`, and with the Support page via `MediaOnSupportPage`, kept in sync automatically whenever a post's, the About page's, or the Support page's content is saved (see `syncMediaUsage` in `post.service.ts` / `about.service.ts` / `support.service.ts`)
@@ -41,6 +41,14 @@ Rather than a simple boolean "published" flag, we use a `publishedAt` datetime c
 - Set publishedAt to now → immediately visible
 - Set publishedAt to a future date → scheduled, becomes visible automatically at that time
 - No cron jobs needed — the query handles it
+
+### Tag rename merges into an existing tag
+
+Tags are created implicitly whenever a post is saved — `buildTagConnections` (`api/src/repositories/post.repository.ts`) upserts by slug for each name typed into the post editor's tag picker, with no admin step in between. That means a typo (`"phytography"`) becomes a permanent `Tag` row the instant a post is saved, and previously had no way to be fixed or removed — it would keep showing up in the public tag-filter chips (`GET /tags`) forever.
+
+`PATCH /tags/:id` (`tag.service.ts`'s `rename`) fixes this by treating a rename that collides with an *existing different tag's slug* as a merge rather than a conflict error: every post linked to the renamed tag is reassigned onto the existing one (`tag.repository.ts`'s `mergeInto`, skipping any post that already had both, since `TagsOnPosts`' composite primary key would reject the duplicate), then the now-empty source tag is deleted. This is deliberately the *default* behavior, not an opt-in "merge" action, because the overwhelmingly common real case is exactly this: an admin fixing a typo'd tag into the correctly-spelled one that already exists from an earlier post. Both the rename-on-save upsert and this endpoint share one `slugify()` (`api/src/lib/slugify.ts`) — they have to produce identical slugs for the same name, or a rename could fail to detect a collision that the next post save would create anyway.
+
+`DELETE /tags/:id` doesn't block on the tag still being attached to posts — it's allowed unconditionally, and `TagsOnPosts`' `onDelete: Cascade` cleans up the join rows. The admin UI (`/admin/tags`) surfaces the post count in the delete confirmation instead of gating on it, since forcing a manual "remove from every post first" step would just be friction for what's usually a deliberate cleanup action.
 
 ### HMAC tokens for newsletter
 
