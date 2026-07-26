@@ -6,13 +6,14 @@ import api, { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { RichTextEditor, RichTextEditorHandle } from '@/components/RichTextEditor';
 import { ImagePickerModal } from '@/components/ImagePickerModal';
+import { TagPicker } from '@/components/TagPicker';
 
 interface PostFormData {
   title: string;
   excerpt: string;
   content: string;
   coverImage: string;
-  tags: string;
+  tags: string[];
   status: 'DRAFT' | 'PUBLISHED';
   publishedAt: string;
 }
@@ -30,7 +31,7 @@ export default function NewPostPage() {
     excerpt: '',
     content: '',
     coverImage: '',
-    tags: '',
+    tags: [],
     status: 'DRAFT',
     publishedAt: '',
   });
@@ -48,10 +49,6 @@ export default function NewPostPage() {
     setError(null);
 
     const token = getToken() || '';
-    const tagsArray = form.tags
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
 
     try {
       await api.createPost(
@@ -60,7 +57,7 @@ export default function NewPostPage() {
           content: form.content,
           excerpt: form.excerpt || undefined,
           coverImage: form.coverImage || undefined,
-          tags: tagsArray.length > 0 ? tagsArray : undefined,
+          tags: form.tags.length > 0 ? form.tags : undefined,
           status: form.status,
           publishedAt: form.publishedAt ? new Date(form.publishedAt).toISOString() : undefined,
         },
@@ -169,18 +166,10 @@ export default function NewPostPage() {
         </div>
 
         <div>
-          <label htmlFor="tags" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Tags (comma-separated)
-          </label>
-          <input
-            id="tags"
-            name="tags"
-            type="text"
-            value={form.tags}
-            onChange={handleChange}
-            placeholder="typescript, react, nextjs"
-            className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
-          />
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Tags</label>
+          <div className="mt-1">
+            <TagPicker value={form.tags} onChange={(tags) => setForm((prev) => ({ ...prev, tags }))} />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
