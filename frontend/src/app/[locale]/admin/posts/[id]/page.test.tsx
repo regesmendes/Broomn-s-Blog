@@ -63,6 +63,9 @@ vi.mock('@/lib/api', async (importOriginal) => {
       ...actual.default,
       getPostById: vi.fn(),
       updatePost: vi.fn(),
+      // TagPicker (rendered by this page) calls this on mount — not under
+      // test here, just needs to resolve so it doesn't blow up the render.
+      getTags: vi.fn().mockResolvedValue([]),
     },
   };
 });

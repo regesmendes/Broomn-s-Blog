@@ -306,6 +306,21 @@ class ApiClient {
     return this.request<TagWithCount[]>('/tags');
   }
 
+  async renameTag(id: string, name: string, token: string): Promise<TagWithCount> {
+    return this.request<TagWithCount>(`/tags/${id}`, {
+      method: 'PATCH',
+      headers: this.authHeaders(token),
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  async deleteTag(id: string, token: string): Promise<void> {
+    return this.request<void>(`/tags/${id}`, {
+      method: 'DELETE',
+      headers: this.authHeaders(token),
+    });
+  }
+
   async getPost(slug: string): Promise<Post> {
     return this.request<Post>(`/posts/${slug}`);
   }

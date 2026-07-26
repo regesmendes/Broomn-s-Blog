@@ -52,6 +52,8 @@ See the root [README](../README.md) for setup and the [architecture doc](./archi
 | GET | `/media/:id` | Get media details with posts (and whether the About/Support pages) uses it |
 | DELETE | `/media/:id` | Delete a media file |
 | PATCH | `/media/:id/replace` | Replace image URL across all posts, the About page, and the Support page |
+| PATCH | `/tags/:id` | Rename a tag. If the new name's slug collides with a *different* existing tag, merges into it instead — reassigns this tag's posts onto the existing one (deduping any post that already had both) and deletes this tag |
+| DELETE | `/tags/:id` | Delete a tag. Allowed even if posts still use it — the join-table rows cascade, posts simply lose the tag |
 | PUT | `/about` | Update the About page content |
 | PUT | `/support` | Update the Support page content |
 | GET | `/analytics/summary?from=&to=` | Grouped counts for a period (defaults to last 30 days) — users, posts (new/reads/comments), newsletter (subscribed/unsubscribed/blocked/pending all-time, plus subscribedInPeriod/unsubscribedInPeriod), backend (API requests) |

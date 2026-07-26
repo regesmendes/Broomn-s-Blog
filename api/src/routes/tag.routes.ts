@@ -1,28 +1,19 @@
 import { FastifyInstance } from 'fastify'
-import { prisma } from '../lib/prisma'
+import { tagController } from '../controllers/tag.controller'
+import { authenticate } from '../middlewares/authenticate'
+import { authorize } from '../middlewares/authorize'
 
 export async function tagRoutes(app: FastifyInstance) {
-  // GET /tags — list all tags with post count
-  app.get('/', async (request, reply) => {
-    const tags = await prisma.tag.findMany({
-      select: {
-        id:   true,
-        name: true,
-        slug: true,
-        _count: {
-          select: { posts: true },
-        },
-      },
-      orderBy: { name: 'asc' },
-    })
+  // ── Public routes ────────────────────────────────────────────────────────────
 
-    const result = tags.map((tag) => ({
-      id:        tag.id,
-      name:      tag.name,
-      slug:      tag.slug,
-      postCount: tag._count.posts,
-    }))
+  // GET /tags — list all tags with post count (powers the public tag-filter chips)
+  app.get('/', tagController.list)
 
-    return reply.send(result)
-  })
+  // ── Admin routes (JWT + admin role required) ─────────────────────────────────
+
+  // PATCH /tags/:id — rename, or merge into an existing tag if the new name collides
+  app.patch('/:id', { preHandler: [authenticate, authorize('admin')] }, tagController.rename)
+
+  // DELETE /tags/:id
+  app.delete('/:id', { preHandler: [authenticate, authorize('admin')] }, tagController.remove)
 }
