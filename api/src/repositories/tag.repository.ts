@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma'
+import { paginateWithCursor } from '../lib/pagination'
 
 const tagWithCountSelect = {
   id:   true,
@@ -15,6 +16,32 @@ export const tagRepository = {
       select:  tagWithCountSelect,
       orderBy: { name: 'asc' },
     })
+  },
+
+  /** Paginated, optionally search-filtered tag listing — powers the admin tag management page. */
+  async findPaginatedWithCount({
+    cursor,
+    limit,
+    search,
+  }: {
+    cursor?: string
+    limit:   number
+    search?: string
+  }) {
+    const where = search ? { name: { contains: search, mode: 'insensitive' as const } } : {}
+
+    return paginateWithCursor(
+      (args) =>
+        prisma.tag.findMany({
+          where,
+          select:  tagWithCountSelect,
+          // name is itself @unique, but id is added for consistency with the
+          // rest of the codebase's "always end orderBy in a unique tiebreaker" rule.
+          orderBy: [{ name: 'asc' }, { id: 'asc' }],
+          ...args,
+        }),
+      { cursor, limit }
+    )
   },
 
   async findById(id: string) {

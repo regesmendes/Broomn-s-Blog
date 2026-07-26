@@ -11,6 +11,9 @@ export async function tagRoutes(app: FastifyInstance) {
 
   // ── Admin routes (JWT + admin role required) ─────────────────────────────────
 
+  // GET /tags/admin — paginated, search-filterable listing for the tag management page
+  app.get('/admin', { preHandler: [authenticate, authorize('admin')] }, tagController.listAdmin)
+
   // PATCH /tags/:id — rename, or merge into an existing tag if the new name collides
   app.patch('/:id', { preHandler: [authenticate, authorize('admin')] }, tagController.rename)
 

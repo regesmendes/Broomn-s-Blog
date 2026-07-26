@@ -1,4 +1,11 @@
 import { z } from 'zod'
+import { cursorQuerySchema } from './pagination.schema'
+
+// ─── Query schemas ─────────────────────────────────────────────────────────────
+
+export const listAdminTagsQuerySchema = cursorQuerySchema(10).extend({
+  search: z.string().optional(),
+})
 
 // ─── Param schemas ─────────────────────────────────────────────────────────────
 
@@ -14,5 +21,6 @@ export const renameTagSchema = z.object({
 
 // ─── Inferred types ────────────────────────────────────────────────────────────
 
-export type TagIdParam    = z.infer<typeof tagIdParamSchema>
-export type RenameTagBody = z.infer<typeof renameTagSchema>
+export type ListAdminTagsQuery = z.infer<typeof listAdminTagsQuerySchema>
+export type TagIdParam         = z.infer<typeof tagIdParamSchema>
+export type RenameTagBody      = z.infer<typeof renameTagSchema>
