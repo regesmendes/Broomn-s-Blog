@@ -1,5 +1,6 @@
 import { tagRepository } from '../repositories/tag.repository'
 import { slugify } from '../lib/slugify'
+import { ListAdminTagsQuery } from '../schemas/tag.schema'
 
 // ─── Service ───────────────────────────────────────────────────────────────────
 
@@ -7,6 +8,13 @@ export const tagService = {
   async list() {
     const tags = await tagRepository.findAllWithCount()
     return tags.map(flattenCount)
+  },
+
+  /** Paginated, search-filterable listing for the admin tag management page. */
+  async listAdmin(query: ListAdminTagsQuery) {
+    const { cursor, limit, search } = query
+    const { data, meta } = await tagRepository.findPaginatedWithCount({ cursor, limit, search })
+    return { data: data.map(flattenCount), meta }
   },
 
   /**

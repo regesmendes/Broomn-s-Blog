@@ -4,12 +4,17 @@ import { useState, useEffect, useCallback } from 'react';
 import api, { ApiError } from '@/lib/api';
 import type { TagWithCount } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { useCursorPagination } from '@/lib/useCursorPagination';
 
 export default function TagsPage() {
   const { getToken } = useAuth();
   const [tags, setTags] = useState<TagWithCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [hasMore, setHasMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const pagination = useCursorPagination();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -19,16 +24,24 @@ export default function TagsPage() {
   const [deleting, setDeleting] = useState(false);
 
   const loadTags = useCallback(async () => {
+    const token = getToken();
+    if (!token) return;
     try {
       setLoading(true);
-      const result = await api.getTags();
-      setTags(result);
+      const result = await api.getAdminTags(token, {
+        cursor: pagination.cursor,
+        limit: 10,
+        search: search || undefined,
+      });
+      setTags(result.data);
+      setHasMore(result.meta.hasMore);
+      setNextCursor(result.meta.nextCursor);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load tags');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getToken, pagination.cursor, search]);
 
   useEffect(() => {
     loadTags();
@@ -108,115 +121,149 @@ export default function TagsPage() {
         </div>
       )}
 
+      <div>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            pagination.reset();
+          }}
+          placeholder="Search tags by name..."
+          className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+        />
+      </div>
+
       {loading ? (
         <p className="text-gray-500 dark:text-gray-400">Loading tags...</p>
       ) : tags.length === 0 ? (
-        <p className="text-gray-500 dark:text-gray-400">No tags yet.</p>
+        <p className="text-gray-500 dark:text-gray-400">{search ? 'No tags match your search.' : 'No tags yet.'}</p>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-800">
-              <tr>
-                <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Name</th>
-                <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Posts</th>
-                <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {tags.map((tag) => (
-                <tr key={tag.id} className="bg-white dark:bg-gray-900">
-                  <td className="px-4 py-3 align-top">
-                    {editingId === tag.id ? (
-                      <div className="flex flex-col gap-1">
-                        <input
-                          type="text"
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          autoFocus
-                          className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-                        />
-                        {editValue.trim() &&
-                          tags.some(
-                            (t) =>
-                              t.id !== tag.id &&
-                              t.name.toLowerCase() === editValue.trim().toLowerCase()
-                          ) && (
-                            <p className="text-xs text-amber-600 dark:text-amber-400">
-                              A tag with this name already exists — saving will merge &quot;{tag.name}&quot; into it.
-                            </p>
-                          )}
-                      </div>
-                    ) : (
-                      <span className="font-medium text-gray-900 dark:text-white">{tag.name}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 align-top text-gray-500 dark:text-gray-400">
-                    {tag.postCount} post{tag.postCount !== 1 ? 's' : ''}
-                  </td>
-                  <td className="px-4 py-3 align-top">
-                    {editingId === tag.id ? (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => saveRename(tag.id)}
-                          disabled={saving || !editValue.trim()}
-                          className="cursor-pointer rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {saving ? 'Saving...' : 'Save'}
-                        </button>
-                        <button
-                          onClick={cancelRename}
-                          disabled={saving}
-                          className="cursor-pointer rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : confirmDeleteId === tag.id ? (
-                      <div className="flex flex-col gap-2">
-                        <p className="text-xs font-medium text-red-600 dark:text-red-400">
-                          {tag.postCount > 0
-                            ? `Delete? Used by ${tag.postCount} post${tag.postCount !== 1 ? 's' : ''} — it'll be removed from all of them.`
-                            : 'Delete this tag? This cannot be undone.'}
-                        </p>
+        <>
+          <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Name</th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Posts</th>
+                  <th className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                {tags.map((tag) => (
+                  <tr key={tag.id} className="bg-white dark:bg-gray-900">
+                    <td className="px-4 py-3 align-top">
+                      {editingId === tag.id ? (
+                        <div className="flex flex-col gap-1">
+                          <input
+                            type="text"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            autoFocus
+                            className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                          />
+                          {editValue.trim() &&
+                            tags.some(
+                              (t) =>
+                                t.id !== tag.id &&
+                                t.name.toLowerCase() === editValue.trim().toLowerCase()
+                            ) && (
+                              <p className="text-xs text-amber-600 dark:text-amber-400">
+                                A tag with this name already exists — saving will merge &quot;{tag.name}&quot; into it.
+                              </p>
+                            )}
+                        </div>
+                      ) : (
+                        <span className="font-medium text-gray-900 dark:text-white">{tag.name}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 align-top text-gray-500 dark:text-gray-400">
+                      {tag.postCount} post{tag.postCount !== 1 ? 's' : ''}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      {editingId === tag.id ? (
                         <div className="flex gap-2">
                           <button
-                            onClick={() => confirmDelete(tag.id)}
-                            disabled={deleting}
-                            className="cursor-pointer rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            onClick={() => saveRename(tag.id)}
+                            disabled={saving || !editValue.trim()}
+                            className="cursor-pointer rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            {deleting ? 'Deleting...' : 'Confirm'}
+                            {saving ? 'Saving...' : 'Save'}
                           </button>
                           <button
-                            onClick={cancelDelete}
-                            disabled={deleting}
+                            onClick={cancelRename}
+                            disabled={saving}
                             className="cursor-pointer rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                           >
                             Cancel
                           </button>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => startRename(tag)}
-                          className="cursor-pointer rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-                        >
-                          Rename
-                        </button>
-                        <button
-                          onClick={() => startDelete(tag.id)}
-                          className="cursor-pointer rounded-md border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                      ) : confirmDeleteId === tag.id ? (
+                        <div className="flex flex-col gap-2">
+                          <p className="text-xs font-medium text-red-600 dark:text-red-400">
+                            {tag.postCount > 0
+                              ? `Delete? Used by ${tag.postCount} post${tag.postCount !== 1 ? 's' : ''} — it'll be removed from all of them.`
+                              : 'Delete this tag? This cannot be undone.'}
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => confirmDelete(tag.id)}
+                              disabled={deleting}
+                              className="cursor-pointer rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {deleting ? 'Deleting...' : 'Confirm'}
+                            </button>
+                            <button
+                              onClick={cancelDelete}
+                              disabled={deleting}
+                              className="cursor-pointer rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => startRename(tag)}
+                            className="cursor-pointer rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                          >
+                            Rename
+                          </button>
+                          <button
+                            onClick={() => startDelete(tag.id)}
+                            className="cursor-pointer rounded-md border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {(pagination.hasPrevious || hasMore) && (
+            <div className="flex items-center justify-center gap-4">
+              <button
+                onClick={pagination.goPrevious}
+                disabled={!pagination.hasPrevious}
+                className="cursor-pointer rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                ← Previous
+              </button>
+              <button
+                onClick={() => pagination.goNext(nextCursor)}
+                disabled={!hasMore}
+                className="cursor-pointer rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                Next →
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
