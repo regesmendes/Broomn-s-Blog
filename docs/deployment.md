@@ -29,7 +29,7 @@ npx cdk deploy --all \
 | Stack | Resources |
 |---|---|
 | BromnBlog-Cognito | User Pool, Google IdP, App Client, Hosted UI |
-| BromnBlog-Database | VPC (3-tier: public/private-with-egress/isolated), RDS PostgreSQL 16 (t4g.micro), Security Groups |
+| BromnBlog-Database | VPC (3-tier: public/private-with-egress/isolated), RDS PostgreSQL 16 (t4g.micro), Security Groups, S3 Gateway Endpoint |
 | BromnBlog-Storage | S3 bucket (media uploads, public read) |
 | BromnBlog-Api | Lambda, API Gateway HTTP API, custom domain |
 | BromnBlog-Frontend | S3 + CloudFront + ACM cert + Route53 |
@@ -47,8 +47,8 @@ npx cdk deploy --all \
 
 - ✅ BromnBlog-Cognito (User Pool ID: `us-east-1_ApHF59Xas`, Client ID: `535qq83rh90srom3ij4ospn78e`) — real Google OAuth login working end-to-end
 - ✅ BromnBlog-Database (RDS PostgreSQL t4g.micro in private subnet) — migrations applied via the on-demand migration Lambda (see below)
-- ✅ BromnBlog-Storage (S3 bucket: `broomns-blog-media-099710233970`) — media uploads/deletes now go directly to this bucket via `api/src/lib/s3.ts` (`S3_BUCKET_NAME` env var, already wired to the Lambda; IAM already granted `s3:PutObject`/`s3:DeleteObject`)
-- ✅ BromnBlog-Api (Lambda + API Gateway, domain: `api.blogdobroomn.com`) — Fastify app wrapped via `@fastify/aws-lambda`, bundled with esbuild (`NodejsFunction`), running in a `PRIVATE_WITH_EGRESS` subnet (not `PRIVATE_ISOLATED` — it needs real internet egress for SES and Cognito's JWKS endpoint, neither of which has a VPC Gateway Endpoint). The `broomns-blog-migrate` Lambda runs in the same `PRIVATE_WITH_EGRESS` subnet for the same reason — see the note under "Running database migrations" below.
+- ✅ BromnBlog-Storage (S3 bucket: `broomns-blog-media-099710233970`) — media uploads/deletes now go directly to this bucket via `api/src/lib/s3.ts` (`S3_BUCKET_NAME` env var, already wired to the Lambda; IAM already granted `s3:PutObject`/`s3:DeleteObject`). The VPC's S3 Gateway Endpoint (`database-stack.ts`, free — no hourly or per-GB charge, unlike Interface endpoints) routes this traffic straight to S3 instead of through the NAT Gateway.
+- ✅ BromnBlog-Api (Lambda + API Gateway, domain: `api.blogdobroomn.com`) — Fastify app wrapped via `@fastify/aws-lambda`, bundled with esbuild (`NodejsFunction`), running in a `PRIVATE_WITH_EGRESS` subnet (not `PRIVATE_ISOLATED` — it needs real internet egress for SES and Cognito's JWKS endpoint, neither of which has a VPC Gateway Endpoint, unlike S3 below). The `broomns-blog-migrate` Lambda runs in the same `PRIVATE_WITH_EGRESS` subnet for the same reason — see the note under "Running database migrations" below.
 - ✅ BromnBlog-Frontend (S3 + CloudFront distribution: `EKN0G1CK1QQC`) — full SSR via OpenNext + a Lambda Function URL behind CloudFront OAC, not just static files
 - ✅ BromnBlog-Ses — `blogdobroomn.com` domain verified (DKIM via Route53, automatic, `DkimAttributes.Status: SUCCESS`). **Production access granted** (confirmed via `aws sesv2 get-account`: `ProductionAccessEnabled: true`, review case `178438314600754` status `GRANTED`) — sending works to any recipient, not just pre-verified addresses. Quota: 50,000 emails/24h, 14/sec.
 - ✅ Google OAuth configured and confirmed working (redirect URI registered in Google Cloud Console, real login tested)
