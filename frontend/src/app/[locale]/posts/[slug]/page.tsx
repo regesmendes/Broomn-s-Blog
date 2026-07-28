@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { Metadata } from 'next';
 import api, { ApiError } from '@/lib/api';
@@ -10,6 +10,7 @@ import { Divider } from '@/components/Divider';
 import { ShareButtons } from '@/components/ShareButtons';
 import { PostNavigation } from '@/components/PostNavigation';
 import { SITE_URL } from '@/lib/constants';
+import { buildAlternates } from '@/lib/seo';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,13 +19,15 @@ export async function generateMetadata({
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const { slug } = await params;
+  const [{ slug }, locale] = await Promise.all([params, getLocale()]);
+  const alternates = buildAlternates(locale, `/posts/${slug}`);
 
   try {
     const post = await api.getPost(slug);
     return {
       title: `${post.title} | Blog do Broomn`,
       description: post.excerpt || post.content.replace(/<[^>]*>/g, '').slice(0, 160),
+      alternates,
       openGraph: {
         title: post.title,
         description: post.excerpt || post.content.replace(/<[^>]*>/g, '').slice(0, 160),
@@ -40,7 +43,7 @@ export async function generateMetadata({
       },
     };
   } catch {
-    return { title: "Post not found | Blog do Broomn" };
+    return { title: "Post not found | Blog do Broomn", alternates };
   }
 }
 
