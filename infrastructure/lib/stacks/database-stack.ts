@@ -38,6 +38,18 @@ export class DatabaseStack extends cdk.Stack {
           cidrMask: 24,
         },
       ],
+      // S3 Gateway Endpoint: free (no hourly/data charge, unlike Interface
+      // endpoints), routes apiFunction's media-upload traffic (api/src/lib/s3.ts)
+      // to S3 over AWS's internal network instead of through the NAT Gateway.
+      // Secrets Manager, SES, and Cognito's JWKS endpoint have no Gateway
+      // Endpoint option (Interface-only, and cost more per month than the NAT
+      // Gateway itself at this traffic scale — not worth it here), so the NAT
+      // Gateway still has to stay for those.
+      gatewayEndpoints: {
+        S3: {
+          service: ec2.GatewayVpcEndpointAwsService.S3,
+        },
+      },
     });
 
     // ── Security Groups ─────────────────────────────────────────────────────
