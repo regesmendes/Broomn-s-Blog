@@ -1,15 +1,16 @@
 import { notFound } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { Metadata } from 'next';
 import api, { ApiError } from '@/lib/api';
 import { CommentSection } from '@/components/CommentSection';
 import { PostContent } from '@/components/PostContent';
-import { TranslatableTitle } from '@/components/TranslatableTitle';
 import { Divider } from '@/components/Divider';
 import { ShareButtons } from '@/components/ShareButtons';
 import { PostNavigation } from '@/components/PostNavigation';
 import { SITE_URL } from '@/lib/constants';
+import { buildAlternates } from '@/lib/seo';
+import { localizeHtml, localizePlainText } from '@/lib/localizeContent';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,29 +19,37 @@ export async function generateMetadata({
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const { slug } = await params;
+  const [{ slug }, locale] = await Promise.all([params, getLocale()]);
+  const alternates = buildAlternates(locale, `/posts/${slug}`);
 
   try {
     const post = await api.getPost(slug);
+    const rawDescription = post.excerpt || post.content.replace(/<[^>]*>/g, '').slice(0, 160);
+    const [title, description] = await Promise.all([
+      localizePlainText(post.title, locale),
+      localizePlainText(rawDescription, locale),
+    ]);
+
     return {
-      title: `${post.title} | Blog do Broomn`,
-      description: post.excerpt || post.content.replace(/<[^>]*>/g, '').slice(0, 160),
+      title: `${title} | Blog do Broomn`,
+      description,
+      alternates,
       openGraph: {
-        title: post.title,
-        description: post.excerpt || post.content.replace(/<[^>]*>/g, '').slice(0, 160),
+        title,
+        description,
         type: 'article',
         publishedTime: post.publishedAt || undefined,
         ...(post.coverImage && { images: [{ url: post.coverImage }] }),
       },
       twitter: {
         card: post.coverImage ? 'summary_large_image' : 'summary',
-        title: post.title,
-        description: post.excerpt || post.content.replace(/<[^>]*>/g, '').slice(0, 160),
+        title,
+        description,
         ...(post.coverImage && { images: [post.coverImage] }),
       },
     };
   } catch {
-    return { title: "Post not found | Blog do Broomn" };
+    return { title: "Post not found | Blog do Broomn", alternates };
   }
 }
 
@@ -62,6 +71,11 @@ export default async function PostPage({
     throw error;
   }
 
+  const [title, { content, translated, error: translationError }] = await Promise.all([
+    localizePlainText(post.title, locale),
+    localizeHtml(post.content, locale),
+  ]);
+
   return (
     <article className="mx-auto max-w-3xl px-4 py-12">
       {post.coverImage && (
@@ -74,10 +88,9 @@ export default async function PostPage({
       )}
 
       <header className="mb-10 text-center">
-        <TranslatableTitle
-          title={post.title}
-          className="mb-4 text-4xl font-bold text-emerald-900 dark:text-emerald-100 md:text-5xl"
-        />
+        <h1 className="mb-4 text-4xl font-bold text-emerald-900 dark:text-emerald-100 md:text-5xl">
+          {title}
+        </h1>
 
         <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-gray-500 dark:text-gray-400">
           {post.publishedAt && (
@@ -107,7 +120,7 @@ export default async function PostPage({
 
       <Divider />
 
-      <PostContent content={post.content} />
+      <PostContent content={content} translated={translated} translationError={translationError} />
 
       <div className="my-8 flex justify-center">
         <ShareButtons
