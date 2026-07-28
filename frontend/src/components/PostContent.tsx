@@ -1,41 +1,33 @@
-'use client';
-
-import { useTranslations } from 'next-intl';
-import { useTranslatedContent } from '@/lib/useTranslatedContent';
+import { getTranslations } from 'next-intl/server';
 
 interface PostContentProps {
   content: string;
+  translated?: boolean;
+  translationError?: string;
 }
 
-export function PostContent({ content }: PostContentProps) {
-  const { displayContent, isTranslated, translating, error } = useTranslatedContent(content);
-  const t = useTranslations('post');
+export async function PostContent({ content, translated, translationError }: PostContentProps) {
+  const t = await getTranslations('post');
 
   return (
     <>
-      {(translating || isTranslated || error) && (
+      {(translated || translationError) && (
         <div className="mb-6">
-          {translating && (
-            <span className="text-sm italic text-gray-500 dark:text-gray-400">
-              {t('translating')}
-            </span>
-          )}
-
-          {isTranslated && (
+          {translated && (
             <p className="text-xs italic text-gray-500 dark:text-gray-400">
               {t('translatedDisclaimer')}
             </p>
           )}
 
-          {error && (
-            <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+          {translationError && (
+            <p className="text-xs text-red-600 dark:text-red-400">{translationError}</p>
           )}
         </div>
       )}
 
       <div
         className="prose"
-        dangerouslySetInnerHTML={{ __html: displayContent }}
+        dangerouslySetInnerHTML={{ __html: content }}
       />
     </>
   );

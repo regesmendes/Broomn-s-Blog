@@ -34,6 +34,15 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Security
   app.register(helmet, { global: true })
 
+  // This host is a JSON API, never meant to be crawled or indexed — but its
+  // own public ACM cert makes api.blogdobroomn.com discoverable via
+  // Certificate Transparency logs regardless of whether the site links to it.
+  // GSC (a domain property covering every subdomain) flagged it, so every
+  // response gets an explicit "don't index this" signal, not just /robots.txt.
+  app.addHook('onRequest', async (_request, reply) => {
+    reply.header('X-Robots-Tag', 'noindex, nofollow')
+  })
+
   app.register(cors, {
     origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
     credentials: true,
@@ -135,6 +144,12 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Health check
   app.get('/health', async () => ({ status: 'ok' }))
+
+  // Belt-and-suspenders alongside the X-Robots-Tag header above: well-behaved
+  // crawlers check this before requesting anything else on the host at all.
+  app.get('/robots.txt', async (_request, reply) => {
+    reply.type('text/plain').send('User-agent: *\nDisallow: /\n')
+  })
 
   // ── Routes ─────────────────────────────────────────────────────────────────
   app.register(authRoutes, { prefix: '/auth' })
