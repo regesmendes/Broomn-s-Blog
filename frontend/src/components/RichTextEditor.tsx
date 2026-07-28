@@ -8,6 +8,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { useEffect, forwardRef, useImperativeHandle } from 'react';
 import { FigureImage, Caption } from './tiptapFigureImage';
 import { EmDash } from './tiptapEmDash';
+import { HtmlEmbed } from './tiptapHtmlEmbed';
 
 // ─── Toolbar Button ────────────────────────────────────────────────────────────
 
@@ -59,6 +60,13 @@ function Toolbar({ editor, onImagePick }: { editor: Editor; onImagePick?: () => 
       if (url) {
         editor.chain().focus().setFigureImage({ src: url }).run();
       }
+    }
+  };
+
+  const addEmbed = () => {
+    const html = prompt('Paste the HTML/script snippet to embed (e.g. a Buy Me a Coffee widget):');
+    if (html) {
+      editor.chain().focus().setHtmlEmbed(html).run();
     }
   };
 
@@ -170,6 +178,12 @@ function Toolbar({ editor, onImagePick }: { editor: Editor; onImagePick?: () => 
       >
         🖼 Image
       </ToolbarButton>
+      <ToolbarButton
+        onClick={addEmbed}
+        title="Insert HTML/script embed"
+      >
+        {'{ }'} Embed
+      </ToolbarButton>
 
       <div className="mx-1 w-px bg-gray-300" />
 
@@ -225,6 +239,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
       FigureImage,
       Caption,
       EmDash,
+      HtmlEmbed,
       Placeholder.configure({
         // Captions live nested inside a figureImage node (doc > figureImage >
         // caption); includeChildren is required for the placeholder plugin to

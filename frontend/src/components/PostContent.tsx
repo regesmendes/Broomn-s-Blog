@@ -1,4 +1,5 @@
 import { getTranslations } from 'next-intl/server';
+import { resolveHtmlEmbeds } from '@/lib/htmlEmbeds';
 
 interface PostContentProps {
   content: string;
@@ -27,7 +28,7 @@ export async function PostContent({ content, translated, translationError }: Pos
 
       <div
         className="prose"
-        dangerouslySetInnerHTML={{ __html: content }}
+        dangerouslySetInnerHTML={{ __html: resolveHtmlEmbeds(content) }}
       />
     </>
   );
