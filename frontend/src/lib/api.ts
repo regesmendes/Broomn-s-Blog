@@ -306,6 +306,20 @@ class ApiClient {
     return this.request<TagWithCount[]>('/tags');
   }
 
+  async getAdminTags(
+    token: string,
+    params?: { cursor?: string; limit?: number; search?: string }
+  ): Promise<CursorPaginatedResponse<TagWithCount>> {
+    const searchParams = new URLSearchParams();
+    if (params?.cursor) searchParams.set('cursor', params.cursor);
+    if (params?.limit) searchParams.set('limit', String(params.limit));
+    if (params?.search) searchParams.set('search', params.search);
+    const query = searchParams.toString();
+    return this.request<CursorPaginatedResponse<TagWithCount>>(`/tags/admin${query ? `?${query}` : ''}`, {
+      headers: this.authHeaders(token),
+    });
+  }
+
   async renameTag(id: string, name: string, token: string): Promise<TagWithCount> {
     return this.request<TagWithCount>(`/tags/${id}`, {
       method: 'PATCH',

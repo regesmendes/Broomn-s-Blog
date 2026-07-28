@@ -1,12 +1,19 @@
 import { FastifyRequest, FastifyReply } from 'fastify'
 import { tagService } from '../services/tag.service'
-import { tagIdParamSchema, renameTagSchema } from '../schemas/tag.schema'
+import { tagIdParamSchema, renameTagSchema, listAdminTagsQuerySchema } from '../schemas/tag.schema'
 
 export const tagController = {
   // ── GET /tags ─────────────────────────────────────────────────────────────────
   async list(_request: FastifyRequest, reply: FastifyReply) {
     const tags = await tagService.list()
     return reply.send(tags)
+  },
+
+  // ── GET /tags/admin (admin) ──────────────────────────────────────────────────
+  async listAdmin(request: FastifyRequest, reply: FastifyReply) {
+    const query = listAdminTagsQuerySchema.parse(request.query)
+    const result = await tagService.listAdmin(query)
+    return reply.send(result)
   },
 
   // ── PATCH /tags/:id (admin) ──────────────────────────────────────────────────

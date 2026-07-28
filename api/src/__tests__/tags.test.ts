@@ -39,6 +39,63 @@ describe('Tags API', () => {
     })
   })
 
+  // ── GET /tags/admin ──────────────────────────────────────────────────────────
+
+  describe('GET /tags/admin', () => {
+    it('rejects non-admin users', async () => {
+      const token = generateTestToken(app, { role: 'user' })
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/tags/admin',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(403)
+    })
+
+    it('returns paginated tags with post counts', async () => {
+      const token = generateAdminToken(app)
+      mockPrisma.tag.findMany.mockResolvedValue([photographyTag, phytographyTag])
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/tags/admin',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.json()).toEqual({
+        data: [
+          { id: 'tag-1', name: 'Photography', slug: 'photography', postCount: 3 },
+          { id: 'tag-2', name: 'Phytography', slug: 'phytography', postCount: 1 },
+        ],
+        meta: { nextCursor: null, hasMore: false },
+      })
+    })
+
+    it('filters by a case-insensitive search term', async () => {
+      const token = generateAdminToken(app)
+      mockPrisma.tag.findMany.mockResolvedValue([phytographyTag])
+
+      const res = await app.inject({
+        method: 'GET',
+        url: '/tags/admin?search=phyto',
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(mockPrisma.tag.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { name: { contains: 'phyto', mode: 'insensitive' } },
+        })
+      )
+      expect(res.json().data).toEqual([
+        { id: 'tag-2', name: 'Phytography', slug: 'phytography', postCount: 1 },
+      ])
+    })
+  })
+
   // ── PATCH /tags/:id ──────────────────────────────────────────────────────────
 
   describe('PATCH /tags/:id', () => {
