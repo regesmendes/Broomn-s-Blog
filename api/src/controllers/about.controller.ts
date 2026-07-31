@@ -16,8 +16,8 @@ export const aboutController = {
 
   // ── PUT /about (admin) ───────────────────────────────────────────────────────
   async update(request: FastifyRequest, reply: FastifyReply) {
-    const { content } = updateAboutSchema.parse(request.body)
-    const about = await aboutService.update(content)
+    const { content, contentEn } = updateAboutSchema.parse(request.body)
+    const about = await aboutService.update(content, contentEn)
 
     if (!about) {
       return reply.status(404).send({ error: 'About page not found' })

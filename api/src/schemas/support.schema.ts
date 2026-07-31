@@ -3,7 +3,8 @@ import { z } from 'zod'
 // ─── Body schemas ──────────────────────────────────────────────────────────────
 
 export const updateSupportSchema = z.object({
-  content: z.string().min(1),
+  content:   z.string().min(1),
+  contentEn: z.string().optional(),
 })
 
 // ─── Inferred types ────────────────────────────────────────────────────────────

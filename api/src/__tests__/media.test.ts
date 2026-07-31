@@ -336,6 +336,38 @@ describe('Media API', () => {
       })
     })
 
+    it('also replaces the image URL inside the About page\'s English body when present', async () => {
+      const token = generateAdminToken(app)
+      const aboutPage = {
+        id: 'about-page-singleton',
+        content: `<p>Us</p><img src="${mockMedia.url}">`,
+        contentEn: `<p>Us EN</p><img src="${mockMedia.url}">`,
+      }
+      mockPrisma.media.findUnique.mockResolvedValue({
+        ...mockMedia,
+        posts: [],
+        aboutPages: [{ aboutPage }],
+        supportPages: [],
+      })
+      mockPrisma.aboutPage.update.mockResolvedValue(aboutPage)
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: `/media/${mockMedia.id}/replace`,
+        headers: { authorization: `Bearer ${token}` },
+        payload: { newUrl: 'https://broomns-blog-media.s3.us-east-1.amazonaws.com/new.png' },
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(mockPrisma.aboutPage.update).toHaveBeenCalledWith({
+        where: { id: 'about-page-singleton' },
+        data: {
+          content: '<p>Us</p><img src="https://broomns-blog-media.s3.us-east-1.amazonaws.com/new.png">',
+          contentEn: '<p>Us EN</p><img src="https://broomns-blog-media.s3.us-east-1.amazonaws.com/new.png">',
+        },
+      })
+    })
+
     it('also replaces the image URL in the Support page when used there', async () => {
       const token = generateAdminToken(app)
       const supportPage = { id: 'support-page-singleton', content: `<p>Thanks</p><img src="${mockMedia.url}">` }
@@ -359,6 +391,38 @@ describe('Media API', () => {
       expect(mockPrisma.supportPage.update).toHaveBeenCalledWith({
         where: { id: 'support-page-singleton' },
         data: { content: '<p>Thanks</p><img src="https://broomns-blog-media.s3.us-east-1.amazonaws.com/new.png">' },
+      })
+    })
+
+    it('also replaces the image URL inside the Support page\'s English body when present', async () => {
+      const token = generateAdminToken(app)
+      const supportPage = {
+        id: 'support-page-singleton',
+        content: `<p>Thanks</p><img src="${mockMedia.url}">`,
+        contentEn: `<p>Thanks EN</p><img src="${mockMedia.url}">`,
+      }
+      mockPrisma.media.findUnique.mockResolvedValue({
+        ...mockMedia,
+        posts: [],
+        aboutPages: [],
+        supportPages: [{ supportPage }],
+      })
+      mockPrisma.supportPage.update.mockResolvedValue(supportPage)
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: `/media/${mockMedia.id}/replace`,
+        headers: { authorization: `Bearer ${token}` },
+        payload: { newUrl: 'https://broomns-blog-media.s3.us-east-1.amazonaws.com/new.png' },
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(mockPrisma.supportPage.update).toHaveBeenCalledWith({
+        where: { id: 'support-page-singleton' },
+        data: {
+          content: '<p>Thanks</p><img src="https://broomns-blog-media.s3.us-east-1.amazonaws.com/new.png">',
+          contentEn: '<p>Thanks EN</p><img src="https://broomns-blog-media.s3.us-east-1.amazonaws.com/new.png">',
+        },
       })
     })
   })

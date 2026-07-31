@@ -108,12 +108,14 @@ export interface MediaDetail extends MediaItem {
 export interface AboutPage {
   id: string;
   content: string;
+  contentEn?: string;
   updatedAt: string;
 }
 
 export interface SupportPage {
   id: string;
   content: string;
+  contentEn?: string;
   updatedAt: string;
 }
 
@@ -236,6 +238,34 @@ export class ApiError extends Error {
   }
 }
 
+// The API's error handler sends a generic top-level `error` string (e.g.
+// "Validation error") plus a `details` array with the actual per-field
+// issues (Zod's `{ path, message }` shape, or Fastify's native validation's
+// `{ instancePath, message }` shape) — without this, a 400 shows no more
+// information than "Validation error", with no way to tell which field or
+// why.
+function describeErrorDetails(details: unknown): string {
+  if (!Array.isArray(details)) return '';
+
+  const parts = details
+    .map((d: { path?: unknown[]; instancePath?: string; message?: string }) => {
+      const field = Array.isArray(d?.path)
+        ? d.path.join('.')
+        : typeof d?.instancePath === 'string'
+          ? d.instancePath.replace(/^\//, '')
+          : '';
+      return field ? `${field}: ${d?.message}` : d?.message;
+    })
+    .filter(Boolean);
+
+  return parts.length > 0 ? ` (${parts.join('; ')})` : '';
+}
+
+function buildApiErrorMessage(body: { error?: string; details?: unknown } | null, status: number): string {
+  const base = body?.error || `Request failed with status ${status}`;
+  return `${base}${describeErrorDetails(body?.details)}`;
+}
+
 // API Client
 
 class ApiClient {
@@ -262,11 +292,7 @@ class ApiClient {
 
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        throw new ApiError(
-          body?.error || `Request failed with status ${response.status}`,
-          response.status,
-          body
-        );
+        throw new ApiError(buildApiErrorMessage(body, response.status), response.status, body);
       }
 
       if (response.status === 204) {
@@ -556,11 +582,7 @@ class ApiClient {
 
     if (!response.ok) {
       const body = await response.json().catch(() => null);
-      throw new ApiError(
-        body?.error || `Request failed with status ${response.status}`,
-        response.status,
-        body
-      );
+      throw new ApiError(buildApiErrorMessage(body, response.status), response.status, body);
     }
 
     return response.json();
@@ -604,11 +626,11 @@ class ApiClient {
     return this.request<AboutPage>('/about');
   }
 
-  async updateAbout(content: string, token: string): Promise<AboutPage> {
+  async updateAbout(data: { content: string; contentEn?: string }, token: string): Promise<AboutPage> {
     return this.request<AboutPage>('/about', {
       method: 'PUT',
       headers: this.authHeaders(token),
-      body: JSON.stringify({ content }),
+      body: JSON.stringify(data),
     });
   }
 
@@ -661,11 +683,11 @@ class ApiClient {
     return this.request<SupportPage>('/support');
   }
 
-  async updateSupport(content: string, token: string): Promise<SupportPage> {
+  async updateSupport(data: { content: string; contentEn?: string }, token: string): Promise<SupportPage> {
     return this.request<SupportPage>('/support', {
       method: 'PUT',
       headers: this.authHeaders(token),
-      body: JSON.stringify({ content }),
+      body: JSON.stringify(data),
     });
   }
 }

@@ -215,6 +215,7 @@ model MediaOnPosts {
 model AboutPage {
   id        String   @id @default(cuid())
   content   String   // rich text / HTML
+  contentEn String?
   updatedAt DateTime @updatedAt
 
   media MediaOnAboutPage[]
@@ -240,6 +241,7 @@ model MediaOnAboutPage {
 model SupportPage {
   id        String   @id @default(cuid())
   content   String   // rich text / HTML
+  contentEn String?
   updatedAt DateTime @updatedAt
 
   media MediaOnSupportPage[]
