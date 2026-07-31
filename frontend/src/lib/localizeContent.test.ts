@@ -7,49 +7,28 @@ vi.mock('./translate', () => ({
   translatePlainText: vi.fn(),
 }));
 
-function embedDiv(rawHtml: string): string {
-  return `<div data-html-embed="${Buffer.from(rawHtml, 'utf-8').toString('base64')}"></div>`;
-}
-
 describe('localizeHtml', () => {
   beforeEach(() => {
     vi.mocked(translateHtml).mockReset();
   });
 
-  it('never sends an embed to the translation API, and reassembles it unchanged afterward', async () => {
-    const embed = embedDiv('<script data-id="reges"></script>');
-    const html = `<p>Depois da nossa conversa.</p>${embed}`;
-
-    vi.mocked(translateHtml).mockImplementation(async (input) => input.replace('conversa', 'conversation'));
+  it('delegates the whole document to translateHtml (embed-safety lives there now)', async () => {
+    const html = '<p>Depois da nossa conversa.</p>';
+    vi.mocked(translateHtml).mockResolvedValue({
+      html: '<p>Depois da nossa conversation.</p>',
+      partial: false,
+    });
 
     const result = await localizeHtml(html, 'en');
 
-    // translateHtml must only ever be called with the surrounding text segment.
-    expect(translateHtml).toHaveBeenCalledTimes(1);
-    const [translatedArg] = vi.mocked(translateHtml).mock.calls[0];
-    expect(translatedArg).not.toContain('data-html-embed');
-
-    expect(result.content).toBe('<p>Depois da nossa conversation.</p>' + embed);
+    expect(translateHtml).toHaveBeenCalledWith(html, 'pt|en');
+    expect(result.content).toBe('<p>Depois da nossa conversation.</p>');
     expect(result.translated).toBe(true);
+    expect(result.error).toBeUndefined();
   });
 
-  it('handles an embed sandwiched between two text segments, translating both independently', async () => {
-    const embed = embedDiv('<script></script>');
-    const html = `<p>Antes.</p>${embed}<p>Depois.</p>`;
-
-    vi.mocked(translateHtml).mockImplementation(async (input) =>
-      input.replace('Antes', 'Before').replace('Depois', 'After')
-    );
-
-    const result = await localizeHtml(html, 'en');
-
-    expect(translateHtml).toHaveBeenCalledTimes(2);
-    expect(result.content).toBe(`<p>Before.</p>${embed}<p>After.</p>`);
-  });
-
-  it('does not translate at all for the pt locale, embed included', async () => {
-    const embed = embedDiv('<script></script>');
-    const html = `<p>Texto.</p>${embed}`;
+  it('does not translate at all for the pt locale', async () => {
+    const html = '<p>Texto.</p>';
 
     const result = await localizeHtml(html, 'pt');
 
@@ -58,9 +37,8 @@ describe('localizeHtml', () => {
     expect(result.translated).toBe(false);
   });
 
-  it('falls back to the original content (embed intact) if translation fails', async () => {
-    const embed = embedDiv('<script></script>');
-    const html = `<p>Texto.</p>${embed}`;
+  it('falls back to the original content if translation fails outright', async () => {
+    const html = '<p>Texto.</p>';
     vi.mocked(translateHtml).mockRejectedValue(new Error('Translation service returned 429'));
 
     const result = await localizeHtml(html, 'en');
@@ -68,5 +46,19 @@ describe('localizeHtml', () => {
     expect(result.content).toBe(html);
     expect(result.translated).toBe(false);
     expect(result.error).toContain('429');
+  });
+
+  it('reports translated content with a note when translateHtml only partially succeeded', async () => {
+    const html = '<p>Texto.</p><p>Mais texto.</p>';
+    vi.mocked(translateHtml).mockResolvedValue({
+      html: '<p>Text.</p><p>Mais texto.</p>',
+      partial: true,
+    });
+
+    const result = await localizeHtml(html, 'en');
+
+    expect(result.content).toBe('<p>Text.</p><p>Mais texto.</p>');
+    expect(result.translated).toBe(true);
+    expect(result.error).toBe('Part of this content could not be translated');
   });
 });

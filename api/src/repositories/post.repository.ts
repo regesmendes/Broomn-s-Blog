@@ -28,12 +28,15 @@ export interface UpsertTagsResult {
 const postSummarySelect = {
   id:          true,
   title:       true,
+  titleEn:     true,
   slug:        true,
   excerpt:     true,
+  excerptEn:   true,
   coverImage:  true,
   status:      true,
   publishedAt: true,
   createdAt:   true,
+  updatedAt:   true,
   tags: {
     select: {
       tag: { select: { id: true, name: true, slug: true } },
@@ -45,7 +48,7 @@ const postSummarySelect = {
 const postFullSelect = {
   ...postSummarySelect,
   content:   true,
-  updatedAt: true,
+  contentEn: true,
 } as const
 
 // ─── Repository ────────────────────────────────────────────────────────────────
@@ -68,9 +71,12 @@ export const postRepository = {
       }),
       ...(search && {
         OR: [
-          { title:   { contains: search, mode: 'insensitive' as const } },
-          { excerpt: { contains: search, mode: 'insensitive' as const } },
-          { content: { contains: search, mode: 'insensitive' as const } },
+          { title:     { contains: search, mode: 'insensitive' as const } },
+          { titleEn:   { contains: search, mode: 'insensitive' as const } },
+          { excerpt:   { contains: search, mode: 'insensitive' as const } },
+          { excerptEn: { contains: search, mode: 'insensitive' as const } },
+          { content:   { contains: search, mode: 'insensitive' as const } },
+          { contentEn: { contains: search, mode: 'insensitive' as const } },
         ],
       }),
     }
@@ -133,7 +139,7 @@ export const postRepository = {
           ],
         },
         orderBy: [{ publishedAt: 'asc' }, { id: 'asc' }],
-        select: { slug: true, title: true },
+        select: { slug: true, title: true, titleEn: true },
       }),
       prisma.post.findFirst({
         where: {
@@ -144,7 +150,7 @@ export const postRepository = {
           ],
         },
         orderBy: [{ publishedAt: 'desc' }, { id: 'desc' }],
-        select: { slug: true, title: true },
+        select: { slug: true, title: true, titleEn: true },
       }),
     ])
 

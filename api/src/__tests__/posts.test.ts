@@ -212,6 +212,14 @@ describe('Posts API', () => {
       const body = res.json()
       expect(body.nextPost).toEqual(nextPost)
       expect(body.previousPost).toEqual(previousPost)
+      // Adjacent-post lookups must select titleEn too, so PostNavigation can
+      // show the English title instead of always falling back to Portuguese.
+      expect(mockPrisma.post.findFirst).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        select: { slug: true, title: true, titleEn: true },
+      }))
+      expect(mockPrisma.post.findFirst).toHaveBeenNthCalledWith(3, expect.objectContaining({
+        select: { slug: true, title: true, titleEn: true },
+      }))
       // "next" (newer) is looked up ascending; "previous" (older) descending
       expect(mockPrisma.post.findFirst).toHaveBeenNthCalledWith(2, expect.objectContaining({
         orderBy: [{ publishedAt: 'asc' }, { id: 'asc' }],
@@ -387,8 +395,10 @@ describe('Posts API', () => {
       mockPrisma.post.findUnique.mockResolvedValue({
         id: 'post-1',
         title: 'Test',
+        titleEn: 'Test EN',
         slug: 'test',
         content: 'x',
+        contentEn: 'x EN',
         status: 'DRAFT',
         tags: [],
       })
@@ -414,6 +424,215 @@ describe('Posts API', () => {
 
       expect(res.statusCode).toBe(200)
       expect(res.json().status).toBe('PUBLISHED')
+    })
+
+    it('rejects publishing a draft with no English translation', async () => {
+      const token = generateAdminToken(app)
+
+      mockPrisma.post.findUnique.mockResolvedValue({
+        id: 'post-1',
+        title: 'Test',
+        titleEn: null,
+        slug: 'test',
+        content: 'x',
+        contentEn: null,
+        status: 'DRAFT',
+        tags: [],
+      })
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/posts/post-1/publish',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { status: 'PUBLISHED' },
+      })
+
+      expect(res.statusCode).toBe(400)
+      expect(mockPrisma.post.update).not.toHaveBeenCalled()
+    })
+
+    it('rejects publishing a draft when the English content is only "<p></p>"', async () => {
+      const token = generateAdminToken(app)
+
+      mockPrisma.post.findUnique.mockResolvedValue({
+        id: 'post-1',
+        title: 'Test',
+        titleEn: 'Test EN',
+        slug: 'test',
+        content: 'x',
+        contentEn: '<p></p>',
+        status: 'DRAFT',
+        tags: [],
+      })
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/posts/post-1/publish',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { status: 'PUBLISHED' },
+      })
+
+      expect(res.statusCode).toBe(400)
+    })
+  })
+
+  // ── Bilingual publish-gating on create/update ─────────────────────────────
+
+  describe('Bilingual publish gating', () => {
+    it('rejects creating a post as PUBLISHED with no English translation', async () => {
+      const token = generateAdminToken(app)
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/posts',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { title: 'Test', content: '<p>Hi</p>', status: 'PUBLISHED' },
+      })
+
+      expect(res.statusCode).toBe(400)
+      expect(mockPrisma.post.create).not.toHaveBeenCalled()
+    })
+
+    it('allows creating a post as PUBLISHED when both languages are present', async () => {
+      const token = generateAdminToken(app)
+      mockPrisma.post.findUnique.mockResolvedValue(null) // slug not taken
+      mockPrisma.post.create.mockResolvedValue({
+        id: 'new-id',
+        title: 'Test',
+        titleEn: 'Test EN',
+        slug: 'test',
+        content: '<p>Hi</p>',
+        contentEn: '<p>Hi EN</p>',
+        status: 'PUBLISHED',
+        publishedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        tags: [],
+      })
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/posts',
+        headers: { authorization: `Bearer ${token}` },
+        payload: {
+          title: 'Test',
+          titleEn: 'Test EN',
+          content: '<p>Hi</p>',
+          contentEn: '<p>Hi EN</p>',
+          status: 'PUBLISHED',
+        },
+      })
+
+      expect(res.statusCode).toBe(201)
+    })
+
+    it('allows creating a draft with no English translation at all', async () => {
+      const token = generateAdminToken(app)
+      mockPrisma.post.findUnique.mockResolvedValue(null)
+      mockPrisma.post.create.mockResolvedValue({
+        id: 'new-id',
+        title: 'Test',
+        slug: 'test',
+        content: '<p>Hi</p>',
+        status: 'DRAFT',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        tags: [],
+      })
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/posts',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { title: 'Test', content: '<p>Hi</p>' },
+      })
+
+      expect(res.statusCode).toBe(201)
+    })
+
+    it('rejects transitioning an existing draft to PUBLISHED without English content', async () => {
+      const token = generateAdminToken(app)
+      mockPrisma.post.findUnique.mockResolvedValue({
+        id: 'post-1',
+        title: 'Test',
+        titleEn: null,
+        slug: 'test',
+        content: '<p>Hi</p>',
+        contentEn: null,
+        status: 'DRAFT',
+        tags: [],
+      })
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/posts/post-1',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { status: 'PUBLISHED' },
+      })
+
+      expect(res.statusCode).toBe(400)
+      expect(mockPrisma.post.update).not.toHaveBeenCalled()
+    })
+
+    it('does not re-gate a save of an already-published post (e.g. autosave)', async () => {
+      const token = generateAdminToken(app)
+      mockPrisma.post.findUnique.mockResolvedValue({
+        id: 'post-1',
+        title: 'Test',
+        titleEn: null,
+        slug: 'test',
+        content: '<p>Hi</p>',
+        contentEn: null,
+        status: 'PUBLISHED',
+        tags: [],
+      })
+      mockPrisma.post.update.mockResolvedValue({
+        id: 'post-1',
+        title: 'Test',
+        slug: 'test',
+        content: '<p>Hi edited</p>',
+        status: 'PUBLISHED',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        tags: [],
+      })
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/posts/post-1',
+        headers: { authorization: `Bearer ${token}` },
+        // Autosave always resends status alongside the rest of the form. Title
+        // is left unchanged (matching `existing.title`) so this doesn't also
+        // exercise slug regeneration — that's covered elsewhere.
+        payload: { title: 'Test', content: '<p>Hi edited</p>', status: 'PUBLISHED' },
+      })
+
+      expect(res.statusCode).toBe(200)
+    })
+  })
+
+  // ── Search matches English fields too ─────────────────────────────────────
+
+  describe('GET /posts?search=', () => {
+    it('searches PT and EN title/excerpt/content fields', async () => {
+      mockPrisma.post.findMany.mockResolvedValue([])
+
+      await app.inject({ method: 'GET', url: '/posts?search=hello' })
+
+      expect(mockPrisma.post.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: [
+              { title: { contains: 'hello', mode: 'insensitive' } },
+              { titleEn: { contains: 'hello', mode: 'insensitive' } },
+              { excerpt: { contains: 'hello', mode: 'insensitive' } },
+              { excerptEn: { contains: 'hello', mode: 'insensitive' } },
+              { content: { contains: 'hello', mode: 'insensitive' } },
+              { contentEn: { contains: 'hello', mode: 'insensitive' } },
+            ],
+          }),
+        })
+      )
     })
   })
 })

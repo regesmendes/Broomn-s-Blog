@@ -175,7 +175,7 @@ export async function mediaRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Media not found' })
     }
 
-    // Update all posts that use this image
+    // Update all posts that use this image (both PT and EN bodies)
     const postUpdates = media.posts.map((mp) => {
       const updatedContent = mp.post.content.replace(
         new RegExp(escapeRegex(media.url), 'g'),
@@ -183,7 +183,12 @@ export async function mediaRoutes(app: FastifyInstance) {
       )
       return prisma.post.update({
         where: { id: mp.post.id },
-        data: { content: updatedContent },
+        data: {
+          content: updatedContent,
+          ...(mp.post.contentEn && {
+            contentEn: mp.post.contentEn.replace(new RegExp(escapeRegex(media.url), 'g'), newUrl),
+          }),
+        },
       })
     })
 

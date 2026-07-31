@@ -9,6 +9,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 interface SitemapPost {
   slug: string;
   updatedAt: string;
+  titleEn?: string;
 }
 
 // Walks the same cursor-paginated /posts endpoint the homepage uses — there's
@@ -51,6 +52,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       entries.push({ url: `${SITE_URL}/${locale}${path}`, changeFrequency });
     }
     for (const post of posts) {
+      // No English translation yet — that page canonicals at /pt/ and is
+      // noindexed (see posts/[slug]/page.tsx), so it doesn't belong here.
+      if (locale === 'en' && !post.titleEn) continue;
+
       entries.push({
         url: `${SITE_URL}/${locale}/posts/${post.slug}`,
         lastModified: new Date(post.updatedAt),

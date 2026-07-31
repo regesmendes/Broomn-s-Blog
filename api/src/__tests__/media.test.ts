@@ -278,6 +278,38 @@ describe('Media API', () => {
       })
     })
 
+    it('also replaces the image URL inside a post\'s English body when present', async () => {
+      const token = generateAdminToken(app)
+      const post = {
+        id: 'post-1',
+        content: `<img src="${mockMedia.url}">`,
+        contentEn: `<p>Hi</p><img src="${mockMedia.url}">`,
+      }
+      mockPrisma.media.findUnique.mockResolvedValue({
+        ...mockMedia,
+        posts: [{ post }],
+        aboutPages: [],
+        supportPages: [],
+      })
+      mockPrisma.post.update.mockResolvedValue(post)
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: `/media/${mockMedia.id}/replace`,
+        headers: { authorization: `Bearer ${token}` },
+        payload: { newUrl: 'https://broomns-blog-media.s3.us-east-1.amazonaws.com/new.png' },
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(mockPrisma.post.update).toHaveBeenCalledWith({
+        where: { id: 'post-1' },
+        data: {
+          content: '<img src="https://broomns-blog-media.s3.us-east-1.amazonaws.com/new.png">',
+          contentEn: '<p>Hi</p><img src="https://broomns-blog-media.s3.us-east-1.amazonaws.com/new.png">',
+        },
+      })
+    })
+
     it('also replaces the image URL in the About page when used there', async () => {
       const token = generateAdminToken(app)
       const aboutPage = { id: 'about-page-singleton', content: `<p>Us</p><img src="${mockMedia.url}">` }

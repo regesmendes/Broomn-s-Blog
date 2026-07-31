@@ -50,7 +50,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 - ✅ Mulgore-inspired visual identity (landscape hero, druidic emblem, vine dividers)
 - ✅ Custom typography (Cinzel headings, Lora body — manuscript/scroll feel)
 - ✅ i18n: Portuguese (default) + English with language switcher — all pages, including auth/login and newsletter flows
-- ✅ On-the-fly post translation via MyMemory API (preserves HTML structure)
+- ✅ Manual bilingual post authoring — PT/EN tabs in the post editor with a one-click MyMemory "Translate" button (admin-triggered and reviewed once, then persisted); `/en/` post pages read the stored English column directly, no live translation call. An untranslated post's `/en/` page falls back to the Portuguese content with a badge, noindexed and excluded from the sitemap until translated. About/Support pages still translate on-the-fly via MyMemory on every `/en/` request (preserves HTML structure) — not yet migrated to the same stored-bilingual model
 - ✅ Image captions in the post editor, tied to that specific image occurrence in that specific post
 - ✅ Editable About page (rich text, media library images) with a top-nav link, admin-editable, no comments
 - ✅ "Say Thanks" support page (`/support`, footer link) — same singleton/rich-text pattern as About, listing free ways to help plus optional Pix/Buy Me a Coffee/PayPal links entered by the admin

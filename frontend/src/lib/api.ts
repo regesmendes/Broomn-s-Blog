@@ -21,14 +21,18 @@ export interface TagWithCount {
 export interface AdjacentPost {
   slug: string;
   title: string;
+  titleEn?: string;
 }
 
 export interface Post {
   id: string;
   title: string;
+  titleEn?: string;
   slug: string;
   excerpt?: string;
+  excerptEn?: string;
   content: string;
+  contentEn?: string;
   coverImage?: string;
   tags: Tag[];
   status: 'DRAFT' | 'PUBLISHED';
@@ -348,8 +352,11 @@ class ApiClient {
   async createPost(
     data: {
       title: string;
+      titleEn?: string;
       excerpt?: string;
+      excerptEn?: string;
       content: string;
+      contentEn?: string;
       coverImage?: string;
       tags?: string[];
       status?: 'DRAFT' | 'PUBLISHED';
@@ -366,8 +373,11 @@ class ApiClient {
 
   async updatePost(id: string, data: {
     title?: string;
+    titleEn?: string;
     excerpt?: string;
+    excerptEn?: string;
     content?: string;
+    contentEn?: string;
     coverImage?: string;
     tags?: string[];
     status?: 'DRAFT' | 'PUBLISHED';

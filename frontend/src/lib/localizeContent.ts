@@ -1,5 +1,4 @@
 import { translateHtml, translatePlainText } from './translate';
-import { splitAroundEmbeds, isEmbedSegment } from './htmlEmbeds';
 
 export interface LocalizedHtml {
   content: string;
@@ -15,20 +14,13 @@ export interface LocalizedHtml {
 export async function localizeHtml(html: string, locale: string): Promise<LocalizedHtml> {
   if (locale !== 'en') return { content: html, translated: false };
 
-  // HTML embeds (see lib/htmlEmbeds.ts) must never reach MyMemory — translate
-  // each surrounding text segment independently and leave embed segments
-  // exactly as they are, rather than translating the whole string at once.
-  const segments = splitAroundEmbeds(html);
-
   try {
-    const translatedSegments: string[] = [];
-    for (let i = 0; i < segments.length; i++) {
-      const segment = segments[i];
-      translatedSegments.push(
-        isEmbedSegment(i) || segment.length === 0 ? segment : await translateHtml(segment, 'pt|en')
-      );
-    }
-    return { content: translatedSegments.join(''), translated: true };
+    const result = await translateHtml(html, 'pt|en');
+    return {
+      content: result.html,
+      translated: true,
+      error: result.partial ? 'Part of this content could not be translated' : undefined,
+    };
   } catch (err) {
     return { content: html, translated: false, error: err instanceof Error ? err.message : 'Translation failed' };
   }
