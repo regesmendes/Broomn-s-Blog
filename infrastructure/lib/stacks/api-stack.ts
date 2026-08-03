@@ -38,6 +38,12 @@ export interface ApiStackProps extends StackProps {
   backupBucketName: string;
   /** Private backups bucket ARN */
   backupBucketArn: string;
+  /** Media CDN domain name (media-cdn-stack.ts, e.g. media.blogdobroomn.com) */
+  mediaCdnDomain: string;
+  /** Media CDN CloudFront distribution ID (media-cdn-stack.ts) */
+  mediaDistributionId: string;
+  /** Media CDN CloudFront distribution ARN, for scoping the invalidation IAM permission */
+  mediaDistributionArn: string;
   /** Route53 Hosted Zone ID for the domain */
   hostedZoneId: string;
   /** Root domain name (blogdobroomn.com) */
@@ -116,7 +122,22 @@ export class ApiStack extends Stack {
         // it as a real dependency in the bundle and copy the generated
         // client — including the rhel-openssl-3.0.x engine for Lambda's
         // Amazon Linux 2023 runtime — in alongside it.
-        nodeModules: ['@prisma/client'],
+        //
+        // 'sharp' (lib/imageProcessing.ts) is listed here for the same
+        // reason: it ships a platform/architecture-specific native binary
+        // (the @img/sharp-<platform>-<arch> optional dependency actually
+        // resolved into node_modules), which esbuild can't bundle either.
+        // Since this Lambda's architecture is the CDK default (X86_64) and
+        // its runtime is Amazon Linux (glibc, not musl), the resolved
+        // package must be @img/sharp-linux-x64 — this only happens
+        // automatically when `npm install` for this repo itself runs on a
+        // linux-x64 host. Building from a different OS/architecture (e.g.
+        // macOS, including Apple Silicon) silently bundles the wrong native
+        // binary: it works in local dev (sharp still loads on the dev
+        // machine's own platform) and only fails at runtime in Lambda. If
+        // that happens, reinstall with the target platform forced before
+        // building, e.g.: `npm install --os=linux --cpu=x64 sharp`.
+        nodeModules: ['@prisma/client', 'sharp'],
         commandHooks: {
           beforeBundling: () => [],
           beforeInstall: () => [],
@@ -138,6 +159,8 @@ export class ApiStack extends Stack {
         COGNITO_CLIENT_ID: props.userPoolClientId,
         COGNITO_DOMAIN: props.cognitoDomain,
         S3_BUCKET_NAME: props.mediaBucketName,
+        MEDIA_CDN_URL: `https://${props.mediaCdnDomain}`,
+        MEDIA_DISTRIBUTION_ID: props.mediaDistributionId,
         AWS_REGION_NAME: 'us-east-1',
         API_URL: `https://api.${props.domainName}`,
         FRONTEND_URL: 'https://blogdobroomn.com',
@@ -260,6 +283,58 @@ export class ApiStack extends Stack {
       targets: [new eventsTargets.LambdaFunction(analyticsPruneFunction)],
     });
 
+    // On-demand media URL backfill (api/src/media-url-backfill.ts, issue #87
+    // Part B item 5): rewrites old direct-S3 media URLs to the CDN origin.
+    // Not wired to any trigger — same manual-invoke pattern as migrateFunction,
+    // and bundled like analyticsPruneFunction (real Prisma Client usage, not
+    // a CLI shell-out). Defaults to a dry run; see the handler's own comment.
+    const mediaUrlBackfillFunction = new NodejsFunction(this, 'MediaUrlBackfillFn', {
+      functionName: 'broomns-blog-media-url-backfill',
+      runtime: lambda.Runtime.NODEJS_24_X,
+      entry: path.join(repoRoot, 'api', 'src', 'media-url-backfill.ts'),
+      handler: 'handler',
+      depsLockFilePath: path.join(repoRoot, 'package-lock.json'),
+      memorySize: 512,
+      timeout: Duration.minutes(5),
+      vpc: props.vpc,
+      vpcSubnets: {
+        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
+      },
+      securityGroups: [props.lambdaSecurityGroup],
+      bundling: {
+        nodeModules: ['@prisma/client'],
+        commandHooks: {
+          beforeBundling: () => [],
+          beforeInstall: () => [],
+          afterBundling: (inputDir: string, outputDir: string) => [
+            `rm -rf ${outputDir}/node_modules/.prisma`,
+            `cp -r ${inputDir}/node_modules/.prisma ${outputDir}/node_modules/.prisma`,
+          ],
+        },
+      },
+      environment: {
+        DB_SECRET_ARN: dbSecret.secretArn,
+        DB_HOST: props.dbInstance.dbInstanceEndpointAddress,
+        DB_PORT: props.dbInstance.dbInstanceEndpointPort,
+        DB_NAME: 'broomnsblog',
+        S3_BUCKET_NAME: props.mediaBucketName,
+        MEDIA_CDN_URL: `https://${props.mediaCdnDomain}`,
+        AWS_REGION_NAME: 'us-east-1',
+      },
+    });
+
+    mediaUrlBackfillFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['secretsmanager:GetSecretValue'],
+        resources: [dbSecret.secretArn],
+      }),
+    );
+
+    new CfnOutput(this, 'MediaUrlBackfillFunctionName', {
+      value: mediaUrlBackfillFunction.functionName,
+      description: 'Invoke this Lambda to rewrite old direct-S3 media URLs to the CDN origin (dry run by default)',
+    });
+
     new CfnOutput(this, 'AnalyticsPruneFunctionName', {
       value: analyticsPruneFunction.functionName,
       description: 'Daily Lambda pruning analytics rows past the 180-day retention window',
@@ -312,6 +387,15 @@ export class ApiStack extends Stack {
       new iam.PolicyStatement({
         actions: ['s3:PutObject', 's3:DeleteObject'],
         resources: [`${props.mediaBucketArn}/*`],
+      }),
+    );
+
+    // IAM: Allow Lambda to invalidate deleted media at the CDN edge
+    // (lib/cloudfront.ts) — scoped to just this one distribution, not '*'
+    apiFunction.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['cloudfront:CreateInvalidation'],
+        resources: [props.mediaDistributionArn],
       }),
     );
 
