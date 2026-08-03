@@ -10,7 +10,6 @@ import { ShareButtons } from '@/components/ShareButtons';
 import { PostNavigation } from '@/components/PostNavigation';
 import { SITE_URL } from '@/lib/constants';
 import { buildAlternates } from '@/lib/seo';
-import { localizeHtml, localizePlainText } from '@/lib/localizeContent';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,20 +19,25 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const [{ slug }, locale] = await Promise.all([params, getLocale()]);
-  const alternates = buildAlternates(locale, `/posts/${slug}`);
 
   try {
     const post = await api.getPost(slug);
-    const rawDescription = post.excerpt || post.content.replace(/<[^>]*>/g, '').slice(0, 160);
-    const [title, description] = await Promise.all([
-      localizePlainText(post.title, locale),
-      localizePlainText(rawDescription, locale),
-    ]);
+    const hasEnTranslation = !!post.contentEn;
+    const alternates = buildAlternates(locale, `/posts/${slug}`, {
+      includeEn: hasEnTranslation,
+      canonicalLocale: locale === 'en' && !hasEnTranslation ? 'pt' : locale,
+    });
+
+    const title = locale === 'en' ? (post.titleEn ?? post.title) : post.title;
+    const excerpt = locale === 'en' ? (post.excerptEn ?? post.excerpt) : post.excerpt;
+    const content = locale === 'en' ? (post.contentEn ?? post.content) : post.content;
+    const description = excerpt || content.replace(/<[^>]*>/g, '').slice(0, 160);
 
     return {
       title: `${title} | Blog do Broomn`,
       description,
       alternates,
+      ...(locale === 'en' && !hasEnTranslation && { robots: { index: false } }),
       openGraph: {
         title,
         description,
@@ -49,6 +53,7 @@ export async function generateMetadata({
       },
     };
   } catch {
+    const alternates = buildAlternates(locale, `/posts/${slug}`);
     return { title: "Post not found | Blog do Broomn", alternates };
   }
 }
@@ -71,10 +76,10 @@ export default async function PostPage({
     throw error;
   }
 
-  const [title, { content, translated, error: translationError }] = await Promise.all([
-    localizePlainText(post.title, locale),
-    localizeHtml(post.content, locale),
-  ]);
+  const hasEnTranslation = !!post.contentEn;
+  const isPtFallback = locale === 'en' && !hasEnTranslation;
+  const title = locale === 'en' ? (post.titleEn ?? post.title) : post.title;
+  const content = locale === 'en' ? (post.contentEn ?? post.content) : post.content;
 
   return (
     <article className="mx-auto max-w-3xl px-4 py-12">
@@ -120,7 +125,7 @@ export default async function PostPage({
 
       <Divider />
 
-      <PostContent content={content} translated={translated} translationError={translationError} />
+      <PostContent content={content} isPtFallback={isPtFallback} />
 
       <div className="my-8 flex justify-center">
         <ShareButtons

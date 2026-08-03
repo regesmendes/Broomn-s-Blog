@@ -9,10 +9,10 @@ export const aboutRepository = {
     return prisma.aboutPage.findFirst()
   },
 
-  async updateContent(id: string, content: string) {
+  async updateContent(id: string, content: string, contentEn?: string | null) {
     return prisma.aboutPage.update({
       where: { id },
-      data: { content },
+      data: { content, contentEn },
     })
   },
 }

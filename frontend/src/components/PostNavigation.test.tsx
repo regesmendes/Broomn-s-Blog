@@ -2,8 +2,11 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { PostNavigation } from './PostNavigation';
 
+let mockLocale = 'pt';
+
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
+  useLocale: () => mockLocale,
 }));
 
 vi.mock('@/i18n/navigation', () => ({
@@ -12,11 +15,12 @@ vi.mock('@/i18n/navigation', () => ({
   ),
 }));
 
-const previous = { slug: 'newer-post', title: 'Newer Post' };
-const next = { slug: 'older-post', title: 'Older Post' };
+const previous = { slug: 'newer-post', title: 'Newer Post', titleEn: 'Newer Post EN' };
+const next = { slug: 'older-post', title: 'Older Post', titleEn: 'Older Post EN' };
 
 afterEach(() => {
   cleanup();
+  mockLocale = 'pt';
 });
 
 describe('PostNavigation', () => {
@@ -47,5 +51,21 @@ describe('PostNavigation', () => {
   it('renders nothing when there are no neighbors', () => {
     const { container } = render(<PostNavigation previous={null} next={null} />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('shows the English title when the locale is en and the neighbor has one', () => {
+    mockLocale = 'en';
+    render(<PostNavigation previous={previous} next={next} />);
+
+    expect(screen.getByRole('link', { name: /newer post en/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /older post en/i })).toBeInTheDocument();
+  });
+
+  it('falls back to the Portuguese title when the locale is en but no translation exists', () => {
+    mockLocale = 'en';
+    const untranslated = { slug: 'no-en', title: 'Somente Português' };
+    render(<PostNavigation previous={untranslated} next={null} />);
+
+    expect(screen.getByRole('link', { name: /somente português/i })).toBeInTheDocument();
   });
 });

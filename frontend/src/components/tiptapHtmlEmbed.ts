@@ -18,8 +18,9 @@ declare module '@tiptap/core' {
 // ProseMirror content, so it round-trips through editor reloads unescaped and
 // untouched. It only becomes live markup again at final render time
 // (resolveHtmlEmbeds in frontend/src/lib/htmlEmbeds.ts), and is deliberately
-// excluded from translation (localizeContent.ts) — an arbitrary third-party
-// translation API has no reason to preserve a base64 blob byte-for-byte.
+// excluded from translation (translateHtml in frontend/src/lib/translate.ts)
+// — an arbitrary third-party translation API has no reason to preserve a
+// base64 blob byte-for-byte.
 export const HtmlEmbed = Node.create({
   name: 'htmlEmbed',
   group: 'block',

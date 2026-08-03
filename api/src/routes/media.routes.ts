@@ -175,7 +175,7 @@ export async function mediaRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: 'Media not found' })
     }
 
-    // Update all posts that use this image
+    // Update all posts that use this image (both PT and EN bodies)
     const postUpdates = media.posts.map((mp) => {
       const updatedContent = mp.post.content.replace(
         new RegExp(escapeRegex(media.url), 'g'),
@@ -183,11 +183,16 @@ export async function mediaRoutes(app: FastifyInstance) {
       )
       return prisma.post.update({
         where: { id: mp.post.id },
-        data: { content: updatedContent },
+        data: {
+          content: updatedContent,
+          ...(mp.post.contentEn && {
+            contentEn: mp.post.contentEn.replace(new RegExp(escapeRegex(media.url), 'g'), newUrl),
+          }),
+        },
       })
     })
 
-    // Update the About page too, if it uses this image
+    // Update the About page too, if it uses this image (both PT and EN bodies)
     const aboutUpdates = media.aboutPages.map((map) => {
       const updatedContent = map.aboutPage.content.replace(
         new RegExp(escapeRegex(media.url), 'g'),
@@ -195,11 +200,16 @@ export async function mediaRoutes(app: FastifyInstance) {
       )
       return prisma.aboutPage.update({
         where: { id: map.aboutPage.id },
-        data: { content: updatedContent },
+        data: {
+          content: updatedContent,
+          ...(map.aboutPage.contentEn && {
+            contentEn: map.aboutPage.contentEn.replace(new RegExp(escapeRegex(media.url), 'g'), newUrl),
+          }),
+        },
       })
     })
 
-    // Update the Support page too, if it uses this image
+    // Update the Support page too, if it uses this image (both PT and EN bodies)
     const supportUpdates = media.supportPages.map((map) => {
       const updatedContent = map.supportPage.content.replace(
         new RegExp(escapeRegex(media.url), 'g'),
@@ -207,7 +217,12 @@ export async function mediaRoutes(app: FastifyInstance) {
       )
       return prisma.supportPage.update({
         where: { id: map.supportPage.id },
-        data: { content: updatedContent },
+        data: {
+          content: updatedContent,
+          ...(map.supportPage.contentEn && {
+            contentEn: map.supportPage.contentEn.replace(new RegExp(escapeRegex(media.url), 'g'), newUrl),
+          }),
+        },
       })
     })
 

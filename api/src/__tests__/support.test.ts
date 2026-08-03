@@ -136,5 +136,71 @@ describe('Support API', () => {
         where: { supportPageId: mockSupport.id },
       })
     })
+
+    it('saves contentEn alongside content — no gating, unlike posts, since Support has no draft state', async () => {
+      const token = generateAdminToken(app)
+
+      mockPrisma.supportPage.findFirst.mockResolvedValue(mockSupport)
+      mockPrisma.supportPage.update.mockResolvedValue({ ...mockSupport, contentEn: '<p>Say thanks EN</p>' })
+      mockPrisma.mediaOnSupportPage.deleteMany.mockResolvedValue({ count: 0 })
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/support',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { content: '<p>Diga obrigado</p>', contentEn: '<p>Say thanks EN</p>' },
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(mockPrisma.supportPage.update).toHaveBeenCalledWith({
+        where: { id: mockSupport.id },
+        data: { content: '<p>Diga obrigado</p>', contentEn: '<p>Say thanks EN</p>' },
+      })
+    })
+
+    it('normalizes a blank contentEn ("<p></p>") to null instead of persisting empty markup', async () => {
+      const token = generateAdminToken(app)
+
+      mockPrisma.supportPage.findFirst.mockResolvedValue(mockSupport)
+      mockPrisma.supportPage.update.mockResolvedValue({ ...mockSupport, contentEn: null })
+      mockPrisma.mediaOnSupportPage.deleteMany.mockResolvedValue({ count: 0 })
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/support',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { content: '<p>Diga obrigado</p>', contentEn: '<p></p>' },
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(mockPrisma.supportPage.update).toHaveBeenCalledWith({
+        where: { id: mockSupport.id },
+        data: { content: '<p>Diga obrigado</p>', contentEn: null },
+      })
+    })
+
+    it('scans contentEn too when syncing media usage', async () => {
+      const token = generateAdminToken(app)
+      const contentEn =
+        '<p>Say thanks</p><img src="https://bucket.s3.amazonaws.com/abcdefab-1234-1234-1234-abcdefabcdef.png">'
+
+      mockPrisma.supportPage.findFirst.mockResolvedValue(mockSupport)
+      mockPrisma.supportPage.update.mockResolvedValue({ ...mockSupport, contentEn })
+      mockPrisma.media.findMany.mockResolvedValue([{ id: 'media-1' }])
+      mockPrisma.$transaction.mockResolvedValue([])
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/support',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { content: '<p>Diga obrigado, sem imagens</p>', contentEn },
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(mockPrisma.media.findMany).toHaveBeenCalledWith({
+        where: { filename: { in: ['abcdefab-1234-1234-1234-abcdefabcdef.png'] } },
+        select: { id: true },
+      })
+    })
   })
 })

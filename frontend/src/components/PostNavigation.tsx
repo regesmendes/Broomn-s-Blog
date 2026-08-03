@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import type { AdjacentPost } from '@/lib/api';
 
@@ -9,8 +9,13 @@ interface PostNavigationProps {
   next: AdjacentPost | null;
 }
 
+function localizedTitle(post: AdjacentPost, locale: string): string {
+  return locale === 'en' ? (post.titleEn ?? post.title) : post.title;
+}
+
 export function PostNavigation({ previous, next }: PostNavigationProps) {
   const t = useTranslations('post');
+  const locale = useLocale();
 
   if (!previous && !next) return null;
 
@@ -25,7 +30,7 @@ export function PostNavigation({ previous, next }: PostNavigationProps) {
             <span className="block text-xs text-gray-500 dark:text-gray-400">
               ← {t('previousPost')}
             </span>
-            {previous.title}
+            {localizedTitle(previous, locale)}
           </Link>
         )}
       </div>
@@ -39,7 +44,7 @@ export function PostNavigation({ previous, next }: PostNavigationProps) {
             <span className="block text-xs text-gray-500 dark:text-gray-400">
               {t('nextPost')} →
             </span>
-            {next.title}
+            {localizedTitle(next, locale)}
           </Link>
         )}
       </div>

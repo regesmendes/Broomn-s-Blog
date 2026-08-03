@@ -1,53 +1,18 @@
-'use client';
-
-import { useState, useEffect } from 'react';
 import { Link } from '@/i18n/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { Post } from '@/lib/api';
-import { translatePlainText } from '@/lib/translate';
 
-interface TranslatablePostCardProps {
+interface PostCardProps {
   post: Post;
   dateLocale: string;
 }
 
-export function TranslatablePostCard({ post, dateLocale }: TranslatablePostCardProps) {
+export function PostCard({ post, dateLocale }: PostCardProps) {
   const locale = useLocale();
   const t = useTranslations('home');
-  const [title, setTitle] = useState(post.title);
-  const [excerpt, setExcerpt] = useState(post.excerpt || '');
-  const [translating, setTranslating] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    if (locale === 'en') {
-      translateCard();
-    }
-  }, [locale]);
-
-  async function translateCard() {
-    setTranslating(true);
-    setFailed(false);
-
-    try {
-      // Translate title
-      const translatedTitle = await translatePlainText(post.title, 'pt|en');
-      setTitle(translatedTitle);
-
-      // Translate excerpt if it exists
-      if (post.excerpt) {
-        const translatedExcerpt = await translatePlainText(post.excerpt, 'pt|en');
-        setExcerpt(translatedExcerpt);
-      }
-    } catch {
-      setFailed(true);
-      // Keep original text on failure
-      setTitle(post.title);
-      setExcerpt(post.excerpt || '');
-    } finally {
-      setTranslating(false);
-    }
-  }
+  const isPtFallback = locale === 'en' && !post.titleEn;
+  const title = locale === 'en' ? (post.titleEn ?? post.title) : post.title;
+  const excerpt = locale === 'en' ? (post.excerptEn ?? post.excerpt) : post.excerpt;
 
   return (
     <article className="flex gap-4 overflow-hidden rounded-lg bg-white shadow-sm transition hover:shadow-md dark:bg-gray-800">
@@ -71,24 +36,10 @@ export function TranslatablePostCard({ post, dateLocale }: TranslatablePostCardP
           href={`/posts/${post.slug}`}
           className="text-emerald-800 hover:text-emerald-600 visited:text-emerald-800 dark:text-emerald-200 dark:hover:text-emerald-400 dark:visited:text-emerald-200"
         >
-          <h2 className="mb-2 text-xl font-semibold">
-            {translating ? (
-              <span className="inline-block animate-pulse text-gray-400 dark:text-gray-500">{post.title}</span>
-            ) : (
-              title
-            )}
-          </h2>
+          <h2 className="mb-2 text-xl font-semibold">{title}</h2>
         </Link>
 
-        {(excerpt || post.excerpt) && (
-          <p className="mb-4 text-gray-600 dark:text-gray-400">
-            {translating ? (
-              <span className="animate-pulse text-gray-400 dark:text-gray-500">{post.excerpt}</span>
-            ) : (
-              excerpt
-            )}
-          </p>
-        )}
+        {excerpt && <p className="mb-4 text-gray-600 dark:text-gray-400">{excerpt}</p>}
 
         <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-500">
           {post.publishedAt && (
@@ -114,7 +65,7 @@ export function TranslatablePostCard({ post, dateLocale }: TranslatablePostCardP
             </div>
           )}
 
-          {failed && (
+          {isPtFallback && (
             <span className="text-xs italic text-amber-600 dark:text-amber-400">
               {t('translationUnavailable')}
             </span>

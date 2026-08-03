@@ -6,7 +6,7 @@ import api, { Post } from '@/lib/api';
 import { useCursorPagination } from '@/lib/useCursorPagination';
 import { SearchAndFilter } from '@/components/SearchAndFilter';
 import { Pagination } from '@/components/Pagination';
-import { TranslatablePostCard } from '@/components/TranslatablePostCard';
+import { PostCard } from '@/components/PostCard';
 
 interface PostListProps {
   dateLocale: string;
@@ -85,7 +85,7 @@ export function PostList({ dateLocale }: PostListProps) {
         <>
           <div className="grid gap-8">
             {posts.map((post) => (
-              <TranslatablePostCard
+              <PostCard
                 key={post.id}
                 post={post}
                 dateLocale={dateLocale}

@@ -16,8 +16,8 @@ export const supportController = {
 
   // ── PUT /support (admin) ─────────────────────────────────────────────────────
   async update(request: FastifyRequest, reply: FastifyReply) {
-    const { content } = updateSupportSchema.parse(request.body)
-    const support = await supportService.update(content)
+    const { content, contentEn } = updateSupportSchema.parse(request.body)
+    const support = await supportService.update(content, contentEn)
 
     if (!support) {
       return reply.status(404).send({ error: 'Support page not found' })
