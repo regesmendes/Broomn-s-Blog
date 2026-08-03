@@ -147,7 +147,7 @@ aws lambda invoke --function-name broomns-blog-media-url-backfill --region us-ea
   --cli-binary-format raw-in-base64-out --payload '{"dryRun":false}' /dev/stdout
 ```
 
-`oldOrigin`/`newOrigin` default from this Lambda's own `S3_BUCKET_NAME`/`MEDIA_CDN_URL` env vars — pass them explicitly in the payload only if production turns out to hold some other URL shape (the dry run's `sampleMediaUrls` is how you'd notice that). Deliberately excludes `contentEn`; see [architecture](./architecture.md#media-served-via-a-dedicated-cloudfront-distribution-not-the-frontend-one) for why and what the later, narrower `contentEn` sweep looks like.
+`oldOrigin`/`newOrigin` default from this Lambda's own `S3_BUCKET_NAME`/`MEDIA_CDN_URL` env vars — pass them explicitly in the payload only if production turns out to hold some other URL shape (the dry run's `sampleMediaUrls`/`*ContentEnMatches` counts are how you'd notice that). Covers `contentEn` in the same pass as `content` — see [architecture](./architecture.md#media-served-via-a-dedicated-cloudfront-distribution-not-the-frontend-one) for why the originally-planned second, narrower sweep was collapsed into this one.
 
 ## Running an on-demand Cognito user export
 
