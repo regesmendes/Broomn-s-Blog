@@ -4,14 +4,17 @@ import { useState, useRef } from 'react';
 import { useRouter } from '@/i18n/navigation';
 import api, { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { RichTextEditor, RichTextEditorHandle } from '@/components/RichTextEditor';
+import { PostLocaleFields, PostLocaleFieldsHandle } from '@/components/PostLocaleFields';
 import { ImagePickerModal } from '@/components/ImagePickerModal';
 import { TagPicker } from '@/components/TagPicker';
 
 interface PostFormData {
   title: string;
+  titleEn: string;
   excerpt: string;
+  excerptEn: string;
   content: string;
+  contentEn: string;
   coverImage: string;
   tags: string[];
   status: 'DRAFT' | 'PUBLISHED';
@@ -24,12 +27,15 @@ export default function NewPostPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
-  const [imagePickerTarget, setImagePickerTarget] = useState<'content' | 'cover'>('content');
-  const editorRef = useRef<RichTextEditorHandle>(null);
+  const [imagePickerTarget, setImagePickerTarget] = useState<'content-pt' | 'content-en' | 'cover'>('content-pt');
+  const localeFieldsRef = useRef<PostLocaleFieldsHandle>(null);
   const [form, setForm] = useState<PostFormData>({
     title: '',
+    titleEn: '',
     excerpt: '',
+    excerptEn: '',
     content: '',
+    contentEn: '',
     coverImage: '',
     tags: [],
     status: 'DRAFT',
@@ -54,8 +60,11 @@ export default function NewPostPage() {
       await api.createPost(
         {
           title: form.title,
+          titleEn: form.titleEn || undefined,
           content: form.content,
+          contentEn: form.contentEn || undefined,
           excerpt: form.excerpt || undefined,
+          excerptEn: form.excerptEn || undefined,
           coverImage: form.coverImage || undefined,
           tags: form.tags.length > 0 ? form.tags : undefined,
           status: form.status,
@@ -81,62 +90,33 @@ export default function NewPostPage() {
 
       <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
         <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Title *
-          </label>
-          <input
-            id="title"
-            name="title"
-            type="text"
-            value={form.title}
-            onChange={handleChange}
-            required
-            className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+          <PostLocaleFields
+            ref={localeFieldsRef}
+            pt={{ title: form.title, excerpt: form.excerpt, content: form.content }}
+            en={{ title: form.titleEn, excerpt: form.excerptEn, content: form.contentEn }}
+            onChangePt={(next) =>
+              setForm((prev) => ({ ...prev, title: next.title, excerpt: next.excerpt, content: next.content }))
+            }
+            onChangeEn={(next) =>
+              setForm((prev) => ({ ...prev, titleEn: next.title, excerptEn: next.excerpt, contentEn: next.content }))
+            }
+            onRequestImagePick={(locale) => {
+              setImagePickerTarget(locale === 'pt' ? 'content-pt' : 'content-en');
+              setImagePickerOpen(true);
+            }}
           />
-        </div>
-
-        <div>
-          <label htmlFor="excerpt" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Excerpt
-          </label>
-          <input
-            id="excerpt"
-            name="excerpt"
-            type="text"
-            value={form.excerpt}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
+          <ImagePickerModal
+            isOpen={imagePickerOpen}
+            onClose={() => setImagePickerOpen(false)}
+            onSelect={(url) => {
+              if (imagePickerTarget === 'cover') {
+                setForm((prev) => ({ ...prev, coverImage: url }));
+              } else {
+                localeFieldsRef.current?.insertImage(imagePickerTarget === 'content-pt' ? 'pt' : 'en', url);
+              }
+              setImagePickerOpen(false);
+            }}
           />
-        </div>
-
-        <div>
-          <label htmlFor="content" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Content *
-          </label>
-          <div className="mt-1">
-            <RichTextEditor
-              ref={editorRef}
-              content={form.content}
-              onChange={(html) => setForm((prev) => ({ ...prev, content: html }))}
-              placeholder="Start writing your post..."
-              onImagePick={() => {
-                setImagePickerTarget('content');
-                setImagePickerOpen(true);
-              }}
-            />
-            <ImagePickerModal
-              isOpen={imagePickerOpen}
-              onClose={() => setImagePickerOpen(false)}
-              onSelect={(url) => {
-                if (imagePickerTarget === 'cover') {
-                  setForm((prev) => ({ ...prev, coverImage: url }));
-                } else {
-                  editorRef.current?.insertImage(url);
-                }
-                setImagePickerOpen(false);
-              }}
-            />
-          </div>
         </div>
 
         <div>

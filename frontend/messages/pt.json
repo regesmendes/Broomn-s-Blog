@@ -62,7 +62,7 @@
   },
   "post": {
     "backToAll": "← Voltar para todas as publicações",
-    "translatedDisclaimer": "Traduzido automaticamente. O texto original está em português.",
+    "ptFallbackBadge": "Versão em inglês ainda não disponível — mostrando o texto original em português.",
     "comments": "Comentários",
     "noComments": "Nenhum comentário ainda. Seja o primeiro a comentar!",
     "writeComment": "Escreva um comentário...",

@@ -1,3 +1,5 @@
+import { splitAroundEmbeds, isEmbedSegment } from './htmlEmbeds';
+
 const MYMEMORY_URL = 'https://api.mymemory.translated.net/get';
 
 // Registering a contact email raises MyMemory's daily anonymous quota from
@@ -12,14 +14,18 @@ const MAX_CHUNK_LENGTH = 450;
 
 async function translateChunk(text: string, langpair: string): Promise<string> {
   const params = new URLSearchParams({ q: text, langpair, de: CONTACT_EMAIL });
-  const response = await fetch(`${MYMEMORY_URL}?${params}`);
+  const response = await fetch(`${MYMEMORY_URL}?${params}`, {
+    signal: AbortSignal.timeout(15000),
+  });
 
   if (!response.ok) {
     throw new Error(`Translation service returned ${response.status}`);
   }
 
   const data = await response.json();
-  if (data.responseStatus !== 200) {
+  // MyMemory returns responseStatus as a string in some responses — comparing
+  // loosely against the number 200 would otherwise falsely treat those as failures.
+  if (Number(data.responseStatus) !== 200) {
     throw new Error(data.responseDetails || 'Translation failed');
   }
 
@@ -152,15 +158,46 @@ function findSafeSplitPoints(html: string): number[] {
   return points;
 }
 
-export async function translateHtml(html: string, langpair: string): Promise<string> {
-  const chunks = splitHtmlContent(html);
-  const translated: string[] = [];
+export interface TranslateHtmlResult {
+  html: string;
+  // True when one or more chunks failed to translate and were left in their
+  // original language — the caller should surface this rather than silently
+  // presenting a mixed-language result as a full translation.
+  partial: boolean;
+}
 
-  for (const chunk of chunks) {
-    translated.push(await translateChunk(chunk, langpair));
+export async function translateHtml(html: string, langpair: string): Promise<TranslateHtmlResult> {
+  // HTML embeds (see lib/htmlEmbeds.ts) must never reach MyMemory — split
+  // around them here so every caller gets embed-safety for free, rather than
+  // requiring each one to pre-split before calling in.
+  const segments = splitAroundEmbeds(html);
+  let partial = false;
+  const results: string[] = [];
+
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+    if (isEmbedSegment(i) || segment.length === 0) {
+      results.push(segment);
+      continue;
+    }
+
+    const chunks = splitHtmlContent(segment);
+    const translatedChunks: string[] = [];
+    for (const chunk of chunks) {
+      try {
+        translatedChunks.push(await translateChunk(chunk, langpair));
+      } catch {
+        // Keep the original chunk instead of discarding everything
+        // translated so far — a transient failure on one chunk shouldn't
+        // burn the whole document's worth of quota on retry.
+        translatedChunks.push(chunk);
+        partial = true;
+      }
+    }
+    results.push(translatedChunks.join(''));
   }
 
-  return translated.join('');
+  return { html: results.join(''), partial };
 }
 
 // Plain text (titles, excerpts) has no tags to worry about splitting inside

@@ -45,10 +45,16 @@ export const postService = {
   },
 
   async create(body: CreatePostBody) {
-    const slug = body.slug ?? (await generateUniqueSlug(body.title))
+    const normalized = normalizeLocaleFields(body)
 
-    const post = flattenTags(await postRepository.create({ ...body, slug }))
-    await syncMediaUsage(post.id, body.content)
+    if (normalized.status === 'PUBLISHED' && !canPublish(normalized.titleEn, normalized.contentEn)) {
+      return 'missing_translation' as const
+    }
+
+    const slug = normalized.slug ?? (await generateUniqueSlug(normalized.title))
+
+    const post = flattenTags(await postRepository.create({ ...normalized, slug }))
+    await syncMediaUsage(post.id, normalized.content, normalized.contentEn)
     return post
   },
 
@@ -56,14 +62,28 @@ export const postService = {
     const existing = await postRepository.findById(id)
     if (!existing) return null
 
-    // If title changed and no explicit slug given, regenerate slug
-    if (body.title && !body.slug && body.title !== existing.title) {
-      body.slug = await generateUniqueSlug(body.title)
+    const normalized = normalizeLocaleFields(body)
+
+    const nextStatus = normalized.status ?? existing.status
+    const nextTitleEn = normalized.titleEn !== undefined ? normalized.titleEn : existing.titleEn
+    const nextContentEn = normalized.contentEn !== undefined ? normalized.contentEn : existing.contentEn
+
+    if (
+      existing.status !== 'PUBLISHED' &&
+      nextStatus === 'PUBLISHED' &&
+      !canPublish(nextTitleEn, nextContentEn)
+    ) {
+      return 'missing_translation' as const
     }
 
-    const post = flattenTags(await postRepository.update(id, body))
-    if (body.content) {
-      await syncMediaUsage(id, body.content)
+    // If title changed and no explicit slug given, regenerate slug
+    if (normalized.title && !normalized.slug && normalized.title !== existing.title) {
+      normalized.slug = await generateUniqueSlug(normalized.title)
+    }
+
+    const post = flattenTags(await postRepository.update(id, normalized))
+    if (normalized.content !== undefined || normalized.contentEn !== undefined) {
+      await syncMediaUsage(id, post.content, post.contentEn)
     }
     return post
   },
@@ -79,6 +99,14 @@ export const postService = {
   async setPublishState(id: string, body: PublishPostBody) {
     const existing = await postRepository.findById(id)
     if (!existing) return null
+
+    if (
+      existing.status !== 'PUBLISHED' &&
+      body.status === 'PUBLISHED' &&
+      !canPublish(existing.titleEn, existing.contentEn)
+    ) {
+      return 'missing_translation' as const
+    }
 
     return flattenTags(
       await postRepository.updatePublishState(id, body.status, body.publishedAt)
@@ -130,15 +158,52 @@ function slugify(value: string): string {
 }
 
 /**
- * Scan post HTML content for media URLs and sync the MediaOnPosts junction table.
- * Automatically adds/removes relations based on what images are actually in the content.
+ * True when HTML has no real text content. Tiptap serializes an empty
+ * document as "<p></p>", which a naive `!value` check would miss.
  */
-async function syncMediaUsage(postId: string, content: string) {
+function isBlankHtml(value: string | null | undefined): boolean {
+  if (!value) return true
+  return value.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, '').trim().length === 0
+}
+
+function canPublish(titleEn: string | null | undefined, contentEn: string | null | undefined): boolean {
+  return !isBlankHtml(titleEn) && !isBlankHtml(contentEn)
+}
+
+/**
+ * Converts blank titleEn/excerptEn/contentEn to null before they reach the
+ * repository, so a cleared EN tab actually clears the DB column instead of
+ * persisting "<p></p>" — which would otherwise defeat both the publish gate
+ * and the frontend's null-means-untranslated fallback.
+ */
+function normalizeLocaleFields<T extends { titleEn?: string; excerptEn?: string; contentEn?: string }>(
+  body: T
+): T {
+  const result = { ...body }
+  if (result.titleEn !== undefined && isBlankHtml(result.titleEn)) {
+    result.titleEn = null as unknown as string
+  }
+  if (result.excerptEn !== undefined && isBlankHtml(result.excerptEn)) {
+    result.excerptEn = null as unknown as string
+  }
+  if (result.contentEn !== undefined && isBlankHtml(result.contentEn)) {
+    result.contentEn = null as unknown as string
+  }
+  return result
+}
+
+/**
+ * Scan post HTML content (both languages) for media URLs and sync the
+ * MediaOnPosts junction table. Automatically adds/removes relations based on
+ * what images are actually in the content.
+ */
+async function syncMediaUsage(postId: string, content: string, contentEn?: string | null) {
   // Match media filenames (uuid.ext, as generated in media.routes.ts) anywhere in
   // the content, regardless of what URL they're embedded in — S3 URLs today,
   // but this stays robust if the storage backend or URL shape changes again.
   const filenameRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-z]+/g
-  const filenames = content.match(filenameRegex) || []
+  const combined = content + '\n' + (contentEn ?? '')
+  const filenames = combined.match(filenameRegex) || []
 
   if (filenames.length === 0) {
     // No media in post — clear all relations

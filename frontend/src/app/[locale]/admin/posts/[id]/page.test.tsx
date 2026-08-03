@@ -38,16 +38,19 @@ vi.mock('@/components/ImagePickerModal', () => ({
 
 // The editor itself (Tiptap) is already covered by its own tests — here we
 // only need something that reports content changes, so the page's autosave
-// orchestration can be exercised without mounting real ProseMirror.
+// orchestration can be exercised without mounting real ProseMirror. The page
+// now renders two editors at once (PT/EN tabs, via PostLocaleFields) — key
+// the stub's testid off its placeholder so both stay independently targetable.
 vi.mock('@/components/RichTextEditor', () => ({
   RichTextEditor: forwardRef(function RichTextEditorStub(
-    props: { content: string; onChange: (html: string) => void },
+    props: { content: string; onChange: (html: string) => void; placeholder?: string },
     ref
   ) {
+    const locale = props.placeholder?.includes('English') ? 'en' : 'pt';
     useImperativeHandle(ref, () => ({ insertImage: vi.fn() }));
     return (
       <textarea
-        data-testid="content-editor"
+        data-testid={`content-editor-${locale}`}
         value={props.content}
         onChange={(e) => props.onChange(e.target.value)}
       />
@@ -132,7 +135,7 @@ describe('EditPostPage — save feedback and autosave', () => {
   it('autosaves a dirty form after 3 minutes and shows a fading "Auto-saved" indicator', async () => {
     await renderAndLoad();
 
-    fireEvent.change(screen.getByTestId('content-editor'), {
+    fireEvent.change(screen.getByTestId('content-editor-pt'), {
       target: { value: '<p>Edited content</p>' },
     });
 
@@ -167,7 +170,7 @@ describe('EditPostPage — save feedback and autosave', () => {
       setMockToken?.('token-2');
     });
 
-    fireEvent.change(screen.getByTestId('content-editor'), {
+    fireEvent.change(screen.getByTestId('content-editor-pt'), {
       target: { value: '<p>Edited after refresh</p>' },
     });
 
@@ -198,7 +201,7 @@ describe('EditPostPage — save feedback and autosave', () => {
     mockUpdatePost.mockRejectedValueOnce(new Error('network down'));
     await renderAndLoad();
 
-    fireEvent.change(screen.getByTestId('content-editor'), {
+    fireEvent.change(screen.getByTestId('content-editor-pt'), {
       target: { value: '<p>Edited content</p>' },
     });
 
@@ -227,7 +230,7 @@ describe('EditPostPage — save feedback and autosave', () => {
 
     // ...then save manually, which should push the next tick out a fresh
     // 3 minutes rather than letting the original timer fire in 5s.
-    fireEvent.change(screen.getByTestId('content-editor'), {
+    fireEvent.change(screen.getByTestId('content-editor-pt'), {
       target: { value: '<p>Edited content</p>' },
     });
     fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
@@ -244,5 +247,26 @@ describe('EditPostPage — save feedback and autosave', () => {
       await vi.advanceTimersByTimeAsync(10_000);
     });
     expect(mockUpdatePost).toHaveBeenCalledTimes(1);
+  });
+
+  it('round-trips titleEn/contentEn edits through save', async () => {
+    await renderAndLoad();
+
+    fireEvent.click(screen.getByText('English'));
+    fireEvent.change(screen.getByTestId('content-editor-en'), {
+      target: { value: '<p>Hello EN</p>' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockUpdatePost).toHaveBeenCalledWith(
+      'post-1',
+      expect.objectContaining({ contentEn: '<p>Hello EN</p>' }),
+      'token-1'
+    );
   });
 });

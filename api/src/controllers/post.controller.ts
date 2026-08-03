@@ -53,6 +53,11 @@ export const postController = {
   async create(request: FastifyRequest, reply: FastifyReply) {
     const body = createPostSchema.parse(request.body)
     const post = await postService.create(body)
+
+    if (post === 'missing_translation') {
+      return reply.status(400).send({ error: 'Cannot publish without both Portuguese and English title and content' })
+    }
+
     return reply.status(201).send(post)
   },
 
@@ -62,6 +67,10 @@ export const postController = {
     const body = updatePostSchema.parse(request.body)
 
     const post = await postService.update(id, body)
+
+    if (post === 'missing_translation') {
+      return reply.status(400).send({ error: 'Cannot publish without both Portuguese and English title and content' })
+    }
 
     if (!post) {
       return reply.status(404).send({ error: 'Post not found' })
@@ -88,6 +97,10 @@ export const postController = {
     const body = publishPostSchema.parse(request.body)
 
     const post = await postService.setPublishState(id, body)
+
+    if (post === 'missing_translation') {
+      return reply.status(400).send({ error: 'Cannot publish without both Portuguese and English title and content' })
+    }
 
     if (!post) {
       return reply.status(404).send({ error: 'Post not found' })

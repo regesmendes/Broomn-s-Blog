@@ -24,9 +24,12 @@ export const postIdParamSchema = z.object({
 
 export const createPostSchema = z.object({
   title:       z.string().min(1).max(255),
+  titleEn:     z.string().max(255).optional(),
   slug:        z.string().min(1).max(255).optional(), // auto-generated if omitted
   excerpt:     z.string().max(500).optional(),
+  excerptEn:   z.string().max(500).optional(),
   content:     z.string().min(1),
+  contentEn:   z.string().optional(),
   coverImage:  z.string().url().optional(),
   status:      z.enum(['DRAFT', 'PUBLISHED']).default('DRAFT'),
   publishedAt: z.string().datetime().optional(),

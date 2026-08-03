@@ -136,5 +136,71 @@ describe('About API', () => {
         where: { aboutPageId: mockAbout.id },
       })
     })
+
+    it('saves contentEn alongside content — no gating, unlike posts, since About has no draft state', async () => {
+      const token = generateAdminToken(app)
+
+      mockPrisma.aboutPage.findFirst.mockResolvedValue(mockAbout)
+      mockPrisma.aboutPage.update.mockResolvedValue({ ...mockAbout, contentEn: '<p>About us EN</p>' })
+      mockPrisma.mediaOnAboutPage.deleteMany.mockResolvedValue({ count: 0 })
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/about',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { content: '<p>Sobre nós</p>', contentEn: '<p>About us EN</p>' },
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(mockPrisma.aboutPage.update).toHaveBeenCalledWith({
+        where: { id: mockAbout.id },
+        data: { content: '<p>Sobre nós</p>', contentEn: '<p>About us EN</p>' },
+      })
+    })
+
+    it('normalizes a blank contentEn ("<p></p>") to null instead of persisting empty markup', async () => {
+      const token = generateAdminToken(app)
+
+      mockPrisma.aboutPage.findFirst.mockResolvedValue(mockAbout)
+      mockPrisma.aboutPage.update.mockResolvedValue({ ...mockAbout, contentEn: null })
+      mockPrisma.mediaOnAboutPage.deleteMany.mockResolvedValue({ count: 0 })
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/about',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { content: '<p>Sobre nós</p>', contentEn: '<p></p>' },
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(mockPrisma.aboutPage.update).toHaveBeenCalledWith({
+        where: { id: mockAbout.id },
+        data: { content: '<p>Sobre nós</p>', contentEn: null },
+      })
+    })
+
+    it('scans contentEn too when syncing media usage', async () => {
+      const token = generateAdminToken(app)
+      const contentEn =
+        '<p>About us</p><img src="https://bucket.s3.amazonaws.com/abcdefab-1234-1234-1234-abcdefabcdef.png">'
+
+      mockPrisma.aboutPage.findFirst.mockResolvedValue(mockAbout)
+      mockPrisma.aboutPage.update.mockResolvedValue({ ...mockAbout, contentEn })
+      mockPrisma.media.findMany.mockResolvedValue([{ id: 'media-1' }])
+      mockPrisma.$transaction.mockResolvedValue([])
+
+      const res = await app.inject({
+        method: 'PUT',
+        url: '/about',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { content: '<p>Sobre nós, sem imagens</p>', contentEn },
+      })
+
+      expect(res.statusCode).toBe(200)
+      expect(mockPrisma.media.findMany).toHaveBeenCalledWith({
+        where: { filename: { in: ['abcdefab-1234-1234-1234-abcdefabcdef.png'] } },
+        select: { id: true },
+      })
+    })
   })
 })

@@ -40,9 +40,12 @@ enum Role {
 model Post {
   id          String      @id @default(cuid())
   title       String
+  titleEn     String?
   slug        String      @unique
   excerpt     String?
+  excerptEn   String?
   content     String      // rich text / HTML
+  contentEn   String?
   coverImage  String?
   status      PostStatus  @default(DRAFT)
   publishedAt DateTime?
@@ -212,6 +215,7 @@ model MediaOnPosts {
 model AboutPage {
   id        String   @id @default(cuid())
   content   String   // rich text / HTML
+  contentEn String?
   updatedAt DateTime @updatedAt
 
   media MediaOnAboutPage[]
@@ -237,6 +241,7 @@ model MediaOnAboutPage {
 model SupportPage {
   id        String   @id @default(cuid())
   content   String   // rich text / HTML
+  contentEn String?
   updatedAt DateTime @updatedAt
 
   media MediaOnSupportPage[]

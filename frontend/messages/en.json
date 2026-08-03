@@ -62,7 +62,7 @@
   },
   "post": {
     "backToAll": "← Back to all posts",
-    "translatedDisclaimer": "Automatically translated from Portuguese.",
+    "ptFallbackBadge": "English version not available yet — showing the original Portuguese text.",
     "comments": "Comments",
     "noComments": "No comments yet. Be the first to comment!",
     "writeComment": "Write a comment...",
