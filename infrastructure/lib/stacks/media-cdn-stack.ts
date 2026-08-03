@@ -36,17 +36,24 @@ export interface MediaCdnStackProps extends StackProps {
  * app deploy (docs/deployment.md) — sharing it would flush the entire media
  * cache on every single app deploy, defeating the point of a long TTL.
  *
- * The bucket stays public-read (see storage-stack.ts) for now, so this uses
- * a plain S3 origin (`withBucketDefaults`) rather than Origin Access
- * Control — OAC's automatic bucket-policy grant mutates the bucket's policy
- * resource, which lives in StorageStack, not here; wiring that grant against
- * this distribution's ID would create a StorageStack <-> MediaCdnStack
- * circular dependency. Switching to OAC (and removing the public policy) is
- * deferred to its own later step (issue #87 Part B item 9): it permanently
- * breaks every direct-S3 image URL already baked into sent newsletter
- * emails, so it can't happen until content referencing old-style URLs
- * (including translated `contentEn`) has been swept first — at which point
- * the OAC grant can be added directly in storage-stack.ts instead.
+ * The bucket is CloudFront-only via Origin Access Control (issue #87 Part B
+ * item 9 — locked down after the media URL backfill confirmed nothing in the
+ * app itself still referenced the old direct-S3 URLs; see storage-stack.ts).
+ * The origin below deliberately passes an *imported* reference to the bucket
+ * (`s3.Bucket.fromBucketName`), not the live `props.mediaBucket` construct:
+ * `S3BucketOrigin.withOriginAccessControl` unconditionally tries to write a
+ * bucket-policy grant via `bucket.addToResourcePolicy(...)`, scoped to
+ * *this* distribution's own ID — which only exists once this stack's
+ * `Distribution` is bound. If that write targeted the real bucket construct
+ * (owned by StorageStack), it would create a StorageStack <-> MediaCdnStack
+ * circular dependency, confirmed by a failing synth when this was first
+ * tried. `addToResourcePolicy` on an *imported* bucket is a documented CDK
+ * no-op instead (just a synth-time warning annotation) — the real, only
+ * policy statement for this bucket is written directly in storage-stack.ts,
+ * scoped to this distribution's actual (already-known, stable) ARN as a
+ * plain string literal, sidestepping the cross-stack token entirely. See
+ * aws-cdk-lib's aws-cloudfront-origins README, "Setting up OAC with
+ * imported S3 buckets".
  *
  * No Origin Request Policy forwarding/varying on `Origin`: every image on
  * this site renders via a plain `<img src>` with no `crossorigin` attribute
@@ -81,7 +88,14 @@ export class MediaCdnStack extends Stack {
       validation: acm.CertificateValidation.fromDns(hostedZone),
     });
 
-    const origin = cloudfrontOrigins.S3BucketOrigin.withBucketDefaults(props.mediaBucket);
+    // Imported, not props.mediaBucket directly — see the class doc comment
+    // above for why this specific distinction matters here.
+    const importedMediaBucket = s3.Bucket.fromBucketName(
+      this,
+      'ImportedMediaBucketForOac',
+      props.mediaBucket.bucketName,
+    );
+    const origin = cloudfrontOrigins.S3BucketOrigin.withOriginAccessControl(importedMediaBucket);
 
     // CORS allow-all (safe for public images) + nosniff, since upload
     // content-type is client-declared with no magic-byte verification
