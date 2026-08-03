@@ -47,10 +47,10 @@ See the root [README](../README.md) for setup and the [architecture doc](./archi
 | PATCH | `/newsletter/subscribers/:id/block` | Block an address — stops delivery, prevents re-subscribing |
 | PATCH | `/newsletter/subscribers/:id/unblock` | Unblock an address |
 | POST | `/newsletter/send` | Send newsletter to confirmed subscribers |
-| POST | `/media/upload` | Upload an image (multipart, 5MB max) |
+| POST | `/media/upload` | Upload an image (multipart, 5MB max original). Resized (2000px longest-edge cap) and converted to WebP before storage — the returned `url`/`mimeType` are always `.webp`/`image/webp` regardless of the uploaded format. Served through the media CDN (`media.blogdobroomn.com`) when `MEDIA_CDN_URL` is configured, otherwise the direct S3 URL |
 | GET | `/media` | List all media with usage count |
 | GET | `/media/:id` | Get media details with posts (and whether the About/Support pages) uses it |
-| DELETE | `/media/:id` | Delete a media file |
+| DELETE | `/media/:id` | Delete a media file — also invalidates the object at the CDN edge |
 | PATCH | `/media/:id/replace` | Replace image URL across all posts (both `content` and `contentEn`), the About page, and the Support page |
 | GET | `/tags/admin?cursor=&limit=&search=` | Paginated tag listing for the admin tag management page, optionally filtered by a case-insensitive `search` on name |
 | PATCH | `/tags/:id` | Rename a tag. If the new name's slug collides with a *different* existing tag, merges into it instead — reassigns this tag's posts onto the existing one (deduping any post that already had both) and deletes this tag |

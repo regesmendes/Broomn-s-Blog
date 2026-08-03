@@ -3,6 +3,7 @@ import * as cdk from 'aws-cdk-lib';
 import { CognitoStack } from '../lib/stacks/cognito-stack';
 import { DatabaseStack } from '../lib/stacks/database-stack';
 import { StorageStack } from '../lib/stacks/storage-stack';
+import { MediaCdnStack } from '../lib/stacks/media-cdn-stack';
 import { ApiStack } from '../lib/stacks/api-stack';
 import { FrontendStack } from '../lib/stacks/frontend-stack';
 import { SesStack } from '../lib/stacks/ses-stack';
@@ -20,6 +21,12 @@ const googleClientId = app.node.tryGetContext('googleClientId') ?? 'PLACEHOLDER_
 const googleClientSecret = app.node.tryGetContext('googleClientSecret') ?? 'PLACEHOLDER_GOOGLE_CLIENT_SECRET';
 const hostedZoneId = app.node.tryGetContext('hostedZoneId') ?? 'PLACEHOLDER_HOSTED_ZONE_ID';
 const domainName = 'blogdobroomn.com';
+// Where CloudFront+S3 cost budget alerts go (see media-cdn-stack.ts) — no
+// placeholder default makes sense for an email address the way it does for
+// OAuth creds/hosted zone, so this defaults to the account owner's own
+// address and stays overridable via --context for a different deployment.
+const budgetAlertEmail = app.node.tryGetContext('budgetAlertEmail') ?? 'reges.mendes@gmail.com';
+const budgetMonthlyLimitUsd = Number(app.node.tryGetContext('budgetMonthlyLimitUsd') ?? 20);
 
 // --- Cognito Stack ---
 // User authentication via Google OAuth
@@ -43,6 +50,19 @@ const storageStack = new StorageStack(app, 'BromnBlog-Storage', {
   env,
   description: "Broomn's Blog - S3 media storage",
 });
+
+// --- Media CDN Stack ---
+// Dedicated CloudFront distribution fronting the media S3 bucket
+const mediaCdnStack = new MediaCdnStack(app, 'BromnBlog-MediaCdn', {
+  env,
+  mediaBucket: storageStack.mediaBucket,
+  hostedZoneId,
+  domainName,
+  budgetAlertEmail,
+  budgetMonthlyLimitUsd,
+  description: "Broomn's Blog - Media CDN (CloudFront)",
+});
+mediaCdnStack.addDependency(storageStack);
 
 // --- SES Stack ---
 // Email sending for newsletters and notifications
@@ -68,6 +88,9 @@ const apiStack = new ApiStack(app, 'BromnBlog-Api', {
   mediaBucketArn: storageStack.bucketArn,
   backupBucketName: storageStack.backupBucketName,
   backupBucketArn: storageStack.backupBucketArn,
+  mediaCdnDomain: mediaCdnStack.domainNameOutput,
+  mediaDistributionId: mediaCdnStack.distributionId,
+  mediaDistributionArn: mediaCdnStack.distributionArn,
   hostedZoneId,
   domainName,
   description: "Broomn's Blog - API (Lambda + API Gateway)",
@@ -77,6 +100,7 @@ const apiStack = new ApiStack(app, 'BromnBlog-Api', {
 apiStack.addDependency(databaseStack);
 apiStack.addDependency(cognitoStack);
 apiStack.addDependency(storageStack);
+apiStack.addDependency(mediaCdnStack);
 
 // --- Frontend Stack ---
 // S3 + CloudFront for static site hosting

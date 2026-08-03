@@ -15,6 +15,7 @@
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-cloudfront": "^3.1101.0",
     "@aws-sdk/client-cognito-identity-provider": "^3.1090.0",
     "@aws-sdk/client-s3": "^3.1090.0",
     "@aws-sdk/client-secrets-manager": "^3.1090.0",
@@ -32,6 +33,7 @@
     "fastify": "^5.10.0",
     "jsonwebtoken": "^9.0.3",
     "jwks-rsa": "^4.1.0",
+    "sharp": "^0.35.3",
     "zod": "^3.24.3"
   },
   "devDependencies": {

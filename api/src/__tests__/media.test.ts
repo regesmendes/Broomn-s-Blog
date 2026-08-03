@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { createTestApp, generateAdminToken, generateTestToken } from './helpers'
 import { prisma } from '../lib/prisma'
 import { uploadObject, deleteObject } from '../lib/s3'
+import { invalidateMediaPath } from '../lib/cloudfront'
 import { FastifyInstance } from 'fastify'
 
 const mockPrisma = prisma as unknown as {
@@ -115,12 +116,16 @@ describe('Media API', () => {
 
       expect(res.statusCode).toBe(201)
       expect(uploadObject).toHaveBeenCalledWith(
-        expect.stringMatching(/\.png$/),
+        expect.stringMatching(/\.webp$/),
         expect.any(Buffer),
-        'image/png'
+        'image/webp'
       )
       expect(mockPrisma.media.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ url: mockMedia.url, originalName: 'photo.png' }),
+        data: expect.objectContaining({
+          url: mockMedia.url,
+          originalName: 'photo.png',
+          mimeType: 'image/webp',
+        }),
       })
       expect(res.json()).toEqual({
         ...mockMedia,
@@ -227,6 +232,7 @@ describe('Media API', () => {
 
       expect(res.statusCode).toBe(204)
       expect(deleteObject).toHaveBeenCalledWith(mockMedia.filename)
+      expect(invalidateMediaPath).toHaveBeenCalledWith(mockMedia.filename)
       expect(mockPrisma.media.delete).toHaveBeenCalledWith({ where: { id: mockMedia.id } })
     })
 
@@ -235,6 +241,22 @@ describe('Media API', () => {
       mockPrisma.media.findUnique.mockResolvedValue({ ...mockMedia, _count: { posts: 0 } })
       mockPrisma.media.delete.mockResolvedValue(mockMedia)
       vi.mocked(deleteObject).mockRejectedValueOnce(new Error('NoSuchKey'))
+
+      const res = await app.inject({
+        method: 'DELETE',
+        url: `/media/${mockMedia.id}`,
+        headers: { authorization: `Bearer ${token}` },
+      })
+
+      expect(res.statusCode).toBe(204)
+      expect(mockPrisma.media.delete).toHaveBeenCalled()
+    })
+
+    it('still deletes the database record if the CDN invalidation fails', async () => {
+      const token = generateAdminToken(app)
+      mockPrisma.media.findUnique.mockResolvedValue({ ...mockMedia, _count: { posts: 0 } })
+      mockPrisma.media.delete.mockResolvedValue(mockMedia)
+      vi.mocked(invalidateMediaPath).mockRejectedValueOnce(new Error('AccessDenied'))
 
       const res = await app.inject({
         method: 'DELETE',

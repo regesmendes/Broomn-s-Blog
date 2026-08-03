@@ -1,9 +1,10 @@
 import { FastifyInstance } from 'fastify'
 import { randomUUID } from 'crypto'
-import { extname } from 'path'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import { uploadObject, deleteObject } from '../lib/s3'
+import { convertToWebp } from '../lib/imageProcessing'
+import { invalidateMediaPath } from '../lib/cloudfront'
 import { paginateWithCursor } from '../lib/pagination'
 import { cursorQuerySchema } from '../schemas/pagination.schema'
 import { authenticate } from '../middlewares/authenticate'
@@ -43,20 +44,22 @@ export async function mediaRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: 'File too large. Maximum size is 5MB.' })
     }
 
-    // Generate unique filename
-    const ext = extname(data.filename) || mimeToExt(data.mimetype)
-    const filename = `${randomUUID()}${ext}`
+    // Every upload is resized and converted to WebP before it ever reaches
+    // S3 (see lib/imageProcessing.ts) — originals were previously served
+    // unresized and unconverted, up to the full 5MB cap.
+    const webpBuffer = await convertToWebp(buffer)
+    const filename = `${randomUUID()}.webp`
 
     // Upload to S3 — this is the public URL used to serve the image
-    const url = await uploadObject(filename, buffer, data.mimetype)
+    const url = await uploadObject(filename, webpBuffer, 'image/webp')
 
     // Save to database
     const media = await prisma.media.create({
       data: {
         filename,
         originalName: data.filename,
-        mimeType: data.mimetype,
-        size: buffer.length,
+        mimeType: 'image/webp',
+        size: webpBuffer.length,
         url,
       },
     })
@@ -144,6 +147,17 @@ export async function mediaRoutes(app: FastifyInstance) {
       await deleteObject(media.filename)
     } catch {
       // Object might already be gone — continue
+    }
+
+    // Invalidate the now-deleted object at the CDN edge — best-effort, same
+    // as the S3 delete above; a failed invalidation shouldn't block removing
+    // the row (the object is already gone from S3 either way, and the long
+    // edge TTL is the one case media's otherwise-immutable URLs can go
+    // stale — see lib/cloudfront.ts).
+    try {
+      await invalidateMediaPath(media.filename)
+    } catch {
+      // Not fatal — worst case the edge serves a 404'd image until TTL expiry
     }
 
     // Delete from database (cascade removes MediaOnPosts)
@@ -241,16 +255,6 @@ export async function mediaRoutes(app: FastifyInstance) {
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
-
-function mimeToExt(mime: string): string {
-  const map: Record<string, string> = {
-    'image/jpeg': '.jpg',
-    'image/png': '.png',
-    'image/webp': '.webp',
-    'image/gif': '.gif',
-  }
-  return map[mime] || '.bin'
-}
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
