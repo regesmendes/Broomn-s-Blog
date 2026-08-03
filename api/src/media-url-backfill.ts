@@ -23,17 +23,15 @@ let initialized = false
  * pass `"dryRun":false` only after reviewing that output and taking an RDS
  * snapshot (see docs/deployment.md).
  *
- * Deliberately excludes `contentEn` on all three content tables. Part A
- * (manual bilingual authoring) may not have shipped yet, and even once it
- * has, most content won't be translated yet, so there's little to rewrite
- * there and no reason to make this backfill wait on it. Any `contentEn`
- * populated after this backfill runs already references the new CDN URL
- * (translated from PT content this backfill already rewrote) — the residual
- * case, `contentEn` translated *before* this ran, still holding an old-style
- * URL, needs its own later, narrower sweep once Part A has shipped and some
- * translation has happened (see the "Cross-cutting: sequencing" section of
- * issue #87) — reuse this same rewrite logic, scoped to just the `contentEn`
- * columns, at that point rather than extending this script now.
+ * Covers `contentEn` on all three content tables too, alongside `content`.
+ * Issue #87's original plan deferred `contentEn` to a second, later, narrower
+ * sweep, specifically because Part A (manual bilingual authoring) might not
+ * have shipped yet when this ran, and even once it had, most content
+ * wouldn't be translated yet. By the time this actually shipped, both had
+ * already happened — a meaningful amount of content was manually translated
+ * before this backfill ever ran — so the reason for a second pass no longer
+ * applied, and splitting it in two would just have meant two dry-runs, two
+ * snapshots, two production runs for no benefit. Collapsed into one pass.
  *
  * Idempotent: the WHERE/filter clauses only match rows still containing
  * `oldOrigin`, so a row already rewritten (or one that never had the old URL)
@@ -65,6 +63,14 @@ export const handler = async (event: BackfillEvent = {}) => {
 
   const rewrite = (value: string) => value.split(oldOrigin).join(newOrigin)
 
+  type ContentRow = { content: string; contentEn: string | null }
+
+  // Matches a row whose PT or EN body still references the old origin —
+  // used identically for all three content tables below.
+  const contentOrEnMatches = {
+    OR: [{ content: { contains: oldOrigin } }, { contentEn: { contains: oldOrigin } }],
+  }
+
   const [mediaRows, coverImageRows, postContentRows, aboutRows, supportRows] = await Promise.all([
     prisma.media.findMany({ where: { url: { startsWith: oldOrigin } } }),
     prisma.post.findMany({
@@ -72,18 +78,21 @@ export const handler = async (event: BackfillEvent = {}) => {
       select: { id: true, coverImage: true },
     }),
     prisma.post.findMany({
-      where: { content: { contains: oldOrigin } },
-      select: { id: true, content: true },
+      where: contentOrEnMatches,
+      select: { id: true, content: true, contentEn: true },
     }),
     prisma.aboutPage.findMany({
-      where: { content: { contains: oldOrigin } },
-      select: { id: true, content: true },
+      where: contentOrEnMatches,
+      select: { id: true, content: true, contentEn: true },
     }),
     prisma.supportPage.findMany({
-      where: { content: { contains: oldOrigin } },
-      select: { id: true, content: true },
+      where: contentOrEnMatches,
+      select: { id: true, content: true, contentEn: true },
     }),
   ])
+
+  const enMatchCount = (rows: ContentRow[]) =>
+    rows.filter((r) => r.contentEn?.includes(oldOrigin)).length
 
   const summary = {
     oldOrigin,
@@ -91,8 +100,11 @@ export const handler = async (event: BackfillEvent = {}) => {
     mediaRows: mediaRows.length,
     postCoverImageRows: coverImageRows.length,
     postContentRows: postContentRows.length,
+    postContentEnMatches: enMatchCount(postContentRows),
     aboutPageRows: aboutRows.length,
+    aboutPageContentEnMatches: enMatchCount(aboutRows),
     supportPageRows: supportRows.length,
+    supportPageContentEnMatches: enMatchCount(supportRows),
     // A sample of actual matched URLs, so an admin can eyeball whether the
     // assumed URL shape covers everything, or whether production holds some
     // other shape this prefix match would silently miss.
@@ -114,14 +126,23 @@ export const handler = async (event: BackfillEvent = {}) => {
     ...coverImageRows.map((p: { id: string; coverImage: string }) =>
       prisma.post.update({ where: { id: p.id }, data: { coverImage: rewrite(p.coverImage) } })
     ),
-    ...postContentRows.map((p: { id: string; content: string }) =>
-      prisma.post.update({ where: { id: p.id }, data: { content: rewrite(p.content) } })
+    ...postContentRows.map((p: ContentRow & { id: string }) =>
+      prisma.post.update({
+        where: { id: p.id },
+        data: { content: rewrite(p.content), ...(p.contentEn && { contentEn: rewrite(p.contentEn) }) },
+      })
     ),
-    ...aboutRows.map((a: { id: string; content: string }) =>
-      prisma.aboutPage.update({ where: { id: a.id }, data: { content: rewrite(a.content) } })
+    ...aboutRows.map((a: ContentRow & { id: string }) =>
+      prisma.aboutPage.update({
+        where: { id: a.id },
+        data: { content: rewrite(a.content), ...(a.contentEn && { contentEn: rewrite(a.contentEn) }) },
+      })
     ),
-    ...supportRows.map((s: { id: string; content: string }) =>
-      prisma.supportPage.update({ where: { id: s.id }, data: { content: rewrite(s.content) } })
+    ...supportRows.map((s: ContentRow & { id: string }) =>
+      prisma.supportPage.update({
+        where: { id: s.id },
+        data: { content: rewrite(s.content), ...(s.contentEn && { contentEn: rewrite(s.contentEn) }) },
+      })
     ),
   ])
 
