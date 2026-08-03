@@ -257,7 +257,7 @@ export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorPro
     },
     editorProps: {
       attributes: {
-        class: 'prose min-h-[300px] max-w-none px-4 py-3 focus:outline-none',
+        class: 'prose min-h-[300px] max-h-[500px] overflow-y-auto max-w-none px-4 py-3 focus:outline-none',
       },
     },
   });
