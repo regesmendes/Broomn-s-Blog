@@ -24,6 +24,16 @@ npx cdk deploy --all \
   --context hostedZoneId=YOUR_ROUTE53_HOSTED_ZONE_ID
 ```
 
+`budgetAlertEmail`/`budgetMonthlyLimitUsd` (`BromnBlog-MediaCdn`'s cost budget — see Architecture below) default to the account owner's email and $20/month if not passed via `--context`; override the same way as the values above if a different deployment needs different ones.
+
+### Native binary gotcha: build host must match the Lambda's OS/architecture
+
+`BromnBlog-Api`'s Lambda (`api-stack.ts`'s `apiFunction`) bundles two dependencies that ship platform/architecture-specific native binaries rather than pure JS: `@prisma/client` (its query/schema engine — see the migration note below) and `sharp` (`api/src/lib/imageProcessing.ts`'s resize/WebP conversion at upload, via the `@img/sharp-<platform>-<arch>` optional dependency actually resolved into `node_modules`). Both are listed in `bundling.nodeModules` in `api-stack.ts` specifically so esbuild treats them as external rather than trying to bundle the native addon.
+
+The Lambda runs Amazon Linux (glibc) on the CDK-default `X86_64` architecture. Whichever binary is present in `node_modules` at build/synth time is what ships — there's no cross-compilation step. **Building from a linux-x64 host with glibc works automatically** (`npm install` resolves the matching optional dependency on its own); building from anything else (macOS, including Apple Silicon, or an Alpine/musl container) silently bundles the wrong binary. This fails ambiguously: local dev keeps working fine (`sharp`/Prisma still load using the dev machine's own platform binary), and it only breaks once deployed, inside the Lambda. If that happens:
+- Prisma: fetch the `rhel-openssl-3.0.x` schema engine with `node api/scripts/fetch-migrate-engine.js` before redeploying (`npm rebuild @prisma/engines` is unreliable on a fresh checkout).
+- sharp: force the correct platform package before building, e.g. `npm install --os=linux --cpu=x64 sharp`.
+
 ## Architecture
 
 | Stack | Resources |
@@ -31,6 +41,7 @@ npx cdk deploy --all \
 | BromnBlog-Cognito | User Pool, Google IdP, App Client, Hosted UI |
 | BromnBlog-Database | VPC (3-tier: public/private-with-egress/isolated), RDS PostgreSQL 16 (t4g.micro), Security Groups, S3 Gateway Endpoint |
 | BromnBlog-Storage | S3 bucket (media uploads, public read) |
+| BromnBlog-MediaCdn | CloudFront distribution + ACM cert + Route53 (media subdomain), WAF WebACL, Budgets alarm — see [architecture](./architecture.md#media-served-via-a-dedicated-cloudfront-distribution-not-the-frontend-one) |
 | BromnBlog-Api | Lambda, API Gateway HTTP API, custom domain |
 | BromnBlog-Frontend | S3 + CloudFront + ACM cert + Route53 |
 | BromnBlog-Ses | SES domain identity for email |
@@ -39,6 +50,7 @@ npx cdk deploy --all \
 
 - Blog: `https://blogdobroomn.com`
 - API: `https://api.blogdobroomn.com`
+- Media CDN: `https://media.blogdobroomn.com`
 - Cognito Hosted UI: `https://broomns-blog.auth.us-east-1.amazoncognito.com`
 
 ## Current Deployment Status (as of July 2026)
@@ -52,6 +64,7 @@ npx cdk deploy --all \
 - ✅ BromnBlog-Frontend (S3 + CloudFront distribution: `EKN0G1CK1QQC`) — full SSR via OpenNext + a Lambda Function URL behind CloudFront OAC, not just static files
 - ✅ BromnBlog-Ses — `blogdobroomn.com` domain verified (DKIM via Route53, automatic, `DkimAttributes.Status: SUCCESS`). **Production access granted** (confirmed via `aws sesv2 get-account`: `ProductionAccessEnabled: true`, review case `178438314600754` status `GRANTED`) — sending works to any recipient, not just pre-verified addresses. Quota: 50,000 emails/24h, 14/sec.
 - ✅ Google OAuth configured and confirmed working (redirect URI registered in Google Cloud Console, real login tested)
+- ⏳ BromnBlog-MediaCdn (media CDN, `media.blogdobroomn.com`) — built (issue #87 Part B), **not yet deployed**. No Prisma migration involved — once deployed, run the URL backfill (see below) and update `Key AWS Resources` above with the real `DistributionId` output.
 
 ## ⚠️ Two footguns that already caused real incidents — read before touching `cdk deploy`
 
@@ -94,6 +107,8 @@ npx cdk deploy BromnBlog-Frontend --exclusively \
 aws cloudfront create-invalidation --distribution-id EKN0G1CK1QQC --paths "/*"
 ```
 
+This `/*` invalidation only ever targets the **frontend** distribution above — it must never be pointed at the media distribution (`BromnBlog-MediaCdn`'s `DistributionId` output). Media's long `CACHING_OPTIMIZED` TTL depends on *not* being flushed on every app deploy (see [architecture](./architecture.md#media-served-via-a-dedicated-cloudfront-distribution-not-the-frontend-one)); it only gets invalidated per-object, on delete (`DELETE /media/:id`, `api/src/lib/cloudfront.ts`).
+
 This produces `.open-next/` with:
 - `assets/` — static files, synced to S3 above
 - `server-functions/default/` — the SSR Lambda handler (fully self-contained, `node_modules` included — no esbuild/CDK bundling needed, unlike the API Lambda)
@@ -118,6 +133,22 @@ Note: `prisma db execute` runs the statement but doesn't print `SELECT` results 
 
 Note: neither this Lambda nor `BromnBlog-Api`'s main function gets a `DATABASE_URL` baked in at deploy time anymore — both fetch DB credentials live from Secrets Manager at cold start (`api/src/lib/dbCredentials.ts`), since the DB secret now rotates automatically every 90 days. See [disaster-recovery.md](./disaster-recovery.md#secrets-rotation) for details. **This is why `broomns-blog-migrate` runs in a `PRIVATE_WITH_EGRESS` subnet, not `PRIVATE_ISOLATED`** — this broke for real on 2026-07-23: the migrate Lambda was left in `PRIVATE_ISOLATED` after secret rotation was added, so its Secrets Manager call had no route out and hung until timeout (`ETIMEDOUT`), silently blocking every migration since. The RDS connection itself was never the problem — that's same-VPC routing either way — only the Secrets Manager call needs internet egress.
 
+## Running the media URL backfill (issue #87 Part B)
+
+One-off, same private-VPC-only access story as the migration Lambda above: `broomns-blog-media-url-backfill` rewrites old direct-S3 media URLs (`Media.url`, `Post.coverImage`, `Post`/`AboutPage`/`SupportPage.content`) to the new CDN origin. **Take an RDS snapshot immediately before running it for real** (see [disaster-recovery.md](./disaster-recovery.md)) — this is a bulk write against live production data.
+
+```bash
+# Dry run (default) — logs row counts + a sample of matched URLs, writes nothing
+aws lambda invoke --function-name broomns-blog-media-url-backfill --region us-east-1 \
+  --cli-binary-format raw-in-base64-out --payload '{"dryRun":true}' /dev/stdout
+
+# Real run — only after reviewing the dry-run output above and taking a snapshot
+aws lambda invoke --function-name broomns-blog-media-url-backfill --region us-east-1 \
+  --cli-binary-format raw-in-base64-out --payload '{"dryRun":false}' /dev/stdout
+```
+
+`oldOrigin`/`newOrigin` default from this Lambda's own `S3_BUCKET_NAME`/`MEDIA_CDN_URL` env vars — pass them explicitly in the payload only if production turns out to hold some other URL shape (the dry run's `sampleMediaUrls` is how you'd notice that). Deliberately excludes `contentEn`; see [architecture](./architecture.md#media-served-via-a-dedicated-cloudfront-distribution-not-the-frontend-one) for why and what the later, narrower `contentEn` sweep looks like.
+
 ## Running an on-demand Cognito user export
 
 A weekly export already runs automatically (EventBridge rule, `broomns-blog-cognito-export` Lambda) and lands in the private backups bucket. To trigger one manually (e.g. right before a risky Cognito change):
@@ -141,9 +172,13 @@ See [disaster-recovery.md](./disaster-recovery.md#scenario-cognito-user-pool-los
 | CloudFront Distribution | `EKN0G1CK1QQC` |
 | S3 Frontend Bucket | `broomns-blog-frontend-099710233970` |
 | S3 Backups Bucket (private) | `broomns-blog-backups-099710233970` |
+| S3 Media Bucket | `broomns-blog-media-099710233970` |
+| Media CloudFront Distribution | not yet deployed — see `BromnBlog-MediaCdn`'s `DistributionId` output once it is |
+| Media CDN domain | `media.blogdobroomn.com` |
 | API Lambda | `broomns-blog-api` |
 | API Gateway | `58m9fzd8lj` |
 | Migration/admin-SQL Lambda | `broomns-blog-migrate` |
+| Media URL backfill Lambda | `broomns-blog-media-url-backfill` (manual-invoke only, not yet deployed) |
 | Cognito Export Lambda | `broomns-blog-cognito-export` (weekly, also invocable on demand) |
 | Analytics Prune Lambda | `broomns-blog-analytics-prune` (daily, deletes RequestLog/PageView rows past 180-day retention; `PRIVATE_WITH_EGRESS` like the other DB-touching Lambdas) |
 | Frontend SSR Lambda | `broomns-blog-frontend-server` |

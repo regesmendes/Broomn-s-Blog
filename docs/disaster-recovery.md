@@ -13,12 +13,12 @@ This is a personal blog, not a business-critical system — the goal here is a p
 | Resource | State | Gap |
 |---|---|---|
 | RDS PostgreSQL (`infrastructure/lib/stacks/database-stack.ts`) | Automated backups, `backupRetention: 7 days`, `deletionProtection: true`, `removalPolicy: RETAIN`, single-AZ, credentials auto-rotate every 90 days (`addRotationSingleUser`) | Backup window satisfies the RPO target on paper, but **no restore has ever been performed** — untested in practice |
-| S3 media bucket (`broomns-blog-media-099710233970`, `infrastructure/lib/stacks/storage-stack.ts`) | `versioned: true`, noncurrent versions expire after 90 days, bucket-level `removalPolicy: RETAIN` | Closed — an overwritten/deleted object is now recoverable (see runbook below) |
+| S3 media bucket (`broomns-blog-media-099710233970`, `infrastructure/lib/stacks/storage-stack.ts`) | `versioned: true`, noncurrent versions expire after 90 days, bucket-level `removalPolicy: RETAIN`. Fronted by a CloudFront distribution (`BromnBlog-MediaCdn`, `media.blogdobroomn.com`, issue #87 Part B) with a long cache TTL, but the bucket itself is still directly public-read, unchanged from before — the CDN is purely additive so far | Closed — an overwritten/deleted object is now recoverable (see runbook below), though restoring a version behind a long CDN TTL needs an extra manual invalidation step (see the runbook's note). Locking the bucket to CloudFront-only (OAC) is a distinct, deliberately deferred later step — see [architecture](./architecture.md#media-served-via-a-dedicated-cloudfront-distribution-not-the-frontend-one) — at which point this row should be revisited (recovery via direct S3 API calls is unaffected either way; only public read access changes) |
 | S3 backups bucket (`broomns-blog-backups-099710233970`, private, new) | Holds weekly Cognito user exports (`cognito-exports/YYYY-MM-DD.json`), objects expire after 1 year | — |
 | Cognito User Pool (`us-east-1_ApHF59Xas`) | `removalPolicy` now genuinely `RETAIN`s in prod (was dead code — see Changelog); weekly user export to the backups bucket (`broomns-blog-cognito-export` Lambda, EventBridge rule) | Export exists now, but restoring the pool itself with the same IDs still isn't possible — see the Cognito runbook for why losing it is worse than plain data loss |
 | Secrets Manager: `broomns-blog/database` | Auto-rotates every 90 days; app fetches credentials dynamically from Secrets Manager at Lambda cold start (`api/src/lib/dbCredentials.ts`) rather than a value baked in at deploy time | Rotation itself untested against the real DB (tracked as a follow-up, same as the restore drill) |
 | Secrets Manager: `broomns-blog/jwt-secret` | No automatic rotation — manual runbook only (see "Secrets rotation" below) | Rotating it force-invalidates every active session; accepted for a personal blog |
-| IaC (all 6 CDK stacks) | Fully defined in `infrastructure/lib/stacks/*.ts`, reproducible from source | Stateful data inside each stack (DB rows, S3 objects, Cognito users) is **not** reproducible by redeploying code — that's exactly what this plan covers |
+| IaC (all 7 CDK stacks) | Fully defined in `infrastructure/lib/stacks/*.ts`, reproducible from source | Stateful data inside each stack (DB rows, S3 objects, Cognito users) is **not** reproducible by redeploying code — that's exactly what this plan covers |
 | Region | Single region, `us-east-1`, no cross-region copies of anything | Accepted risk under the current RPO/RTO target (see below) |
 
 ## Decisions made in this plan
@@ -48,6 +48,8 @@ Versioning is enabled — recovering a prior version:
 aws s3api list-object-versions --bucket broomns-blog-media-099710233970 --prefix <key>
 ```
 to find the version ID of the version you want back, then `aws s3api copy-object` (copy that version back to the current, un-versioned key) or, if the "deletion" was actually just a delete marker, `aws s3api delete-object --bucket ... --key <key> --version-id <delete-marker-version-id>` to remove the marker and un-hide the underlying object. Noncurrent versions expire after 90 days, so this only works within that window — past it, the object is genuinely gone.
+
+**If the object is behind the media CDN** (`media.blogdobroomn.com`, issue #87 Part B), restoring the S3 object alone isn't enough to make readers see it again right away — `CACHING_OPTIMIZED`'s long TTL means the edge may still be serving whatever it last cached for that key (the bad/missing version, or a 404 if the object was deleted via `DELETE /media/:id`, which already fired its own invalidation for that exact path). Issue a manual invalidation for the restored key after copying it back: `aws cloudfront create-invalidation --distribution-id <BromnBlog-MediaCdn's DistributionId> --paths "/<key>"` (never `/*` on this distribution — see [deployment.md](./deployment.md#frontend-deploy-procedure-ssr-via-opennext)).
 
 ### Scenario: Cognito User Pool lost or deleted
 
@@ -96,7 +98,7 @@ then redeploy `BromnBlog-Api` so the new value gets baked into the Lambda's `JWT
 ## Follow-up issues to file
 
 1. **Medium** — Actually perform and document a real RDS restore-from-snapshot dry run (new instance, point a scratch `DATABASE_URL` at it, verify data, tear down), and while at it, verify a DB secret rotation completes cleanly against a real instance. Both are unverified in practice today.
-2. **Low** — Dry-run a full CDK stack redeploy in a scratch AWS account/region to confirm the "all 6 stacks are reproducible from source" claim in practice.
+2. **Low** — Dry-run a full CDK stack redeploy in a scratch AWS account/region to confirm the "all 7 stacks are reproducible from source" claim in practice.
 3. **Low, deferred** — Cross-region snapshot/export copies. Explicitly not pursued under the current RPO/RTO; revisit only if the blog's stakes grow.
 4. **Low, deferred** — Automatic JWT secret rotation with dual-secret grace-period verification. Only worth building if forced re-logins on rotation become a real annoyance.
 
@@ -104,3 +106,4 @@ then redeploy `BromnBlog-Api` so the new value gets baked into the Lambda's `JWT
 
 - **2026-07-23** — Initial plan (issue #61). Fixed `cognito-stack.ts`'s dead `removalPolicy` ternary as part of this change (previously always `undefined` regardless of environment; now genuinely `RemovalPolicy.RETAIN` in prod).
 - **2026-07-23** — Implemented three of the follow-ups instead of just tracking them: S3 media bucket versioning (+ noncurrent-version lifecycle rule), a weekly Cognito user export to a new private backups bucket, and automatic 90-day DB secret rotation (which required switching the API/migrate Lambdas to fetch DB credentials from Secrets Manager dynamically at cold start instead of baking them in at deploy time — see `api/src/lib/dbCredentials.ts`). JWT secret rotation stayed manual-only, by choice.
+- **2026-08-03** — Media bucket gained a CloudFront distribution in front of it (`BromnBlog-MediaCdn`, issue #87 Part B, not yet deployed) — bucket's own recovery posture (versioning, `RETAIN`) is unchanged, but restoring an object now needs a manual per-key CDN invalidation on top (see the S3 runbook above). Updated the stack count (6 → 7) accordingly.

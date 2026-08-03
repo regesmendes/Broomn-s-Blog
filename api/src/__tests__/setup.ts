@@ -11,6 +11,19 @@ vi.mock('../lib/s3', () => ({
   deleteObject: vi.fn(),
 }))
 
+// Mock CloudFront globally for all tests — no real invalidation calls
+vi.mock('../lib/cloudfront', () => ({
+  invalidateMediaPath: vi.fn(),
+}))
+
+// Mock image processing globally — route-level tests upload fake, non-image
+// buffers that real sharp calls would reject. Identity passthrough keeps
+// those tests focused on the route logic; lib/imageProcessing.ts's own real
+// resize/WebP conversion is covered directly in imageProcessing.test.ts.
+vi.mock('../lib/imageProcessing', () => ({
+  convertToWebp: vi.fn(async (buffer: Buffer) => buffer),
+}))
+
 // Mock Prisma globally for all tests
 vi.mock('../lib/prisma', () => ({
   prisma: {
