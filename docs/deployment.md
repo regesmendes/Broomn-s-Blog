@@ -64,7 +64,7 @@ The Lambda runs Amazon Linux (glibc) on the CDK-default `X86_64` architecture. W
 - ✅ BromnBlog-Frontend (S3 + CloudFront distribution: `EKN0G1CK1QQC`) — full SSR via OpenNext + a Lambda Function URL behind CloudFront OAC, not just static files
 - ✅ BromnBlog-Ses — `blogdobroomn.com` domain verified (DKIM via Route53, automatic, `DkimAttributes.Status: SUCCESS`). **Production access granted** (confirmed via `aws sesv2 get-account`: `ProductionAccessEnabled: true`, review case `178438314600754` status `GRANTED`) — sending works to any recipient, not just pre-verified addresses. Quota: 50,000 emails/24h, 14/sec.
 - ✅ Google OAuth configured and confirmed working (redirect URI registered in Google Cloud Console, real login tested)
-- ⏳ BromnBlog-MediaCdn (media CDN, `media.blogdobroomn.com`) — built (issue #87 Part B), **not yet deployed**. No Prisma migration involved — once deployed, run the URL backfill (see below) and update `Key AWS Resources` above with the real `DistributionId` output.
+- ✅ BromnBlog-MediaCdn (media CDN, `media.blogdobroomn.com`, distribution `E1WND5038XU2PX`) — issue #87 Part B, fully deployed. The media URL backfill has run (all app-referenced URLs rewritten to the CDN origin) and the bucket is locked down to CloudFront-only via OAC (`BlockPublicAccess.BLOCK_ALL` — direct S3 URLs now 404/403, including in already-sent newsletter emails, an accepted one-time cost).
 
 ## ⚠️ Two footguns that already caused real incidents — read before touching `cdk deploy`
 
@@ -173,12 +173,13 @@ See [disaster-recovery.md](./disaster-recovery.md#scenario-cognito-user-pool-los
 | S3 Frontend Bucket | `broomns-blog-frontend-099710233970` |
 | S3 Backups Bucket (private) | `broomns-blog-backups-099710233970` |
 | S3 Media Bucket | `broomns-blog-media-099710233970` |
-| Media CloudFront Distribution | not yet deployed — see `BromnBlog-MediaCdn`'s `DistributionId` output once it is |
+| Media CloudFront Distribution | `E1WND5038XU2PX` |
 | Media CDN domain | `media.blogdobroomn.com` |
+| S3 Media Bucket access | CloudFront-only (OAC) as of 2026-08-03 — `BlockPublicAccess.BLOCK_ALL`, bucket policy scoped to `cloudfront.amazonaws.com` + the distribution ARN above |
 | API Lambda | `broomns-blog-api` |
 | API Gateway | `58m9fzd8lj` |
 | Migration/admin-SQL Lambda | `broomns-blog-migrate` |
-| Media URL backfill Lambda | `broomns-blog-media-url-backfill` (manual-invoke only, not yet deployed) |
+| Media URL backfill Lambda | `broomns-blog-media-url-backfill` (manual-invoke only; already run once against production, 2026-08-03) |
 | Cognito Export Lambda | `broomns-blog-cognito-export` (weekly, also invocable on demand) |
 | Analytics Prune Lambda | `broomns-blog-analytics-prune` (daily, deletes RequestLog/PageView rows past 180-day retention; `PRIVATE_WITH_EGRESS` like the other DB-touching Lambdas) |
 | Frontend SSR Lambda | `broomns-blog-frontend-server` |
