@@ -134,4 +134,28 @@ describe('MediaCdnStack', () => {
     expect(statement.Principal.Service).toBe('budgets.amazonaws.com');
     expect(statement.Action).toBe('sns:Publish');
   });
+
+  it('configures the S3 origin with Origin Access Control (CloudFront-only bucket access)', () => {
+    const template = synthMediaCdnStackTemplate();
+
+    const distributions = template.findResources('AWS::CloudFront::Distribution');
+    const config = Object.values(distributions)[0] as {
+      Properties: { DistributionConfig: { Origins: Array<Record<string, unknown>> } };
+    };
+    const origin = config.Properties.DistributionConfig.Origins[0];
+    expect(origin.OriginAccessControlId).toBeDefined();
+
+    expect(Object.keys(template.findResources('AWS::CloudFront::OriginAccessControl'))).toHaveLength(1);
+  });
+
+  it('does not itself write a bucket policy on the media bucket (StorageStack owns that)', () => {
+    const template = synthMediaCdnStackTemplate();
+
+    // The library's withOriginAccessControl() would normally also emit an
+    // S3::BucketPolicy in whichever stack calls it — using an *imported*
+    // bucket reference (see media-cdn-stack.ts) must suppress that, or the
+    // real, hand-written policy in storage-stack.ts would end up competing
+    // with a second one here.
+    expect(Object.keys(template.findResources('AWS::S3::BucketPolicy'))).toHaveLength(0);
+  });
 });

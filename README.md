@@ -31,7 +31,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 ### What's working
 
 - ✅ REST API with all CRUD endpoints (posts, comments, newsletter, auth)
-- ✅ 171 passing tests covering all API modules
+- ✅ 352 passing tests across all three packages — api (198), frontend (139), infrastructure (15)
 - ✅ Role-based access control (public, authenticated user, admin)
 - ✅ JWT authentication with access/refresh token flow
 - ✅ Cognito integration with real Google OAuth login, live in production
@@ -61,12 +61,15 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 - ✅ Google Analytics (GA4), wired via `next/script` with manual page_view tracking on client-side route changes (App Router navigations don't trigger gtag's automatic one)
 - ✅ Social share buttons on every post (X, Facebook, LinkedIn, WhatsApp, Instagram, copy-link) — pre-filled share-intent links, no OAuth or platform APIs; Instagram falls back to copy-link with a paste-it-yourself hint
 - ✅ Internal analytics dashboard (`/admin/analytics`) — registered-user request logging, page-view tracking with per-session journey reconstruction, newsletter subscriber stats; raw rows auto-pruned after 180 days by a daily Lambda (covers what GA's aggregate/anonymous data can't)
-- ✅ Media CDN — uploaded images are resized (2000px cap) and converted to WebP at upload time, then served through a dedicated CloudFront distribution (`media.blogdobroomn.com`) with a long cache TTL and active per-object invalidation on delete, instead of unresized originals served directly from S3. Backed by a rate-limiting WAF rule and a CloudFront+S3 cost budget alarm; see [docs/architecture.md](./docs/architecture.md#media-served-via-a-dedicated-cloudfront-distribution-not-the-frontend-one)
+- ✅ Media CDN — uploaded images are resized (2000px cap) and converted to WebP at upload time, then served through a dedicated CloudFront distribution (`media.blogdobroomn.com`) with a long cache TTL and active per-object invalidation on delete, instead of unresized originals served directly from S3. The S3 bucket itself is now CloudFront-only (Origin Access Control, no public reads at all) — the one accepted, permanent cost being that direct-S3 image URLs already baked into sent newsletter emails no longer resolve. Backed by a rate-limiting WAF rule and a CloudFront+S3 cost budget alarm; see [docs/architecture.md](./docs/architecture.md#media-served-via-a-dedicated-cloudfront-distribution-not-the-frontend-one)
 
 ### Known Issues
 
 - **Next.js 15.3.9 build warning**: The build emits a non-fatal warning about `/404` page prerendering (`<Html> should not be imported outside of pages/_document`). This is a confirmed framework bug where Next.js internally generates a legacy pages-router `/404` page even in app-router-only projects. The validation check fires against the framework's own internal rendering. We added `src/pages/_document.tsx` and `src/pages/_error.tsx` to make the error non-fatal (build exits 0), but the warning message persists. **The app runs perfectly fine** — the app router's `not-found.tsx` handles 404s correctly for users.
-- **`npm audit` reports 4 vulnerabilities in `frontend/` (3 moderate, 1 high), accepted for now** (checked 2026-07-19): `postcss@8.4.31` (XSS advisory) and `esbuild@0.19.2` (dev-server CORS advisory) are bundled *inside* `next`'s and `open-next`'s own dependency trees respectively — not top-level deps we control. Confirmed even `next@16.2.10` (latest) still pins the same vulnerable postcss internally, so upgrading `next` within its current major wouldn't help. `npm audit fix --force` would downgrade `open-next` to `0.0.1` (an ancient pre-1.0 release) to "fix" esbuild — worse than the vulnerability. The remaining `next` advisories (SSRF/DoS/cache-poisoning in Image Optimization, middleware) mostly affect features this app doesn't use heavily. **Recheck on the next `next`/`open-next` version bump** — a future release may finally drop the vulnerable nested deps.
+- **`npm audit` findings across all three packages, accepted for now** (checked 2026-08-06) — in each case `npm audit fix` (no `--force`) was already run and is safe to rerun any time; what's left below all needs a breaking/major bump we haven't evaluated, so we're deferring rather than forcing it in blind:
+  - **`frontend/`: 5 vulnerabilities (2 moderate, 3 high)**, down from an original 4 as of 2026-07-19 (the count moves around release to release as new advisories land, not a regression). `npm audit fix` bumped `next` to the latest 15.x (`15.5.22`) and cleared `brace-expansion`/`undici` outright. Left: `postcss` (path-traversal/XSS advisories) and `sharp` (libvips CVEs), both pulled in *inside* `next`'s own dependency tree, plus `esbuild` (dev-server CORS advisory) inside `open-next`'s tree — none are top-level deps we control. Clearing postcss/sharp needs `next@16.3.0` (major, untested against this app); clearing esbuild needs downgrading `open-next` to `0.0.1` (an ancient pre-1.0 release) — both worse than the vulnerabilities. **Recheck on the next `next`/`open-next` version bump.**
+  - **`api/`: 2 vulnerabilities (1 moderate, 1 high)**, down from 6. `npm audit fix` cleared `brace-expansion`, `fast-uri`, `find-my-way`, and `postcss`. Left: `@fastify/static` (authorization-bypass/path-traversal advisories), pulled in transitively via `@fastify/swagger-ui` (the Swagger docs UI) — nothing in `api/src` uses `@fastify/static` directly. Fixing it needs `@fastify/static@10.1.2` via `--force`, a breaking bump. **Recheck before the next `@fastify/swagger-ui` upgrade.**
+  - **`infrastructure/`: 1 high-severity vulnerability (`brace-expansion`)**, unchanged. Bundled *inside* `aws-cdk-lib`'s own dependency tree — not a top-level dependency, and npm's own audit output confirms it "cannot be fixed automatically." Bumped `aws-cdk-lib` to the latest `2.263.0` within its existing `^2.254.0` range, which narrowed the vulnerable range but didn't fully clear it. **Recheck on the next `aws-cdk-lib` version bump.**
 
 ## Tech Stack
 
@@ -157,7 +160,7 @@ The API and frontend are deployed and working end-to-end on AWS: real Google OAu
 
 ### Prerequisites
 
-- Node.js >= 20 (tested on Node 25 — see note below)
+- Node.js >= 24 (matches CI and the Lambda runtime; also tested locally on Node 25 — see note below). Node 20 is no longer supported here: it reached its own upstream end-of-life in April 2026, and CI/Lambda already moved off it in July 2026 after GitHub Actions started flagging it as a deprecated runner.
 - Docker (for PostgreSQL)
 - npm
 
@@ -220,7 +223,13 @@ Node.js 25 introduced a built-in `localStorage` global that requires `--localsto
 
 ```bash
 cd api
-npm test              # Runs all 171 tests
+npm test              # 198 tests (Vitest — Prisma and SES are globally mocked, no DB or real network needed)
+
+cd frontend
+npm test              # 139 tests (Vitest + React Testing Library + jsdom)
+
+cd infrastructure
+npm test              # 15 tests (Jest — CDK synth/snapshot tests, no AWS credentials needed)
 ```
 
 ## Contributing
@@ -228,7 +237,7 @@ npm test              # Runs all 171 tests
 This is a personal project. If you're reading this as a collaborator or future-me, the key things to know:
 
 1. **API pattern**: routes → controllers → services → repositories. Add new features by following the existing post/comment/newsletter pattern.
-2. **Tests**: Run `npm test` in `api/` before committing. Add tests for new endpoints.
+2. **Tests**: Run `npm test` in `api/`, `frontend/`, and `infrastructure/` before committing — see [Running tests](#running-tests). Add tests for new endpoints, components, and CDK stack changes respectively.
 3. **Frontend**: Run `npm run dev` in `frontend/`. TypeScript errors caught by `npx tsc --noEmit`.
 4. **No commits to master without tests passing.** CI runs automatically on every PR/push to `master`, and GitHub branch protection now actually enforces it on both `master` and `prod` (see [docs/architecture.md#cicd-pipeline](./docs/architecture.md#cicd-pipeline)) — a PR with a failing check can't be merged, not even by an admin.
 5. **Always update the docs** ([docs/architecture.md](./docs/architecture.md), [docs/api.md](./docs/api.md), [docs/deployment.md](./docs/deployment.md), [docs/disaster-recovery.md](./docs/disaster-recovery.md), or this README) when adding features or changing architecture, before raising a PR.

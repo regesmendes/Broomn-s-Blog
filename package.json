@@ -11,7 +11,7 @@
     "test": "npm run test --workspace=api"
   },
   "engines": {
-    "node": ">=20.0.0",
+    "node": ">=24.0.0",
     "npm": ">=10.0.0"
   },
   "allowScripts": {
