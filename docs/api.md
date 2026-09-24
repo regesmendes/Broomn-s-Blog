@@ -1,5 +1,7 @@
 # API Reference
 
+**blogdobroomn is currently sunset** (deliberately taken offline for cost reasons, 2026-09-24) — the API described below is not currently deployed. See [disaster-recovery.md](./disaster-recovery.md#resurrection-runbook) for the current dormant state and how to bring it back.
+
 See the root [README](../README.md) for setup and the [architecture doc](./architecture.md) for the reasoning behind these endpoints (pagination, auth flow, data model, etc).
 
 ## Public

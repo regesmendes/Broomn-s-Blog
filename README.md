@@ -24,9 +24,9 @@ This README covers local setup and orientation. Deeper reference material lives 
 
 ## Current Status
 
-**Phase: Live in production** — https://blogdobroomn.com
+**Phase: Sunset (2026-09-24)** — https://blogdobroomn.com now serves a static goodbye page instead of the live app, deliberately taken offline for cost reasons (was running ~$60/month for a low-traffic personal blog). No data was lost: the RDS database has a final snapshot, the S3 media bucket is untouched, and the Cognito user pool was left running (idle, no cost) so reactivating needs no user reconciliation. See [docs/disaster-recovery.md](./docs/disaster-recovery.md#resurrection-runbook) for exactly what's preserved and how to bring it back.
 
-The API and frontend are deployed and working end-to-end on AWS: real Google OAuth login, real newsletter emails, the full admin panel. See [docs/deployment.md](./docs/deployment.md) for infrastructure details and known operational gotchas.
+The rest of this README, and `docs/architecture.md`/`docs/api.md`/`docs/deployment.md`, describe the app as it ran in production — kept as the reference for reactivating it, not a description of what's currently deployed.
 
 ### What's working
 
