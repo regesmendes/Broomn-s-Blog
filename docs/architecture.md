@@ -1,5 +1,7 @@
 # Architecture
 
+**blogdobroomn is currently sunset** (deliberately taken offline for cost reasons, 2026-09-24) — this doc describes the app as it ran in production, kept as the reference for reactivating it. See [disaster-recovery.md](./disaster-recovery.md#resurrection-runbook) for the current dormant state and how to bring it back.
+
 See the root [README](../README.md) for setup, the [API reference](./api.md) for endpoints, and [deployment](./deployment.md) for AWS/CDK details.
 
 ## Data Model

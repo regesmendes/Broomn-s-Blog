@@ -95,6 +95,26 @@ aws secretsmanager update-secret --secret-id broomns-blog/jwt-secret --generate-
 ```
 then redeploy `BromnBlog-Api` so the new value gets baked into the Lambda's `JWT_SECRET` (same mechanism as today — this secret is *not* on the dynamic-fetch path, unlike the DB one). **Every active session is invalidated immediately** — both access and refresh tokens stop verifying — so this is a "everyone please log in again" event, not silent data loss. Acceptable as an occasional, deliberate action; don't automate it without first building the grace-period support above.
 
+## Resurrection runbook
+
+**blogdobroomn is currently sunset** (as of 2026-09-24) — deliberately taken offline for cost reasons (was running ~$60/month for a low-traffic personal blog), not a disaster. `blogdobroomn.com` now serves a static bilingual page instead of the app (see `infrastructure/lib/stacks/frontend-stack.ts`). This section is how to bring it back.
+
+**What's preserved:**
+- Two final RDS snapshots in `us-east-1`: `blogdobroomn-final-sunset-2026-09-24` (manual, taken before teardown) and `blogdobroomn-final-sunset-2026-09-24-orphan-delete` (RDS's own automatic final snapshot at instance deletion).
+- The S3 media bucket (`broomns-blog-media-099710233970`) and backups bucket — untouched, all objects intact, just no longer served over HTTP (the media CDN distribution is gone).
+- The Cognito User Pool (`us-east-1_ApHF59Xas`) — left running the whole time (idle costs $0), specifically to avoid the "Scenario: Cognito User Pool lost or deleted" outcome above. Reactivating needs **no** user reconciliation.
+- All CDK stack source — `DatabaseStack`, `ApiStack`, and `MediaCdnStack` were removed from `infrastructure/bin/infrastructure.ts`, but `database-stack.ts`, `api-stack.ts`, and `media-cdn-stack.ts` themselves are untouched on disk and in git history (see this doc's Changelog for the commit that removed their instantiation).
+
+**What was torn down:** the RDS Postgres instance, its VPC/NAT Gateway, the API Gateway + all 5 backend Lambdas, and the media CDN's CloudFront distribution + WAF.
+
+**To reactivate:**
+1. Restore the RDS instance from a snapshot: `aws rds restore-db-instance-from-db-snapshot --db-instance-identifier <new-id> --db-snapshot-identifier blogdobroomn-final-sunset-2026-09-24 --region us-east-1` (same "restores to a new instance" caveat as the RDS scenario above) — or skip this and let a redeployed `DatabaseStack` create a fresh empty instance, then restore data into it separately; restoring the snapshot directly is simpler.
+2. Restore the `DatabaseStack`/`MediaCdnStack`/`ApiStack` instantiation block in `infrastructure/bin/infrastructure.ts` from git history (the commit that removed it), and restore `frontend-stack.ts`'s OpenNext/Lambda origin and `deploy.yml`'s Prisma-generate + migrate-Lambda-invoke steps from the same commit.
+3. **Media CDN gotcha**: `storage-stack.ts` hardcodes the media CloudFront distribution's ARN as a literal string (`MEDIA_DISTRIBUTION_ARN`) to avoid a circular stack dependency — see that file's comment. A redeployed `MediaCdnStack` gets a **new** distribution ID, so this constant must be updated with the new ARN and `StorageStack` redeployed again before media reads actually work.
+4. Redeploy: `cd infrastructure && npx cdk deploy --all` (with real Google OAuth context, same as `deploy.yml`).
+5. Run `prisma migrate deploy` via the restored `broomns-blog-migrate` Lambda if the snapshot predates any migrations applied elsewhere.
+6. Verify end-to-end (Google login, posts, admin panel, newsletter subscribe) before considering it live again.
+
 ## Follow-up issues to file
 
 1. **Medium** — Actually perform and document a real RDS restore-from-snapshot dry run (new instance, point a scratch `DATABASE_URL` at it, verify data, tear down), and while at it, verify a DB secret rotation completes cleanly against a real instance. Both are unverified in practice today.
@@ -108,3 +128,4 @@ then redeploy `BromnBlog-Api` so the new value gets baked into the Lambda's `JWT
 - **2026-07-23** — Implemented three of the follow-ups instead of just tracking them: S3 media bucket versioning (+ noncurrent-version lifecycle rule), a weekly Cognito user export to a new private backups bucket, and automatic 90-day DB secret rotation (which required switching the API/migrate Lambdas to fetch DB credentials from Secrets Manager dynamically at cold start instead of baking them in at deploy time — see `api/src/lib/dbCredentials.ts`). JWT secret rotation stayed manual-only, by choice.
 - **2026-08-03** — Media bucket gained a CloudFront distribution in front of it (`BromnBlog-MediaCdn`, issue #87 Part B) — bucket's own recovery posture (versioning, `RETAIN`) is unchanged, but restoring an object now needs a manual per-key CDN invalidation on top (see the S3 runbook above). Updated the stack count (6 → 7) accordingly.
 - **2026-08-03** — Locked the media bucket down to CloudFront-only (OAC, `BlockPublicAccess.BLOCK_ALL`) — the last step of issue #87 Part B, run only after the media URL backfill confirmed nothing in the app still referenced the old direct-S3 URLs. One accepted, permanent cost: direct-S3 image URLs already baked into sent newsletter emails now 404.
+- **2026-09-24** — blogdobroomn sunset (cost — was ~$60/month for a low-traffic personal blog). `DatabaseStack` (RDS instance, VPC, NAT Gateway), `ApiStack` (API Gateway + 5 Lambdas), and `MediaCdnStack` (CloudFront + WAF) destroyed, in that order, after taking a final RDS snapshot. `FrontendStack` redeployed as a static bilingual page instead of the live Next.js app. Cognito and both S3 buckets deliberately left untouched. Added the "Resurrection runbook" section above. Stack count 7 → 4.

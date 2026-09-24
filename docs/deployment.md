@@ -1,5 +1,7 @@
 # Deployment (AWS CDK)
 
+**blogdobroomn is currently sunset** (deliberately taken offline for cost reasons, 2026-09-24) — `DatabaseStack`, `ApiStack`, and `MediaCdnStack` described below are not currently deployed. See [disaster-recovery.md](./disaster-recovery.md#resurrection-runbook) for the current dormant state and how to bring them back; the procedures below remain accurate for when that happens.
+
 See the root [README](../README.md) for local setup, the [architecture doc](./architecture.md#cicd-pipeline) for how the CI/CD pipeline drives this, and [disaster-recovery.md](./disaster-recovery.md) for backup posture and recovery runbooks if something goes wrong with the deployed data (RDS, S3, Cognito).
 
 The infrastructure is defined in the `infrastructure/` directory using AWS CDK (TypeScript).
