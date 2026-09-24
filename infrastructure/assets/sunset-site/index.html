@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Broomn's Blog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #1b140e;
+    --bg-glow: #2a1f15;
+    --ink: #f1e6d3;
+    --ink-soft: #c9b89c;
+    --accent: #c98a3a;
+    --rule: #4a3826;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: radial-gradient(circle at 50% 20%, var(--bg-glow), var(--bg) 65%);
+    color: var(--ink);
+    font-family: 'Lora', serif;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6vh 1.5rem;
+  }
+
+  main {
+    max-width: 640px;
+    width: 100%;
+    text-align: center;
+  }
+
+  .emblem {
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+    opacity: 0.85;
+  }
+
+  h1 {
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    font-size: clamp(1.6rem, 4vw, 2.4rem);
+    letter-spacing: 0.02em;
+    margin: 0 0 1.25rem;
+    color: var(--ink);
+  }
+
+  p {
+    font-size: 1.05rem;
+    line-height: 1.7;
+    color: var(--ink-soft);
+    margin: 0 0 1rem;
+  }
+
+  .signature {
+    font-style: italic;
+    color: var(--ink);
+    margin-top: 1.5rem;
+  }
+
+  .rule {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 3rem 0;
+    color: var(--rule);
+  }
+
+  .rule::before,
+  .rule::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+  }
+
+  .rule span {
+    font-size: 1.1rem;
+    color: var(--accent);
+  }
+
+  a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s ease;
+  }
+
+  a:hover,
+  a:focus {
+    border-bottom-color: var(--accent);
+  }
+
+  section[lang="en"] {
+    margin-top: 0;
+  }
+</style>
+</head>
+<body>
+  <main>
+    <div class="emblem" aria-hidden="true">&#127804;</div>
+
+    <section lang="pt">
+      <h1>Até breve</h1>
+      <p>Obrigado por caminhar entre essas histórias. Por ora, precisamos encerrar esta jornada — mas as memórias continuam guardadas, e talvez um dia possamos reacender esta fogueira.</p>
+      <p>Se quiser entrar em contato, escreva para <a href="mailto:reges.mendes@gmail.com">reges.mendes@gmail.com</a>.</p>
+      <p class="signature">Com carinho,<br />Broomn</p>
+    </section>
+
+    <div class="rule" aria-hidden="true"><span>&#8258;</span></div>
+
+    <section lang="en">
+      <h1>See You Down the Road</h1>
+      <p>Thank you for walking among these stories. For now, we have to close this chapter — but the memories are kept safe, and perhaps one day we'll light this fire again.</p>
+      <p>If you'd like to reach out, write to <a href="mailto:reges.mendes@gmail.com">reges.mendes@gmail.com</a>.</p>
+      <p class="signature">With gratitude,<br />Broomn</p>
+    </section>
+  </main>
+</body>
+</html>
